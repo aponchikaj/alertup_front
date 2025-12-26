@@ -19,6 +19,7 @@ const Dashboard = lazy(() => import("./pages/dashboard/dashboard"));
 const NewBuilding = lazy(() => import("./pages/buildings/newBuilding"));
 const Mybuildings = lazy(() => import("./pages/buildings/mybuildings"));
 const Checkout = lazy(() => import("./pages/premium/checkout"));
+const Success = lazy(() => import("./pages/premium/success"));
 const Building = lazy(() => import("./pages/buildings/building"));
 const Floor = lazy(() => import("./pages/buildings/floor"));
 const Settings = lazy(() => import("./pages/settings/settings"));
@@ -72,6 +73,14 @@ const App = () => {
               element={
                 <AuthGuard>
                   <Checkout />
+                </AuthGuard>
+              }
+            />
+            <Route
+              path="/premium/success"
+              element={
+                <AuthGuard>
+                  <Success />
                 </AuthGuard>
               }
             />

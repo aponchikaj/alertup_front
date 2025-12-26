@@ -46,8 +46,11 @@ const Login = () => {
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-[#353535] px-4">
-      <section
-        onSubmitCapture={(e) => e.preventDefault()}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleSubmit();
+        }}
         className="w-full max-w-md bg-white/5 backdrop-blur-lg rounded-2xl p-6 md:p-8 shadow-xl border border-white/10"
       >
 
@@ -87,9 +90,8 @@ const Login = () => {
 
         {/* Submit */}
         <button
-          type={loading ? "button" : "submit"}
+          type="submit"
           disabled={loading}
-          onClick={handleSubmit}
           className="w-full py-2 rounded-lg bg-[#FF7B22] disabled:opacity-50 disabled:cursor-not-allowed transition text-white font-semibold"
         >
           {loading ? "Loading..." : "Login"}
@@ -113,7 +115,7 @@ const Login = () => {
             Reset
           </Link>
         </p>
-      </section>
+      </form>
     </div>
   );
 };

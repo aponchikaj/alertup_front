@@ -9,7 +9,7 @@ export const ConnectApis = async()=>{
         }
 
         return res;
-    }catch{
+    }catch(error){
         return {Success:false,Message:'Something went wrong'}
     }
 }

@@ -81,8 +81,9 @@ const Checkout = () => {
     return new Promise<void>((resolve, reject) => {
       if (window.paypal) return resolve();
       const script = document.createElement("script");
+      // Use PayPal sandbox short-id 'sb' for testing. Replace with your live client-id in production.
       script.src =
-        "https://www.paypal.com/sdk/js?client-id=YOUR_SANDBOX_CLIENT_ID&currency=USD&intent=capture";
+        "https://www.paypal.com/sdk/js?client-id=sb&currency=USD&intent=capture";
       script.async = true;
       script.onload = () => resolve();
       script.onerror = () => reject(new Error("PayPal SDK failed to load"));
