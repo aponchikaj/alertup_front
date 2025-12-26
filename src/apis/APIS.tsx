@@ -1,4 +1,4 @@
-export const MAIN_API_URL:string = 'http://localhost:3001/api/'
+export const MAIN_API_URL:string = 'https://alertup-backend.onrender.com/api/'
 export const APIS = {
     contact:`${MAIN_API_URL}contact`,
     me:`${MAIN_API_URL}me`,
