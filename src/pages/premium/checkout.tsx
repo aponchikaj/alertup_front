@@ -27,9 +27,7 @@ const Checkout = () => {
     const checkUser = async () => {
       try {
         const res = await getMe();
-        if (!res || res.Success === false) {
-          navigate("/login");
-        }
+        if (!res || res.Success === false) navigate("/login");
       } catch {
         navigate("/login");
       }
@@ -71,6 +69,7 @@ const Checkout = () => {
   const loadPayPalSDK = (clientId: string) =>
     new Promise<void>((resolve, reject) => {
       if (window.paypal) return resolve();
+
       const script = document.createElement("script");
       script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=USD&intent=capture&components=buttons,funding-eligibility`;
       script.async = true;
@@ -80,35 +79,37 @@ const Checkout = () => {
     });
 
   // -------------------------------
-  // Render PayPal + Apple Pay + Google Pay
+  // Render PayPal buttons
   // -------------------------------
   useEffect(() => {
     if (!orderID) return;
 
     const init = async () => {
-      try { 
-        const clientId = "AQ_vHdiFQWqEH2jJ3r-BZxSyjnqwOF_tAZai0KGvae6cQLZuQ1N6E6KVH9xt9fQMdtKNHOeSM2dzHaWQ";
+      try {
+        const clientId = import.meta.env.VITE_PAYPAL_CLIENT_ID || "sb";
         await loadPayPalSDK(clientId);
+
         if (!paypalRef.current || !window.paypal) return;
 
+        // Clear previous buttons if any
         paypalRef.current.innerHTML = "";
 
-        // Unified buttons: PayPal, Apple Pay, Google Pay, Card
+        // Funding options: PayPal, Apple Pay, Google Pay, Card
         const fundingSources = [
-          window.paypal.FUNDING.APPLEPAY,
           window.paypal.FUNDING.PAYPAL,
-          window.paypal.FUNDING.GOOGLEPAY,
           window.paypal.FUNDING.CARD,
+          window.paypal.FUNDING.APPLEPAY,
+          window.paypal.FUNDING.GOOGLEPAY,
         ];
 
-        fundingSources.forEach((funding: any) => {
+        fundingSources.forEach((funding) => {
           const button = window.paypal.Buttons({
             fundingSource: funding,
             style: {
               layout: "vertical",
               color: funding === window.paypal.FUNDING.CARD ? "black" : "gold",
               shape: "rect",
-              label: "paypal"
+              label: "paypal",
             },
             createOrder: () => orderID,
             onApprove: async (data: any) => {
@@ -129,6 +130,7 @@ const Checkout = () => {
             },
           });
 
+          // Render only if eligible
           if (button.isEligible()) button.render(paypalRef.current);
         });
       } catch (err) {
@@ -138,7 +140,7 @@ const Checkout = () => {
     };
 
     init();
-  }, [orderID]);
+  }, [orderID, plan]);
 
   // -------------------------------
   // UI
