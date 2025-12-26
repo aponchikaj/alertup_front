@@ -86,8 +86,8 @@ const Checkout = () => {
     if (!orderID) return;
 
     const init = async () => {
-      try {
-        const clientId = (import.meta as any).env?.VITE_PAYPAL_CLIENT_ID || "sb";
+      try { 
+        const clientId = "AQ_vHdiFQWqEH2jJ3r-BZxSyjnqwOF_tAZai0KGvae6cQLZuQ1N6E6KVH9xt9fQMdtKNHOeSM2dzHaWQ";
         await loadPayPalSDK(clientId);
         if (!paypalRef.current || !window.paypal) return;
 
