@@ -57,7 +57,6 @@ const Register = () => {
             return;
         }
         
-        localStorage.setItem("loggedIn", "true");
         navigate('/dashboard');
         setLoading(false);
     }catch{
