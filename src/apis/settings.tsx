@@ -87,6 +87,9 @@ export const deleteAccount = async(data:any)=>{
             return {Success:false,Message:'Something went wrong.'}
         }
 
+        // Clear localStorage token (Safari/iOS fallback)
+        localStorage.removeItem('userToken');
+
         return res;
     }catch{
         return {Success:false,Message:'Something went wrong.'}
@@ -99,6 +102,9 @@ export const logoutFromAccount = async()=>{
         if(!res){
             return {Success:false,Message:'Something went wrong.'}
         }
+
+        // Clear localStorage token (Safari/iOS fallback)
+        localStorage.removeItem('userToken');
 
         return res;
     }catch{
