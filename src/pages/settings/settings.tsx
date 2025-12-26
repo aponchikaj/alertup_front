@@ -269,22 +269,26 @@ const Settings = () => {
             </section>
 
             {/* ACCOUNT VERIFICATION */}
-            <section className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-6 shadow-xl space-y-4">
-              <h2 className="text-2xl font-bold mb-4">Verify Account</h2>
-              {accountVerificationCodeStep === 2 && (
-                <InputField
-                  label="Verification Code"
-                  value={accountVerificationCode}
-                  onChange={(e:any) => setAccountVerificationCode(e.target.value)}
-                />
-              )}
-              <button
-                onClick={verifyAccount}
-                className="w-full bg-[#FF7B22] hover:bg-[#e06b1b] transition text-black font-semibold py-2 rounded-xl"
-              >
-                {accountVerificationCodeStep === 1 ? "Send Code" : "Verify Account"}
-              </button>
-            </section>
+              {
+                userData.verified == false ?
+                <section className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-6 shadow-xl space-y-4">
+                  <h2 className="text-2xl font-bold mb-4">Verify Account</h2>
+                  {accountVerificationCodeStep === 2 && (
+                    <InputField
+                      label="Verification Code"
+                      value={accountVerificationCode}
+                      onChange={(e:any) => setAccountVerificationCode(e.target.value)}
+                    />
+                  )}
+                  <button
+                    onClick={verifyAccount}
+                    className="w-full bg-[#FF7B22] hover:bg-[#e06b1b] transition text-black font-semibold py-2 rounded-xl"
+                  >
+                    {accountVerificationCodeStep === 1 ? "Send Code" : "Verify Account"}
+                  </button>
+                </section>
+                : null
+              }
 
             {/* DELETE ACCOUNT */}
             <section className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-6 shadow-xl space-y-4">
