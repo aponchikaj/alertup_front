@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { capturePremiumOrder, CheckoutPaymentPremium } from "../../apis/premium";
+import { CheckoutPaymentPremium, capturePremiumOrder } from "../../apis/premium";
 import { getMe } from "../../apis/me";
 
 declare global {
@@ -21,13 +21,13 @@ const Checkout = () => {
   const [loading, setLoading] = useState(true);
 
   // -------------------------------
-  // Check user auth
+  // Check user authentication
   // -------------------------------
   useEffect(() => {
     const checkUser = async () => {
       try {
         const res = await getMe();
-        if (!res || res.Success === false) navigate("/login");
+        if (!res?.Success) navigate("/login");
       } catch {
         navigate("/login");
       }
@@ -39,7 +39,6 @@ const Checkout = () => {
   // Create PayPal order
   // -------------------------------
   useEffect(() => {
-    document.title = "Premium - AlertUp";
     if (!plan || !VALID_PLANS.includes(plan)) {
       setError("Invalid premium plan.");
       setLoading(false);
@@ -79,22 +78,21 @@ const Checkout = () => {
     });
 
   // -------------------------------
-  // Render PayPal buttons
+  // Render PayPal + Apple Pay + Google Pay + Card
   // -------------------------------
   useEffect(() => {
     if (!orderID) return;
 
-    const init = async () => {
+    const initPayPalButtons = async () => {
       try {
-        const clientId = import.meta.env.VITE_PAYPAL_CLIENT_ID || "sb";
+        const clientId = "AQ_vHdiFQWqEH2jJ3r-BZxSyjnqwOF_tAZai0KGvae6cQLZuQ1N6E6KVH9xt9fQMdtKNHOeSM2dzHaWQ";
         await loadPayPalSDK(clientId);
 
         if (!paypalRef.current || !window.paypal) return;
 
-        // Clear previous buttons if any
+        // Clear previous buttons
         paypalRef.current.innerHTML = "";
 
-        // Funding options: PayPal, Apple Pay, Google Pay, Card
         const fundingSources = [
           window.paypal.FUNDING.PAYPAL,
           window.paypal.FUNDING.CARD,
@@ -130,7 +128,6 @@ const Checkout = () => {
             },
           });
 
-          // Render only if eligible
           if (button.isEligible()) button.render(paypalRef.current);
         });
       } catch (err) {
@@ -139,7 +136,7 @@ const Checkout = () => {
       }
     };
 
-    init();
+    initPayPalButtons();
   }, [orderID, plan]);
 
   // -------------------------------
