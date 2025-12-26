@@ -35,7 +35,7 @@ const Login = () => {
         return;
       }
 
-      navigate('/dashboard')
+      navigate('/')
       setLoading(false)
       return;
     }catch{

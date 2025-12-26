@@ -57,7 +57,7 @@ const Register = () => {
             return;
         }
         
-        navigate('/dashboard');
+        navigate('/');
         setLoading(false);
     }catch{
         setServerError("Something went wrong.")
