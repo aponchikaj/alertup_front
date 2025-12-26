@@ -104,7 +104,12 @@ const Checkout = () => {
         fundingSources.forEach((funding: any) => {
           const button = window.paypal.Buttons({
             fundingSource: funding,
-            style: { layout: "vertical", color: "gold", shape: "rect", label: "paypal" },
+            style: {
+              layout: "vertical",
+              color: funding === window.paypal.FUNDING.CARD ? "black" : "gold",
+              shape: "rect",
+              label: "paypal"
+            },
             createOrder: () => orderID,
             onApprove: async (data: any) => {
               try {
