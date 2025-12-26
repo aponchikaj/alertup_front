@@ -1,9 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import {
-  capturePremiumOrder,
-  CheckoutPaymentPremium
-} from "../../apis/premium";
+import { capturePremiumOrder, CheckoutPaymentPremium } from "../../apis/premium";
 import { getMe } from "../../apis/me";
 
 declare global {
@@ -22,34 +19,30 @@ const Checkout = () => {
   const [orderID, setOrderID] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  
-  useEffect(()=>{
-    const checkUser= async()=>{
-      try{
-        const res= await getMe()
-        if(!res){
-          navigate('/login')
-          return;
-        }
-
-        if(res.Success==false){
-          navigate('/login');
-          return;
-        }
-
-        return;
-      }catch{
-        navigate("/login")
-      }
-    }
-    checkUser()
-  },[])
 
   /* ---------------------------------- */
-  /* Create PayPal order */
+  /* Check if user is logged in */
   /* ---------------------------------- */
   useEffect(() => {
-    document.title="Premium - Alertup"
+    const checkUser = async () => {
+      try {
+        const res = await getMe();
+        if (!res || res.Success === false) {
+          navigate("/login");
+        }
+      } catch {
+        navigate("/login");
+      }
+    };
+    checkUser();
+  }, []);
+
+  /* ---------------------------------- */
+  /* Create backend order */
+  /* ---------------------------------- */
+  useEffect(() => {
+    document.title = "Premium - AlertUp";
+
     if (!plan || !VALID_PLANS.includes(plan)) {
       setError("Invalid premium plan.");
       setLoading(false);
@@ -80,10 +73,10 @@ const Checkout = () => {
   const loadPayPalSDK = () => {
     return new Promise<void>((resolve, reject) => {
       if (window.paypal) return resolve();
+
       const script = document.createElement("script");
-      // Use client id from Vite env: set VITE_PAYPAL_CLIENT_ID in production.
-      const paypalClientId = (import.meta as any).env?.VITE_PAYPAL_CLIENT_ID || 'sb';
-      script.src = `https://www.paypal.com/sdk/js?client-id=${paypalClientId}&currency=USD&intent=capture`;
+      const paypalClientId = (import.meta as any).env?.VITE_PAYPAL_CLIENT_ID || "sb"; // live or sandbox
+      script.src = `https://www.paypal.com/sdk/js?client-id=AQ_vHdiFQWqEH2jJ3r-BZxSyjnqwOF_tAZai0KGvae6cQLZuQ1N6E6KVH9xt9fQMdtKNHOeSM2dzHaWQ&currency=USD&intent=capture`;
       script.async = true;
       script.onload = () => resolve();
       script.onerror = () => reject(new Error("PayPal SDK failed to load"));
@@ -92,7 +85,7 @@ const Checkout = () => {
   };
 
   /* ---------------------------------- */
-  /* Render PayPal + Apple Pay buttons */
+  /* Render PayPal buttons */
   /* ---------------------------------- */
   useEffect(() => {
     if (!orderID) return;
@@ -101,8 +94,7 @@ const Checkout = () => {
       .then(() => {
         if (!paypalRef.current || !window.paypal) return;
 
-        // Clear container to avoid double render
-        paypalRef.current.innerHTML = "";
+        paypalRef.current.innerHTML = ""; // clear previous buttons
 
         window.paypal.Buttons({
           style: {
@@ -112,10 +104,11 @@ const Checkout = () => {
             label: "paypal",
           },
 
-          // Automatically shows Apple Pay if available
+          /* Use backend-created order */
           createOrder: () => orderID,
 
-          onApprove: async (data: any) => {
+          /* Capture payment on approve */
+          onApprove: async (data: any, actions: any) => {
             try {
               const res = await capturePremiumOrder({
                 orderID: data.orderID,
@@ -133,7 +126,8 @@ const Checkout = () => {
             }
           },
 
-          onError: () => {
+          onError: (err: any) => {
+            console.error(err);
             setError("PayPal/Apple Pay error occurred.");
           },
         }).render(paypalRef.current);
