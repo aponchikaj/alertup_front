@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { CheckoutPaymentPremium, capturePremiumOrder } from "../../apis/premium";
+import { capturePremiumOrder, CheckoutPaymentPremium } from "../../apis/premium";
 import { getMe } from "../../apis/me";
 
 declare global {
@@ -27,7 +27,7 @@ const Checkout = () => {
     const checkUser = async () => {
       try {
         const res = await getMe();
-        if (!res?.Success) navigate("/login");
+        if (!res || res.Success === false) navigate("/login");
       } catch {
         navigate("/login");
       }
@@ -39,6 +39,8 @@ const Checkout = () => {
   // Create PayPal order
   // -------------------------------
   useEffect(() => {
+    document.title = "Premium - AlertUp";
+
     if (!plan || !VALID_PLANS.includes(plan)) {
       setError("Invalid premium plan.");
       setLoading(false);
@@ -59,6 +61,7 @@ const Checkout = () => {
         setLoading(false);
       }
     };
+
     createOrder();
   }, [plan]);
 
@@ -68,7 +71,6 @@ const Checkout = () => {
   const loadPayPalSDK = (clientId: string) =>
     new Promise<void>((resolve, reject) => {
       if (window.paypal) return resolve();
-
       const script = document.createElement("script");
       script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=USD&intent=capture&components=buttons,funding-eligibility`;
       script.async = true;
@@ -83,31 +85,29 @@ const Checkout = () => {
   useEffect(() => {
     if (!orderID) return;
 
-    const initPayPalButtons = async () => {
+    const renderButtons = async () => {
       try {
         const clientId = "AQ_vHdiFQWqEH2jJ3r-BZxSyjnqwOF_tAZai0KGvae6cQLZuQ1N6E6KVH9xt9fQMdtKNHOeSM2dzHaWQ";
         await loadPayPalSDK(clientId);
 
         if (!paypalRef.current || !window.paypal) return;
-
-        // Clear previous buttons
-        paypalRef.current.innerHTML = "";
+        paypalRef.current.innerHTML = ""; // clear previous renders
 
         const fundingSources = [
           window.paypal.FUNDING.PAYPAL,
-          window.paypal.FUNDING.CARD,
           window.paypal.FUNDING.APPLEPAY,
           window.paypal.FUNDING.GOOGLEPAY,
+          window.paypal.FUNDING.CARD
         ];
 
-        fundingSources.forEach((funding) => {
+        fundingSources.forEach((funding: any) => {
           const button = window.paypal.Buttons({
             fundingSource: funding,
             style: {
               layout: "vertical",
               color: funding === window.paypal.FUNDING.CARD ? "black" : "gold",
               shape: "rect",
-              label: "paypal",
+              label: "paypal"
             },
             createOrder: () => orderID,
             onApprove: async (data: any) => {
@@ -125,7 +125,7 @@ const Checkout = () => {
             onError: (err: any) => {
               console.error("PayPal error:", err);
               setError("Payment error occurred.");
-            },
+            }
           });
 
           if (button.isEligible()) button.render(paypalRef.current);
@@ -136,8 +136,8 @@ const Checkout = () => {
       }
     };
 
-    initPayPalButtons();
-  }, [orderID, plan]);
+    renderButtons();
+  }, [orderID]);
 
   // -------------------------------
   // UI
