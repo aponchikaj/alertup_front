@@ -38,7 +38,7 @@ const Checkout = () => {
   useEffect(() => {
     const init = async () => {
       try {
-        await loadPayPalSDK(import.meta.env.VITE_PAYPAL_CLIENT_ID || "sb");
+        await loadPayPalSDK("AQ_vHdiFQWqEH2jJ3r-BZxSyjnqwOF_tAZai0KGvae6cQLZuQ1N6E6KVH9xt9fQMdtKNHOeSM2dzHaWQ");  
       } catch (err) {
         console.error(err);
         setError("PayPal SDK failed to load.");
