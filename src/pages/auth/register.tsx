@@ -168,22 +168,13 @@ const Register = () => {
         />
 
         {/* Submit */}
-        {
-            loading == false ? (
-                <button
-                type="submit"
-                className="w-full py-2 rounded-lg bg-[#FF7B22] hover:scale-105 cursor-pointer transition text-white font-semibold"
-                >
-                    Register
-                </button>
-            ) : (
-                <button
-                className="w-full py-2 rounded-lg bg-[#FF7B22]/50 disabled cursor-pointer transition text-white font-semibold"
-                >
-                    Loading
-                </button>
-            )
-        }
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full py-2 rounded-lg bg-[#FF7B22] disabled:opacity-50 disabled:cursor-not-allowed transition text-white font-semibold"
+        >
+          {loading ? "Loading..." : "Register"}
+        </button>
 
         <p className="text-sm text-gray-400 text-center mt-4">
           Already have an account?{" "}

@@ -85,21 +85,13 @@ const Login = () => {
         />
 
         {/* Submit */}
-        {!loading ? (
-          <button
-            type="submit"
-            className="w-full py-2 rounded-lg bg-[#FF7B22] hover:scale-105 transition text-white font-semibold"
-          >
-            Login
-          </button>
-        ) : (
-          <button
-            disabled
-            className="w-full py-2 rounded-lg bg-[#FF7B22]/50 cursor-not-allowed text-white font-semibold"
-          >
-            Loading
-          </button>
-        )}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full py-2 rounded-lg bg-[#FF7B22] disabled:opacity-50 disabled:cursor-not-allowed transition text-white font-semibold"
+        >
+          {loading ? "Loading..." : "Login"}
+        </button>
 
         <p className="text-sm text-gray-400 text-center mt-4">
           Don't have an account?{" "}
