@@ -1,17 +1,19 @@
 import { useEffect, useState } from "react";
+import { useLocation, Link } from "react-router-dom";
 import foxImage from '../assets/images/fox.png';
 import settingsIcon from '../assets/images/settings.png';
 import './navbar.css';
-import { Link } from "react-router-dom";
 import { getMe } from "../apis/me";
 
 const Navbar = () => {
   const [menuMode, setMenuMode] = useState<boolean>(false);
   const [isLogged, setIsLogged] = useState<boolean>(false);
 
+  const location = useLocation(); // track route changes
+
   const toggleMenu = (mode: boolean) => setMenuMode(mode);
 
-  // Check if user is logged in
+  // Check if user is logged in on every route change
   useEffect(() => {
     const checkIfLoggedIn = async () => {
       try {
@@ -22,7 +24,7 @@ const Navbar = () => {
       }
     };
     checkIfLoggedIn();
-  }, []);
+  }, [location.pathname]); // ✅ runs whenever the route changes
 
   // Prevent scroll when sidebar is open
   useEffect(() => {

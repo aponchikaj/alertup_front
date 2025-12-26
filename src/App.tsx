@@ -24,10 +24,12 @@ import GuestGuard from "./guards/guestguard";
 import AuthGuard from "./guards/authguard";
 import ServerGate from "./pages/other/loading"; // move it here (recommended)
 
+
 const App = () => {
+
   return (
     <>
-      <Navbar />
+      <Navbar  />
 
       <ServerGate>
         <Routes>

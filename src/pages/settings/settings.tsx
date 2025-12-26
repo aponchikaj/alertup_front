@@ -10,8 +10,10 @@ import {
   deleteAccount,
   logoutFromAccount
 } from "../../apis/settings";
+import { useNavigate } from "react-router-dom";
 
 const Settings = () => {
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
 
@@ -150,6 +152,7 @@ const Settings = () => {
         return;
       }
       setServerError("Account deleted successfully!");
+      navigate('/')
     } catch {
       setServerError("Something went wrong.");
     } finally {
