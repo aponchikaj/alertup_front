@@ -41,6 +41,7 @@ const Register = () => {
     setLoading(true)
     if (newUserData.password !== repeatPassword) {
       alert("Passwords do not match");
+      setLoading(false);
       return;
     }
 
@@ -48,12 +49,18 @@ const Register = () => {
         const res = await RegisterUser(newUserData);
         if(!res){
             setServerError("Something went wrong.")
+            setLoading(false);
+            return;
         }
         if(res.Success==false){
             setServerError(res.Message);
+            setLoading(false);
+            return;
         }
-      
+        
+        localStorage.setItem("loggedIn", "true");
         navigate('/dashboard');
+        setLoading(false);
     }catch{
         setServerError("Something went wrong.")
         setLoading(false)

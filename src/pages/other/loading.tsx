@@ -12,12 +12,15 @@ const ServerGate = ({ children }: { children: JSX.Element }) => {
 
         if (res?.Success !== true) {
           setServerDown(true);
+          return;
         }
       } catch (err) {
         console.error("ServerGate error:", err);
         setServerDown(true);
+        return;
       } finally {
         setLoading(false);
+        return;
       }
     };
 
