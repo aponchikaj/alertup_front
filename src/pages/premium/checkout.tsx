@@ -20,36 +20,9 @@ const Checkout = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // ----------------------------------
-  // Load PayPal SDK dynamically
-  // ----------------------------------
-  const loadPayPalSDK = (clientId: string) =>
-    new Promise<void>((resolve, reject) => {
-      if (window.paypal) return resolve();
-
-      const script = document.createElement("script");
-      script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=USD&intent=capture`;
-      script.async = true;
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error("PayPal SDK failed to load"));
-      document.body.appendChild(script);
-    });
-
-  useEffect(() => {
-    const init = async () => {
-      try {
-        await loadPayPalSDK("AQ_vHdiFQWqEH2jJ3r-BZxSyjnqwOF_tAZai0KGvae6cQLZuQ1N6E6KVH9xt9fQMdtKNHOeSM2dzHaWQ");  
-      } catch (err) {
-        console.error(err);
-        setError("PayPal SDK failed to load.");
-      }
-    };
-    init();
-  }, []);
-
-  // ----------------------------------
-  // Check user authentication
-  // ----------------------------------
+  // -------------------------------
+  // Check user auth
+  // -------------------------------
   useEffect(() => {
     const checkUser = async () => {
       try {
@@ -64,12 +37,11 @@ const Checkout = () => {
     checkUser();
   }, []);
 
-  // ----------------------------------
+  // -------------------------------
   // Create PayPal order
-  // ----------------------------------
+  // -------------------------------
   useEffect(() => {
-    document.title = "Premium - Alertup";
-
+    document.title = "Premium - AlertUp";
     if (!plan || !VALID_PLANS.includes(plan)) {
       setError("Invalid premium plan.");
       setLoading(false);
@@ -90,45 +62,82 @@ const Checkout = () => {
         setLoading(false);
       }
     };
-
     createOrder();
   }, [plan]);
 
-  // ----------------------------------
-  // Render PayPal buttons
-  // ----------------------------------
-  useEffect(() => {
-    if (!orderID || !window.paypal || !paypalRef.current) return;
-
-    paypalRef.current.innerHTML = ""; // clear previous renders
-
-    const button = window.paypal.Buttons({
-      style: { layout: "vertical", color: "gold", shape: "rect", label: "paypal" },
-      createOrder: () => orderID,
-      onApprove: async (data: any) => {
-        try {
-          const res = await capturePremiumOrder({ orderID: data.orderID, option: plan });
-          if (!res.Success) {
-            setError(res.Message);
-            return;
-          }
-          navigate("/premium/success");
-        } catch {
-          setError("Payment capture failed.");
-        }
-      },
-      onError: (err: any) => {
-        console.error("PayPal button error:", err);
-        setError("PayPal/Apple Pay error occurred. Try again or use a PayPal account.");
-      },
+  // -------------------------------
+  // Load PayPal SDK dynamically
+  // -------------------------------
+  const loadPayPalSDK = (clientId: string) =>
+    new Promise<void>((resolve, reject) => {
+      if (window.paypal) return resolve();
+      const script = document.createElement("script");
+      script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=USD&intent=capture&components=buttons,funding-eligibility`;
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error("PayPal SDK failed to load"));
+      document.body.appendChild(script);
     });
 
-    if (button.isEligible()) button.render(paypalRef.current);
+  // -------------------------------
+  // Render PayPal + Apple Pay + Google Pay
+  // -------------------------------
+  useEffect(() => {
+    if (!orderID) return;
+
+    const init = async () => {
+      try {
+        const clientId = (import.meta as any).env?.VITE_PAYPAL_CLIENT_ID || "sb";
+        await loadPayPalSDK(clientId);
+        if (!paypalRef.current || !window.paypal) return;
+
+        paypalRef.current.innerHTML = "";
+
+        // Unified buttons: PayPal, Apple Pay, Google Pay, Card
+        const fundingSources = [
+          window.paypal.FUNDING.APPLEPAY,
+          window.paypal.FUNDING.PAYPAL,
+          window.paypal.FUNDING.GOOGLEPAY,
+          window.paypal.FUNDING.CARD,
+        ];
+
+        fundingSources.forEach((funding: any) => {
+          const button = window.paypal.Buttons({
+            fundingSource: funding,
+            style: { layout: "vertical", color: "gold", shape: "rect", label: "paypal" },
+            createOrder: () => orderID,
+            onApprove: async (data: any) => {
+              try {
+                const res = await capturePremiumOrder({ orderID: data.orderID, option: plan });
+                if (!res.Success) {
+                  setError(res.Message);
+                  return;
+                }
+                navigate("/premium/success");
+              } catch {
+                setError("Payment capture failed.");
+              }
+            },
+            onError: (err: any) => {
+              console.error("PayPal error:", err);
+              setError("Payment error occurred.");
+            },
+          });
+
+          if (button.isEligible()) button.render(paypalRef.current);
+        });
+      } catch (err) {
+        console.error(err);
+        setError("PayPal SDK failed to load.");
+      }
+    };
+
+    init();
   }, [orderID]);
 
-  // ----------------------------------
+  // -------------------------------
   // UI
-  // ----------------------------------
+  // -------------------------------
   if (loading) {
     return (
       <main className="min-h-screen bg-[#353535] text-white flex items-center justify-center">
