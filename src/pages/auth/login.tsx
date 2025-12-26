@@ -17,8 +17,7 @@ const Login = () => {
   const [serverError, setServerError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     setLoading(true);
     setServerError("");
 
@@ -47,8 +46,7 @@ const Login = () => {
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-[#353535] px-4">
-      <form
-        onSubmit={handleSubmit}
+      <section
         onSubmitCapture={(e) => e.preventDefault()}
         className="w-full max-w-md bg-white/5 backdrop-blur-lg rounded-2xl p-6 md:p-8 shadow-xl border border-white/10"
       >
@@ -91,6 +89,7 @@ const Login = () => {
         <button
           type={loading ? "button" : "submit"}
           disabled={loading}
+          onClick={handleSubmit}
           className="w-full py-2 rounded-lg bg-[#FF7B22] disabled:opacity-50 disabled:cursor-not-allowed transition text-white font-semibold"
         >
           {loading ? "Loading..." : "Login"}
@@ -114,7 +113,7 @@ const Login = () => {
             Reset
           </Link>
         </p>
-      </form>
+      </section>
     </div>
   );
 };
