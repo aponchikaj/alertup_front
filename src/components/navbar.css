@@ -1,0 +1,25 @@
+@keyframes navbarAnimation {
+    0%{
+        transform: translateY(-50vh);
+    }100%{
+        transform: translateY(0vh);
+    }
+}
+
+@keyframes sidebarAnimation {
+    0%{
+        transform: translateX(-100vh);
+    }100%{
+        transform: translateX(0vh);
+    }
+}
+
+.navbarAnim{
+    animation: navbarAnimation 0.5s ease-out forwards;
+    /* animation-duration:  0.5s; */
+}
+
+.sidebarAnim{
+    animation: sidebarAnimation 0.4s ease-out forwards;
+    /* animation-duration:  0.5s; */
+}

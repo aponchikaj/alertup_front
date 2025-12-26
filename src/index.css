@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: 'main';
+  src: url('./assets/fonts/Comfortaa-VariableFont_wght.ttf');
+}
+
+@theme{
+  --font-sans:'main';
+}
