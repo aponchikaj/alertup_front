@@ -29,7 +29,7 @@ export const CheckoutPaymentPremium = async(data:any)=>{
 
 export const capturePremiumOrder = async(data:any)=>{
     try{
-        const res = (await axios.post(APIS.premium.captureOrder,data)).data;
+        const res = (await axios.post(APIS.premium.captureOrder,data,{withCredentials:true})).data;
         if(!res){
             return {Success:false,Message:'Something went wrong.'}
         }
