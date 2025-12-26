@@ -81,9 +81,9 @@ const Checkout = () => {
     return new Promise<void>((resolve, reject) => {
       if (window.paypal) return resolve();
       const script = document.createElement("script");
-      // Use PayPal sandbox short-id 'sb' for testing. Replace with your live client-id in production.
-      script.src =
-        "https://www.paypal.com/sdk/js?client-id=sb&currency=USD&intent=capture";
+      // Use client id from Vite env: set VITE_PAYPAL_CLIENT_ID in production.
+      const paypalClientId = (import.meta as any).env?.VITE_PAYPAL_CLIENT_ID || 'sb';
+      script.src = `https://www.paypal.com/sdk/js?client-id=${paypalClientId}&currency=USD&intent=capture`;
       script.async = true;
       script.onload = () => resolve();
       script.onerror = () => reject(new Error("PayPal SDK failed to load"));
