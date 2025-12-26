@@ -41,6 +41,7 @@ const Login = () => {
       return;
     }catch{
       setServerError("Something went wrong.")
+      setLoading(false)
     }
   };
 
@@ -48,8 +49,10 @@ const Login = () => {
     <div className="min-h-screen w-full flex items-center justify-center bg-[#353535] px-4">
       <form
         onSubmit={handleSubmit}
+        onSubmitCapture={(e) => e.preventDefault()}
         className="w-full max-w-md bg-white/5 backdrop-blur-lg rounded-2xl p-6 md:p-8 shadow-xl border border-white/10"
       >
+
         <h1 className="text-2xl font-bold text-white text-center mb-6">
           Welcome Back
         </h1>
@@ -86,7 +89,7 @@ const Login = () => {
 
         {/* Submit */}
         <button
-          type="submit"
+          type={loading ? "button" : "submit"}
           disabled={loading}
           className="w-full py-2 rounded-lg bg-[#FF7B22] disabled:opacity-50 disabled:cursor-not-allowed transition text-white font-semibold"
         >
