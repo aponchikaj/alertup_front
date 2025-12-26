@@ -75,7 +75,6 @@ const Checkout = () => {
       if (window.paypal) return resolve();
 
       const script = document.createElement("script");
-      const paypalClientId = (import.meta as any).env?.VITE_PAYPAL_CLIENT_ID || "sb"; // live or sandbox
       script.src = `https://www.paypal.com/sdk/js?client-id=AQ_vHdiFQWqEH2jJ3r-BZxSyjnqwOF_tAZai0KGvae6cQLZuQ1N6E6KVH9xt9fQMdtKNHOeSM2dzHaWQ&currency=USD&intent=capture`;
       script.async = true;
       script.onload = () => resolve();
@@ -108,7 +107,7 @@ const Checkout = () => {
           createOrder: () => orderID,
 
           /* Capture payment on approve */
-          onApprove: async (data: any, actions: any) => {
+          onApprove: async (data: any) => {
             try {
               const res = await capturePremiumOrder({
                 orderID: data.orderID,
