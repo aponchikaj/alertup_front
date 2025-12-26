@@ -21,7 +21,7 @@ const Checkout = () => {
   const [loading, setLoading] = useState(true);
 
   // -------------------------------
-  // Check user authentication
+  // Check user auth
   // -------------------------------
   useEffect(() => {
     const checkUser = async () => {
@@ -72,7 +72,7 @@ const Checkout = () => {
     new Promise<void>((resolve, reject) => {
       if (window.paypal) return resolve();
       const script = document.createElement("script");
-      script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=USD&intent=capture&components=buttons,funding-eligibility`;
+      script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=USD&intent=capture&components=buttons`;
       script.async = true;
       script.onload = () => resolve();
       script.onerror = () => reject(new Error("PayPal SDK failed to load"));
@@ -80,23 +80,21 @@ const Checkout = () => {
     });
 
   // -------------------------------
-  // Render PayPal + Apple Pay + Google Pay + Card
+  // Render PayPal + Card buttons
   // -------------------------------
   useEffect(() => {
     if (!orderID) return;
 
     const renderButtons = async () => {
       try {
-        const clientId = "AQ_vHdiFQWqEH2jJ3r-BZxSyjnqwOF_tAZai0KGvae6cQLZuQ1N6E6KVH9xt9fQMdtKNHOeSM2dzHaWQ";
+        const clientId = (import.meta as any).env?.VITE_PAYPAL_CLIENT_ID || "sb";
         await loadPayPalSDK(clientId);
 
         if (!paypalRef.current || !window.paypal) return;
-        paypalRef.current.innerHTML = ""; // clear previous renders
+        paypalRef.current.innerHTML = ""; // clear previous buttons
 
         const fundingSources = [
           window.paypal.FUNDING.PAYPAL,
-          window.paypal.FUNDING.APPLEPAY,
-          window.paypal.FUNDING.GOOGLEPAY,
           window.paypal.FUNDING.CARD
         ];
 
