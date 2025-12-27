@@ -1,19 +1,19 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import SubscriptionButton from "../../components/paymentBtn";
+import PaymentButton from "../../components/paymentBtn";
 import { getMe } from "../../apis/me";
+import { Get_Premium_Plans } from "../../apis/premium";
 
-const VALID_PLANS = [
-  { name: "Basic", id: "P-11X27865HK279192ENFH7Q5Q" },
-  { name: "Platinum", id: "P-2TG459541U474594GNFH7S6Y" },
-  { name: "Elite", id: "P-8R946168441544305NFH7R7A" },
-  { name: "Professional", id: "P-9TJ12709BF866930RNFH7TSQ" },
-];
+interface PremiumPlan {
+  key: string;
+  price: number;
+  name: string;
+}
 
 const Checkout = () => {
   const { plan } = useParams<{ plan: string }>();
   const navigate = useNavigate();
-  const [selectedPlan, setSelectedPlan] = useState<{ name: string; id: string } | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<PremiumPlan | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,22 +24,52 @@ const Checkout = () => {
   }, []);
 
   useEffect(() => {
-    const match = VALID_PLANS.find(p => p.name.toLowerCase() === plan?.toLowerCase());
-    if (!match) {
-      navigate("/premium");
-      return;
-    }
-    setSelectedPlan(match);
-    setLoading(false);
-  }, [plan]);
+    const loadPlan = async () => {
+      try {
+        const res = await Get_Premium_Plans();
+        if (!res || res.Success === false) {
+          navigate("/premium");
+          return;
+        }
 
-  if (loading) return <div>Loading...</div>;
+        const plans: PremiumPlan[] = Object.entries(res.Message).map(
+          ([key, value]: any) => ({
+            key,
+            price: value.price,
+            name: value.name,
+          })
+        );
+
+        const match = plans.find(p => p.key.toLowerCase() === plan?.toLowerCase());
+        if (!match) {
+          navigate("/premium");
+          return;
+        }
+        setSelectedPlan(match);
+      } catch (err) {
+        console.error("Error loading plan:", err);
+        navigate("/premium");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadPlan();
+  }, [plan, navigate]);
+
+  if (loading) return <div className="min-h-screen bg-[#353535] flex items-center justify-center text-white">Loading...</div>;
   if (!selectedPlan) return null;
 
   return (
-    <div className="min-h-screen bg-[#353535] flex flex-col items-center justify-center text-white">
-      <h1 className="text-2xl font-bold mb-4">{selectedPlan.name} Plan</h1>
-      <SubscriptionButton planId={selectedPlan.id} />
+    <div className="min-h-screen bg-[#353535] flex flex-col items-center justify-center text-white px-4">
+      <h1 className="text-2xl font-bold mb-2">{selectedPlan.name}</h1>
+      <p className="text-lg mb-6">${selectedPlan.price} - 1 Month Premium Access</p>
+      <div className="mb-4 max-w-md w-full">
+        <PaymentButton plan={selectedPlan.key} price={selectedPlan.price} />
+      </div>
+      <p className="text-sm text-gray-400 mt-4 text-center max-w-md">
+        Having payment issues? Please contact support or try again later.
+      </p>
     </div>
   );
 };

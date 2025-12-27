@@ -1,36 +1,30 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import axios from "axios";
+import { ConfirmPurchase } from "../../apis/premium";
 
 const Success = () => {
-  // const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     document.title = "Payment Success - AlertUp";
 
-    const confirmSubscription = async () => {
+    const confirmPurchase = async () => {
       const params = new URLSearchParams(window.location.search);
-      const subscriptionID = params.get("subscription_id");
+      const orderID = params.get("order_id");
+      const plan = params.get("plan");
 
-      if (!subscriptionID) {
-        setError("Invalid subscription");
+      if (!orderID || !plan) {
+        setError("Invalid payment information");
         setLoading(false);
         return;
       }
 
       try {
-        const res = (
-          await axios.post(
-            "/api/premium/confirm",
-            { subscriptionID },
-            { withCredentials: true }
-          )
-        ).data;
+        const res = await ConfirmPurchase(orderID, plan);
 
         if (!res.Success) {
-          setError("Subscription verification failed");
+          setError(res.Message || "Payment verification failed");
         }
       } catch (err) {
         console.error(err);
@@ -40,7 +34,7 @@ const Success = () => {
       }
     };
 
-    confirmSubscription();
+    confirmPurchase();
   }, []);
 
   if (loading)
@@ -63,9 +57,9 @@ const Success = () => {
   return (
     <main className="min-h-screen bg-[#353535] text-white flex items-center justify-center">
       <div className="bg-[#2c2c2c] p-10 rounded-2xl w-full max-w-md text-center">
-        <h1 className="text-2xl font-bold mb-4">Subscription Active 🎉</h1>
+        <h1 className="text-2xl font-bold mb-4">Payment Successful 🎉</h1>
         <p className="text-gray-300 mb-6">
-          Your premium access has been successfully activated.
+          Your premium access has been successfully activated for 1 month.
         </p>
         <Link
           to="/dashboard"

@@ -129,7 +129,7 @@ const Premium = () => {
 
                 <div className="mt-auto">
                   <span className="text-3xl font-bold">${price}</span>
-                  <span className="text-gray-400 text-sm"> / month</span>
+                  <span className="text-gray-400 text-sm"> / 1 month</span>
                 </div>
 
                 <Link
@@ -137,7 +137,7 @@ const Premium = () => {
                   className="mt-4 w-full text-center py-3 rounded-full bg-[#FF7B22]
                              text-[#353535] font-semibold hover:opacity-90 transition"
                 >
-                  Upgrade Now
+                  Purchase Now
                 </Link>
               </div>
             );
