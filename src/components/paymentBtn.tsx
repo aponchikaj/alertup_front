@@ -57,7 +57,7 @@ const PaymentButton = ({ plan, price }: Props) => {
 
       window.paypal.Buttons({
         style: { shape: "pill", color: "gold", layout: "vertical", label: "pay" },
-        createOrder: async (_data: any, actions: any) => {
+        createOrder: async (_data: any) => {
           try {
             console.log("Creating order for plan:", plan);
             // Create order on backend
