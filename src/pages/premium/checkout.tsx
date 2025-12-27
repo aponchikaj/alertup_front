@@ -9,6 +9,8 @@ interface PremiumPlan {
   key: string;
   price: number;
   name: string;
+  invoiceId?: string;
+  link?: string;
 }
 
 const Checkout = () => {
@@ -38,6 +40,8 @@ const Checkout = () => {
             key,
             price: value.price,
             name: value.name,
+            invoiceId: value.invoiceId,
+            link: value.link
           })
         );
 
@@ -68,6 +72,22 @@ const Checkout = () => {
       <div className="mb-4 max-w-md w-full">
         <NowPaymentsButton plan={selectedPlan.key} price={selectedPlan.price} />
         <WalletsButton plan={selectedPlan.key} price={selectedPlan.price} />
+
+        {selectedPlan.invoiceId && (
+          <div style={{ marginTop: 12, textAlign: 'center' }}>
+            <a
+              href={`https://nowpayments.io/payment/?iid=${selectedPlan.invoiceId}&source=button`}
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              <img
+                src="https://nowpayments.io/images/embeds/payment-button-white.svg"
+                alt="Cryptocurrency & Bitcoin payment button by NOWPayments"
+                style={{ maxWidth: 260 }}
+              />
+            </a>
+          </div>
+        )}
       </div>
       <p className="text-sm text-gray-400 mt-4 text-center max-w-md">
         Having payment issues? Please contact support or try again later.
