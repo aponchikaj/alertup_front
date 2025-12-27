@@ -9,6 +9,7 @@ interface Props {
 const NowPaymentsButton = ({ plan, price }: Props) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currency, setCurrency] = useState<string>("USDT");
 
   const handlePayment = async () => {
     try {
@@ -35,8 +36,10 @@ const NowPaymentsButton = ({ plan, price }: Props) => {
         return;
       }
 
-      // Redirect to NowPayments
-      window.location.href = paymentLink;
+      // Redirect to NowPayments with selected stablecoin (append coin param)
+      const separator = paymentLink.includes("?") ? "&" : "?";
+      const target = `${paymentLink}${separator}coin=${encodeURIComponent(currency)}`;
+      window.location.href = target;
     } catch (err: any) {
       console.error("Payment error:", err);
       const errorMsg = err.response?.data?.Message || err.message || "Payment failed";
@@ -62,6 +65,18 @@ const NowPaymentsButton = ({ plan, price }: Props) => {
           <strong>Error:</strong> {error}
         </div>
       )}
+
+      <div style={{ marginBottom: 12 }}>
+        <label style={{ marginRight: 8, fontSize: 14, color: '#ddd' }}>Pay with:</label>
+        <select
+          value={currency}
+          onChange={(e) => setCurrency(e.target.value)}
+          style={{ padding: '6px 8px', borderRadius: 6 }}
+        >
+          <option value="USDT">USDT (Tether)</option>
+          <option value="USDC">USDC (USD Coin)</option>
+        </select>
+      </div>
 
       <button
         onClick={handlePayment}
