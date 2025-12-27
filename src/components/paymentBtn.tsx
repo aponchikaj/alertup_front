@@ -23,22 +23,58 @@ const PaymentButton = ({ plan, price }: Props) => {
       return new Promise<void>((resolve) => {
         if (window.paypal) return resolve(); // already loaded
 
-        // Use environment variable or default to sandbox for testing
-        // Set VITE_PAYPAL_CLIENT_ID in your .env file for production
+        // Use environment variable or default to the existing client ID
+        // IMPORTANT: This client ID appears to be restricted. 
+        // You need to either:
+        // 1. Get PayPal Sandbox credentials from https://developer.paypal.com
+        // 2. Fix your live PayPal account restrictions
         const clientId = import.meta.env.VITE_PAYPAL_CLIENT_ID || 
                         'AQ_vHdiFQWqEH2jJ3r-BZxSyjnqwOF_tAZai0KGvae6cQLZuQ1N6E6KVH9xt9fQMdtKNHOeSM2dzHaWQ';
-        const useSandbox = import.meta.env.VITE_PAYPAL_SANDBOX !== 'false'; // Default to sandbox unless explicitly disabled
+        
+        // Check if we should use sandbox (default to false, set VITE_PAYPAL_SANDBOX=true to enable)
+        const useSandbox = import.meta.env.VITE_PAYPAL_SANDBOX === 'true';
         
         const script = document.createElement("script");
-        // Use sandbox URL if sandbox mode is enabled
-        const sdkUrl = useSandbox 
+        
+        // Build the SDK URL - use live by default unless sandbox is explicitly enabled
+        const sdkUrl = useSandbox
           ? `https://www.sandbox.paypal.com/sdk/js?client-id=${clientId}&currency=USD`
           : `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=USD`;
+        
+        console.log("Loading PayPal SDK...", useSandbox ? "(SANDBOX)" : "(LIVE)");
         script.src = sdkUrl;
         script.async = true;
-        script.onload = () => resolve();
-        script.onerror = () => {
-          console.error("Failed to load PayPal SDK");
+        script.onload = () => {
+          console.log("PayPal SDK loaded successfully");
+          resolve();
+        };
+        script.onerror = (error) => {
+          console.error("Failed to load PayPal SDK:", error);
+          console.error("This usually means:");
+          console.error("1. PayPal Client ID is invalid or restricted");
+          console.error("2. Account is restricted (PAYEE_ACCOUNT_RESTRICTED)");
+          console.error("3. For testing, use PayPal Sandbox credentials");
+          
+          if (containerRef.current) {
+            containerRef.current.innerHTML = `
+              <div style="padding: 20px; background: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; color: #856404; max-width: 500px; margin: 0 auto;">
+                <h3 style="margin-top: 0; color: #856404;">⚠️ PayPal Payment Unavailable</h3>
+                <p><strong>Your PayPal account is restricted.</strong></p>
+                <p>To fix this:</p>
+                <ol style="text-align: left; margin: 10px 0; padding-left: 20px;">
+                  <li><strong>For Testing:</strong> Get PayPal Sandbox credentials from <a href="https://developer.paypal.com" target="_blank" style="color: #0056b3;">developer.paypal.com</a></li>
+                  <li><strong>For Production:</strong> Fix your PayPal account restrictions at <a href="https://www.paypal.com/businessmanage" target="_blank" style="color: #0056b3;">paypal.com/businessmanage</a></li>
+                </ol>
+                <p style="margin-top: 15px; font-size: 14px;">
+                  <strong>Quick Setup:</strong><br>
+                  1. Go to <a href="https://developer.paypal.com" target="_blank" style="color: #0056b3;">PayPal Developer Dashboard</a><br>
+                  2. Create Sandbox App<br>
+                  3. Copy Client ID and Secret<br>
+                  4. Add to your .env file
+                </p>
+              </div>
+            `;
+          }
           resolve(); // Resolve anyway to prevent hanging
         };
         document.body.appendChild(script);
