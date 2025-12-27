@@ -9,7 +9,7 @@ interface Props {
 const NowPaymentsButton = ({ plan, price }: Props) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currency, setCurrency] = useState<string>("USDT");
+  const [currency, setCurrency] = useState<string>("ALL");
 
   const handlePayment = async () => {
     try {
@@ -36,10 +36,14 @@ const NowPaymentsButton = ({ plan, price }: Props) => {
         return;
       }
 
-      // Redirect to NowPayments with selected stablecoin (append coin param)
-      const separator = paymentLink.includes("?") ? "&" : "?";
-      const target = `${paymentLink}${separator}coin=${encodeURIComponent(currency)}`;
-      window.location.href = target;
+      // Redirect to NowPayments. If user selected a specific coin, append the coin param.
+      if (currency && currency !== 'ALL') {
+        const separator = paymentLink.includes("?") ? "&" : "?";
+        const target = `${paymentLink}${separator}coin=${encodeURIComponent(currency)}`;
+        window.location.href = target;
+      } else {
+        window.location.href = paymentLink;
+      }
     } catch (err: any) {
       console.error("Payment error:", err);
       const errorMsg = err.response?.data?.Message || err.message || "Payment failed";
@@ -73,6 +77,7 @@ const NowPaymentsButton = ({ plan, price }: Props) => {
           onChange={(e) => setCurrency(e.target.value)}
           style={{ padding: '6px 8px', borderRadius: 6 }}
         >
+          <option value="ALL">All coins (user chooses on NowPayments)</option>
           <option value="USDT">USDT (Tether)</option>
           <option value="USDC">USDC (USD Coin)</option>
         </select>
