@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import NowPaymentsButton from "../../components/nowpaymentsBtn";
+import WalletsButton from "../../components/walletsBtn";
 import { getMe } from "../../apis/me";
 import { Get_Premium_Plans } from "../../apis/premium";
 
@@ -66,6 +67,7 @@ const Checkout = () => {
       <p className="text-lg mb-6">${selectedPlan.price} - 1 Month Premium Access</p>
       <div className="mb-4 max-w-md w-full">
         <NowPaymentsButton plan={selectedPlan.key} price={selectedPlan.price} />
+        <WalletsButton plan={selectedPlan.key} price={selectedPlan.price} />
       </div>
       <p className="text-sm text-gray-400 mt-4 text-center max-w-md">
         Having payment issues? Please contact support or try again later.

@@ -40,3 +40,13 @@ export const ConfirmPurchase = async (orderID: string, plan: string) => {
   const res = await axios.post(APIS.premium.confirmPremium, { orderID, plan }, { withCredentials: true });
   return res.data;
 };
+
+export const ChargePayment = async (token: any, amount: number, plan: string, method = 'wallet') => {
+  try {
+    const res = await axios.post('/api/payments/charge', { token, amount, plan, method }, { withCredentials: true });
+    return res.data;
+  } catch (err: any) {
+    console.error('ChargePayment error', err);
+    return { Success: false, Message: err.response?.data?.Message || err.message };
+  }
+};
