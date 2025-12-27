@@ -2,6 +2,7 @@ import axios from "axios"
 import { APIS } from "./APIS"
 
 export const RegisterUser = async(data:any)=>{
+    console.log(data)
     try{
         const res = (await axios.post(APIS.auth.register,data,{withCredentials:true})).data;
         if(!res){

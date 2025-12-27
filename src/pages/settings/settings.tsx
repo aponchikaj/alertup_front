@@ -170,7 +170,7 @@ const Settings = () => {
         setServerError(res?.Message || "Something went wrong.");
         return;
       }
-      setServerError("Logged out successfully!");
+      navigate('/')
     } catch {
       setServerError("Something went wrong.");
     } finally {
@@ -194,11 +194,28 @@ const Settings = () => {
             <section className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-6 shadow-xl space-y-4">
               <h2 className="text-2xl font-bold mb-4">Profile Info</h2>
 
-              <InputField
-                label="Username"
-                value={userData.username}
-                onChange={(e:any) => setUserData({ ...userData, username: e.target.value })}
-              />
+              {
+                userData.userType == "Individual" ? (
+                  <section className="w-full p-[10px] flex items-center justify-center">
+                    <InputField
+                      label="Name"
+                      value={userData.name}
+                      onChange={(e:any) => setUserData({ ...userData, name: e.target.value })}
+                    />
+                    <InputField
+                      label="Lastname"
+                      value={userData.lastname}
+                      onChange={(e:any) => setUserData({ ...userData, lastname: e.target.value })}
+                    />
+                  </section>
+                ) : (
+                  <InputField
+                    label="Company"
+                    value={userData.company}
+                    onChange={(e:any) => setUserData({ ...userData, company: e.target.value })}
+                  />
+                )
+              }
               <InputField
                 label="Phone"
                 value={userData.phone}
