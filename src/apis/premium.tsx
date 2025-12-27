@@ -1,41 +1,17 @@
-import axios from "axios"
-import { APIS } from "./APIS"
+import axios from "axios";
+import { APIS } from "./APIS";
 
-export const Get_Premium_Plans = async()=>{
-    try{
-        const res = (await axios.get(APIS.premium.getPremiumPlans)).data;
-        if(!res){
-            return {Success:false,Message:"Something went wrong."}
-        }
+export const Get_Premium_Plans = async () => {
+  const res = await axios.get(APIS.premium.getPremiumPlans, { withCredentials: true });
+  return res.data;
+};
 
-        return res;
-    }catch{
-        return {Success:false,Message:'Something went wrong.'}
-    }
-}
+export const CreateSubscription = async (data: { option: string }) => {
+  const res = await axios.post(APIS.premium.subscribePremium, data, { withCredentials: true });
+  return res.data;
+};
 
-export const CheckoutPaymentPremium = async(data:any)=>{
-    try{
-        const res = (await axios.post(APIS.premium.checkoutPremium,data,{withCredentials:true})).data;
-        if(!res){
-            return {Success:false,Message:"Something went wrong."}
-        }
-
-        return res;
-    }catch{
-        return {Success:false,Message:"Something went wrong."}
-    }
-}
-
-export const capturePremiumOrder = async(data:any)=>{
-    try{
-        const res = (await axios.post(APIS.premium.captureOrder,data,{withCredentials:true})).data;
-        if(!res){
-            return {Success:false,Message:'Something went wrong.'}
-        }
-
-        return res;
-    }catch{
-        return {Success:false,Message:"Something went wrong."}
-    }
-}
+export const CancelSubscription = async () => {
+  const res = await axios.post(APIS.premium.cancelPremium, {}, { withCredentials: true });
+  return res.data;
+};
