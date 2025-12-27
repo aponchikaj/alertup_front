@@ -80,6 +80,7 @@ const Mybuildings = () => {
     try {
       setActionLoading(id);
       const res = await deleteBuilding(id);
+      console.log(res)
       if (res.Success) {
         setBuildings((prev) => prev.filter((b) => b._id !== id));
       } else {

@@ -1,6 +1,6 @@
 // Use Vite env `VITE_API_URL` when available (set in production), otherwise fallback to known backend.
 const envApi = typeof import.meta !== 'undefined' ? (import.meta.env.VITE_API_URL as string | undefined) : undefined;
-export const MAIN_API_URL: string = (envApi && envApi.endsWith('/') ? envApi : envApi ? envApi + '/' : 'https://alertup-backend.onrender.com/api/');
+export const MAIN_API_URL: string = (envApi && envApi.endsWith('/') ? envApi : envApi ? envApi + '/' : 'http://localhost:3001/api/');
 export const APIS = {
     contact:`${MAIN_API_URL}contact`,
     me:`${MAIN_API_URL}me`,
@@ -23,7 +23,7 @@ export const APIS = {
         newBuilding:`${MAIN_API_URL}building/new`,
         myBuildings:`${MAIN_API_URL}building/my`,
         deactivateBuilding:`${MAIN_API_URL}building/deactivate/`,
-        deleteBuilding:`${MAIN_API_URL}building/`,
+        deleteBuilding:`${MAIN_API_URL}building/delete/`,
         getBuilding:`${MAIN_API_URL}building/id/`,
         getFloor:`${MAIN_API_URL}building/scan/`
     },

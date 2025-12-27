@@ -41,7 +41,7 @@ const NewBuilding = () => {
         }
 
         const premiumFloors: Record<string, number> = {
-          basic: 5,
+          Basic: 5,
           Platinum: 10,
           Elite: 20,
           Professional: 50,

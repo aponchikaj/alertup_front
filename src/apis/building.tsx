@@ -22,12 +22,14 @@ export const getMyBuildings = async () => {
   }
 };
 
+
 export const deleteBuilding = async (buildingID: string) => {
+  console.log(buildingID)
   try {
-    const res = (await axios.delete(APIS.buildings.deleteBuilding, {
-      data: { buildingID },
+    const res = (await axios.get(APIS.buildings.deleteBuilding+buildingID, {
       withCredentials: true,
     })).data;
+    console.log(res)
     return res || { Success: false, Message: 'Something went wrong.' };
   } catch (err) {
     console.error("deleteBuilding error:", err);
