@@ -60,18 +60,13 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
     }
     
     const isPoster = printSize === 'poster';
-    const qrSize = isPoster ? '300px' : '200px';
-    const titleSize = isPoster ? '32px' : '24px';
-    const subtitleSize = isPoster ? '20px' : '16px';
-    const infoSize = isPoster ? '16px' : '14px';
-    const containerWidth = isPoster ? '500px' : '350px';
-    const padding = isPoster ? '40px' : '25px';
     
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
         <head>
           <title>Emergency Route QR Code</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
             body { 
               margin: 0; 
@@ -84,47 +79,50 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
               min-height: 100vh;
             }
             .qr-container { 
-              width: ${containerWidth};
+              width: min(90%, 500px);
+              max-width: 500px;
               background: white;
-              padding: ${padding};
+              padding: 40px;
               border-radius: 12px;
               box-shadow: 0 4px 20px rgba(0,0,0,0.1);
               text-align: center;
+              margin: 0 auto;
             }
             .qr-header {
-              margin-bottom: ${isPoster ? '30px' : '20px'};
+              margin-bottom: 30px;
             }
             .qr-title { 
-              font-size: ${titleSize}; 
+              font-size: clamp(20px, 5vw, 32px); 
               font-weight: bold; 
-              margin-bottom: ${isPoster ? '12px' : '8px'};
+              margin-bottom: 12px;
               color: #FF7B22;
             }
             .qr-subtitle { 
-              font-size: ${subtitleSize}; 
-              margin-bottom: ${isPoster ? '25px' : '20px'};
+              font-size: clamp(14px, 3.5vw, 20px); 
+              margin-bottom: 25px;
               color: #353535;
             }
             .qr-image { 
-              margin: ${isPoster ? '30px' : '20px'} 0;
+              margin: 30px 0;
             }
             .qr-image svg {
-              width: ${qrSize};
-              height: ${qrSize};
+              width: clamp(120px, 25vw, 300px);
+              height: clamp(120px, 25vw, 300px);
+              max-width: 100%;
             }
             .qr-footer { 
-              margin-top: ${isPoster ? '30px' : '20px'};
-              padding-top: ${isPoster ? '25px' : '20px'};
+              margin-top: 30px;
+              padding-top: 25px;
               border-top: 1px solid #eee;
-              font-size: ${isPoster ? '14px' : '12px'}; 
+              font-size: 14px; 
               color: #666;
             }
             .qr-info {
-              margin: ${isPoster ? '20px' : '15px'} 0;
-              padding: ${isPoster ? '15px' : '10px'};
+              margin: 20px 0;
+              padding: 15px;
               background: #f8f9fa;
               border-radius: 8px;
-              font-size: ${infoSize};
+              font-size: clamp(12px, 2.5vw, 16px);
               color: #333;
               line-height: 1.6;
             }
@@ -139,18 +137,98 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
               border-radius: 4px;
               border: 1px solid #ddd;
             }
+            
+            @media (max-width: 640px) {
+              body { 
+                padding: 10px;
+                font-size: 14px;
+              }
+              .qr-container { 
+                width: 100%;
+                max-width: 350px;
+                padding: 20px;
+              }
+              .qr-title { 
+                font-size: 24px !important; 
+                margin-bottom: 8px !important;
+              }
+              .qr-subtitle { 
+                font-size: 16px !important; 
+                margin-bottom: 15px !important;
+              }
+              .qr-image { 
+                margin: 15px 0 !important;
+              }
+              .qr-image svg {
+                width: 180px !important;
+                height: 180px !important;
+              }
+              .qr-footer { 
+                margin-top: 15px !important;
+                padding-top: 15px !important;
+                font-size: 12px !important; 
+              }
+              .qr-info {
+                margin: 10px 0 !important;
+                padding: 10px !important;
+                font-size: 12px !important;
+              }
+              .qr-size-indicator {
+                font-size: 8px !important;
+                padding: 1px 4px !important;
+              }
+            }
+            
+            @media (min-width: 641px) and (max-width: 1024px) {
+              body { 
+                padding: 15px;
+              }
+              .qr-container { 
+                width: 90%;
+                max-width: 450px;
+              }
+              .qr-image svg {
+                width: 220px !important;
+                height: 220px !important;
+              }
+            }
+            
             @media print {
               body { 
                 background: white;
-                padding: 10px;
+                padding: 5mm;
+                font-size: 12pt;
               }
               .qr-container { 
                 box-shadow: none;
                 margin: 0;
-                width: ${isPoster ? '100%' : '350px'};
+                width: 100%;
+                max-width: none;
+                page-break-inside: avoid;
+              }
+              .qr-image svg {
+                width: 25mm !important;
+                height: 25mm !important;
+              }
+              .qr-title { 
+                font-size: 16pt !important; 
+              }
+              .qr-subtitle { 
+                font-size: 12pt !important; 
+              }
+              .qr-info {
+                font-size: 10pt !important;
+              }
+              .qr-footer { 
+                font-size: 9pt !important; 
               }
               .qr-size-indicator {
                 display: block;
+                font-size: 8pt;
+              }
+              @page {
+                margin: 10mm;
+                size: auto;
               }
             }
           </style>
@@ -200,22 +278,22 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-[#353535] rounded-lg max-w-md w-full border border-white/10">
-        <div className="p-6">
+      <div className="bg-[#353535] rounded-lg max-w-md w-full border border-white/10 max-h-[90vh] overflow-y-auto">
+        <div className="p-4 sm:p-6">
           {/* Header */}
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-white">QR Code</h2>
+          <div className="flex justify-between items-center mb-4 sm:mb-6">
+            <h2 className="text-lg sm:text-xl font-bold text-white">QR Code</h2>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-white text-2xl transition-colors"
+              className="text-gray-400 hover:text-white text-xl sm:text-2xl transition-colors"
             >
               ×
             </button>
           </div>
 
           {/* Node Info */}
-          <div className="mb-6 p-4 bg-white/5 rounded-lg border border-white/10">
-            <div className="text-sm text-gray-300">
+          <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-white/5 rounded-lg border border-white/10">
+            <div className="text-xs sm:text-sm text-gray-300">
               <div className="font-semibold text-white mb-1">
                 {node.label || `${node.type} node`}
               </div>
@@ -230,7 +308,7 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
             <button
               onClick={generateQR}
               disabled={loading}
-              className="w-full px-6 py-3 bg-[#FF7B22] text-white rounded-lg font-medium hover:bg-[#FF7B22]/80 disabled:opacity-50 disabled:cursor-not-allowed mb-4 transition-colors"
+              className="w-full px-4 sm:px-6 py-2 sm:py-3 bg-[#FF7B22] text-white rounded-lg font-medium hover:bg-[#FF7B22]/80 disabled:opacity-50 disabled:cursor-not-allowed mb-3 sm:mb-4 transition-colors text-sm sm:text-base"
             >
               {loading ? 'Generating...' : 'Generate QR Code'}
             </button>
@@ -238,19 +316,19 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
 
           {/* Error Display */}
           {error && (
-            <div className="mb-4 p-3 bg-red-500/20 border border-red-500 text-red-300 rounded-lg">
+            <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-red-500/20 border border-red-500 text-red-300 rounded-lg text-xs sm:text-sm">
               {error}
             </div>
           )}
 
           {/* QR Code Display */}
           {qrData && (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {/* Size Selection */}
               <div className="flex gap-2 p-3 bg-white/5 rounded-lg border border-white/10">
                 <button
                   onClick={() => setPrintSize('poster')}
-                  className={`flex-1 px-3 py-2 rounded-lg font-medium transition-colors ${
+                  className={`flex-1 px-2 sm:px-3 py-1 sm:py-2 rounded-lg font-medium transition-colors text-xs sm:text-sm ${
                     printSize === 'poster'
                       ? 'bg-[#FF7B22] text-white'
                       : 'bg-white/10 border border-white/20 text-white hover:bg-white/20'
@@ -260,7 +338,7 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
                 </button>
                 <button
                   onClick={() => setPrintSize('card')}
-                  className={`flex-1 px-3 py-2 rounded-lg font-medium transition-colors ${
+                  className={`flex-1 px-2 sm:px-3 py-1 sm:py-2 rounded-lg font-medium transition-colors text-xs sm:text-sm ${
                     printSize === 'card'
                       ? 'bg-[#FF7B22] text-white'
                       : 'bg-white/10 border border-white/20 text-white hover:bg-white/20'
@@ -271,14 +349,14 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
               </div>
 
               {/* Emergency Route Link */}
-              <div className="p-3 bg-white/5 rounded-lg border border-white/10">
-                <div className="text-sm text-gray-300 mb-2">Emergency Route Link:</div>
-                <div className="flex items-center gap-2">
+              <div className="p-2 sm:p-3 bg-white/5 rounded-lg border border-white/10">
+                <div className="text-xs sm:text-sm text-gray-300 mb-2">Emergency Route Link:</div>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
                   <input
                     type="text"
                     readOnly
                     value={`https://www.alertup.world/scan/route/qr_${node.buildingId}_${node.floorNumber}_${node._id}`}
-                    className="flex-1 px-3 py-2 bg-black/40 border border-white/20 rounded-lg text-white text-xs font-mono"
+                    className="flex-1 px-2 sm:px-3 py-1 sm:py-2 bg-black/40 border border-white/20 rounded-lg text-white text-xs sm:text-sm font-mono"
                   />
                   <button
                     onClick={(event) => {
@@ -295,7 +373,7 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
                         }, 2000);
                       }
                     }}
-                    className="px-3 py-2 bg-white/10 border border-white/20 text-white rounded-lg hover:bg-white/20 text-sm transition-colors"
+                    className="px-2 sm:px-3 py-1 sm:py-2 bg-white/10 border border-white/20 text-white rounded-lg hover:bg-white/20 text-xs sm:text-sm transition-colors whitespace-nowrap"
                   >
                     📋 Copy
                   </button>
@@ -304,37 +382,37 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
 
               {/* Preview */}
               <div className="text-center">
-                <div className="inline-block p-4 bg-white rounded-lg border border-white/20">
+                <div className="inline-block p-2 sm:p-4 bg-white rounded-lg border border-white/20">
                   {qrData.svgContent ? (
                     <div dangerouslySetInnerHTML={{ __html: qrData.svgContent }} />
                   ) : (
-                    <img src={qrData.url} alt="QR Code" className="w-32 h-32" />
+                    <img src={qrData.url} alt="QR Code" className="w-24 h-24 sm:w-32 sm:h-32" />
                   )}
-                  <div className="mt-3">
-                    <div className="font-bold text-sm text-[#FF7B22]">
+                  <div className="mt-2 sm:mt-3">
+                    <div className="font-bold text-xs sm:text-sm text-[#FF7B22]">
                       {buildingName || 'Emergency Route'}
                     </div>
                     <div className="text-xs text-gray-400">
                       {node.label || node.type} - Floor {floorName || '1'}
                     </div>
                   </div>
-                  <div className="mt-2 text-xs text-gray-500">
+                  <div className="mt-1 sm:mt-2 text-xs text-gray-500">
                     www.alertup.world
                   </div>
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3">
                 <button
                   onClick={handleDownload}
-                  className="px-4 py-2 bg-white/10 border border-white/20 text-white rounded-lg hover:bg-white/20 font-medium transition-colors"
+                  className="px-3 sm:px-4 py-2 bg-white/10 border border-white/20 text-white rounded-lg hover:bg-white/20 font-medium transition-colors text-xs sm:text-sm"
                 >
                   📱 Download
                 </button>
                 <button
                   onClick={handlePrint}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium transition-colors"
+                  className="px-3 sm:px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium transition-colors text-xs sm:text-sm"
                 >
                   🖨️ Print {printSize === 'poster' ? 'Poster' : 'Card'}
                 </button>

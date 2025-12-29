@@ -86,14 +86,36 @@ const InteractiveMap = ({
     }
   }, [translateX, translateY]);
 
+  // Get actual SVG dimensions from the content
+  const [svgDimensions, setSvgDimensions] = useState({ width: 1000, height: 800 });
+  
+  // Parse SVG content to get actual viewBox
+  useEffect(() => {
+    if (svgContent) {
+      const parser = new DOMParser();
+      const svgDoc = parser.parseFromString(svgContent, 'image/svg+xml');
+      const svgElement = svgDoc.querySelector('svg');
+      
+      if (svgElement) {
+        const viewBox = svgElement.getAttribute('viewBox');
+        if (viewBox) {
+          const [, , w, h] = viewBox.split(' ').map(Number);
+          if (!isNaN(w) && !isNaN(h)) {
+            setSvgDimensions({ width: w, height: h });
+          }
+        }
+      }
+    }
+  }, [svgContent]);
+
   // Convert screen coordinates to SVG coordinates
   const screenToSvgCoords = useCallback((screenX: number, screenY: number) => {
     const baseX = (screenX - translateX) / scale;
     const baseY = (screenY - translateY) / scale;
-    const svgX = (baseX / width) * 1000;
-    const svgY = (baseY / height) * 800;
+    const svgX = (baseX / width) * svgDimensions.width;
+    const svgY = (baseY / height) * svgDimensions.height;
     return { x: Math.round(svgX), y: Math.round(svgY) };
-  }, [width, height, scale, translateX, translateY]);
+  }, [width, height, scale, translateX, translateY, svgDimensions]);
 
   // Handle node mouse down for dragging
   const handleNodeMouseDown = useCallback((e: React.MouseEvent, node: Node) => {
@@ -178,9 +200,9 @@ const InteractiveMap = ({
 
   // Calculate node positions with map transformation
   const getNodePosition = useCallback((node: Node) => {
-    // Assuming SVG viewBox is 1000x800, scale positions accordingly
-    const svgWidth = 1000;
-    const svgHeight = 800;
+    // Use actual SVG dimensions instead of hardcoded values
+    const svgWidth = svgDimensions.width;
+    const svgHeight = svgDimensions.height;
     const baseX = (node.x / svgWidth) * width;
     const baseY = (node.y / svgHeight) * height;
     
@@ -189,7 +211,7 @@ const InteractiveMap = ({
     const transformedY = baseY * scale + translateY;
     
     return { x: transformedX, y: transformedY };
-  }, [width, height, scale, translateX, translateY]);
+  }, [width, height, scale, translateX, translateY, svgDimensions]);
 
   // Render connections between nodes
   const renderConnections = useCallback(() => {
@@ -271,7 +293,7 @@ const InteractiveMap = ({
           <svg
             ref={svgRef}
             className="absolute inset-0"
-            viewBox={`0 0 1000 800`}
+            viewBox={`0 0 ${svgDimensions.width} ${svgDimensions.height}`}
             preserveAspectRatio="xMidYMid meet"
             style={{
               transform: `translate(${translateX}px, ${translateY}px) scale(${scale})`,
@@ -294,7 +316,7 @@ const InteractiveMap = ({
 
         {/* Connections Layer */}
         {svgContent && (
-          <svg className="absolute inset-0 pointer-events-none" style={{ width, height }}>
+          <svg className="absolute inset-0 pointer-events-none" style={{ width, height }} viewBox={`0 0 ${svgDimensions.width} ${svgDimensions.height}`}>
             {renderConnections()}
           </svg>
         )}
