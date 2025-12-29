@@ -58,7 +58,7 @@ const VisualEmergencyRoute: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://alertup-backend.onrender.com';
 
   useEffect(() => {
     document.title = 'Emergency Route - AlertUp';

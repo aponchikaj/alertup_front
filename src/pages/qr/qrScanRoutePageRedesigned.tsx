@@ -62,7 +62,7 @@ const QRScanRoutePage: React.FC = () => {
   const [hoveredNode, setHoveredNode] = useState<FloorNode | null>(null);
   const [mapImageError, setMapImageError] = useState(false);
 
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://alertup-backend.onrender.com';
 
   useEffect(() => {
     document.title = 'Emergency Route - AlertUp';

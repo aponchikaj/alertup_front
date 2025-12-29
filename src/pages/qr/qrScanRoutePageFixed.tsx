@@ -65,7 +65,7 @@ const QRScanRoutePageFixed: React.FC = () => {
   // Fixed dimensions for uploaded images
   const mapDimensions = { width: 1000, height: 800 };
 
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://alertup-backend.onrender.com';
 
   const fetchRouteData = useCallback(async (qrId: string) => {
     try {
