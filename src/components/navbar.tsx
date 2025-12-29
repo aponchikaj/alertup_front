@@ -35,7 +35,6 @@ const Navbar = () => {
     { to: '/', title: 'Home' },
     { to: '/scan', title: 'Scan' },
     { to: '/contact', title: 'Contact' },
-    { to: '/premium', title: 'Premium' },
   ];
 
   const AUTHORIZED_NAV_BTNS = [
@@ -43,7 +42,6 @@ const Navbar = () => {
     { to: '/scan', title: 'Scan' },
     { to: '/mybuildings', title: 'Buildings' },
     { to: '/new', title: 'New' },
-    { to: '/premium', title: 'Premium' },
   ];
 
   // Render Navbar

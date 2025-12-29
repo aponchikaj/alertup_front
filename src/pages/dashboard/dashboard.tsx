@@ -5,11 +5,9 @@ const LABELS: { [key: string]: string } = {
   MyBuildings: "My Buildings",
   scanned: "Total Scans",
   myBuildingsScanned: "My Buildings Scanned",
-  lastScanned: "Last Scan",
-  premiumStatus: "Premium Status",
-  premiumExpires: "Premium Expires",
+  lastScan: "Last Scan",
+  totalBuildings: "Total Buildings",
   recentNotification: "Recent Notification",
-  totalTransactions: "Total Transactions",
 };
 
 const Dashboard = () => {
@@ -59,7 +57,7 @@ const Dashboard = () => {
           Your <span className="text-[#FF7B22]">Dashboard</span>
         </h1>
         <p className="text-gray-300 max-w-2xl mx-auto">
-          Overview of your buildings, floors, analytics, and premium features.
+          Overview of your buildings, floors, and analytics.
         </p>
       </section>
 
@@ -82,7 +80,7 @@ const Dashboard = () => {
               className="border-2 border-[#FF7B22] rounded-2xl p-8 flex flex-col gap-6 relative hover:scale-105 hover:shadow-2xl transition-transform duration-300 bg-[#353535] animate-fadeIn"
             >
               <span className="absolute top-4 right-4 text-xs bg-[#FF7B22] text-[#353535] px-3 py-1 rounded-full font-semibold">
-                {key === "premiumStatus" ? "PREMIUM" : "INFO"}
+                INFO
               </span>
 
               <h2 className="text-2xl font-semibold text-[#FF7B22]">
@@ -96,13 +94,13 @@ const Dashboard = () => {
                         ✔ {k.replace(/([A-Z])/g, " $1")}: {v !== null ? v.toString() : "N/A"}
                     </li>
                     ))
-                ) : key === "lastScanned" || key === "premiumExpires" ? (
+                ) : key === "lastScan" ? (
                     <li>✔ {formatDate(value as string)}</li>
                 ) : key === "recentNotification" && value && typeof value === "object" ? (
                     <li>
-                    ✔ {(value as { Title?: string; summary?: string; to?: string }).Title || "N/A"}:{" "}
-                    {(value as { Title?: string; summary?: string; to?: string }).summary || "N/A"} (To:{" "}
-                    {(value as { Title?: string; summary?: string; to?: string }).to || "N/A"})
+                      ✔ {(value as { Title?: string; summary?: string; to?: string }).Title || "N/A"}:{" "}
+                      {(value as { Title?: string; summary?: string; to?: string }).summary || "N/A"} (To:{" "}
+                      {(value as { Title?: string; summary?: string; to?: string }).to || "N/A"})
                     </li>
                 ) : (
                     <li>✔ {value !== null ? value?.toString() : "N/A"}</li>

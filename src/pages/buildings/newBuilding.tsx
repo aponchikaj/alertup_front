@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { getMe } from "../../apis/me";
 import { createNewBuilding } from "../../apis/building";
 import { useNavigate } from "react-router-dom";
 
@@ -17,8 +16,6 @@ const NewBuilding = () => {
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
 
-  const [maxFloors, setMaxFloors] = useState(3);
-
   const [buildingData, setBuildingData] = useState<BuildingSchema>({
     buildingName: "",
     floors: 1,
@@ -27,34 +24,11 @@ const NewBuilding = () => {
   });
 
   /* ----------------------------------
-     PAGE SETUP + PREMIUM CHECK
+     PAGE SETUP - NO PREMIUM RESTRICTIONS
   ----------------------------------- */
   useEffect(() => {
     document.title = "New - Alertup";
-
-    const checkUser = async () => {
-      try {
-        const res = await getMe();
-        if (!res || res.Success === false) {
-          setMaxFloors(3);
-          return;
-        }
-
-        const premiumFloors: Record<string, number> = {
-          Basic: 5,
-          Platinum: 10,
-          Elite: 20,
-          Professional: 50,
-        };
-
-        const userType = res.Message?.premium?.premiumType;
-        setMaxFloors(premiumFloors[userType] ?? 3);
-      } catch {
-        setMaxFloors(3);
-      }
-    };
-
-    checkUser();
+    // No premium checks - unlimited access for all users
   }, []);
 
   /* ----------------------------------
@@ -181,7 +155,7 @@ const NewBuilding = () => {
         </h1>
 
         <p className="text-sm text-white/60 text-center mb-4">
-          Max floors allowed: {maxFloors}
+          Unlimited floors available
         </p>
 
         {serverError && (
@@ -209,14 +183,13 @@ const NewBuilding = () => {
             <input
               type="number"
               min={1}
-              max={maxFloors}
               className="w-full px-4 py-2 rounded-lg bg-black/40 text-white outline-none mb-3"
               value={buildingData.floors}
               onChange={(e) => {
                 const value = Number(e.target.value);
                 setBuildingData({
                   ...buildingData,
-                  floors: Math.min(maxFloors, Math.max(1, value)),
+                  floors: Math.max(1, value),
                 });
               }}
               required

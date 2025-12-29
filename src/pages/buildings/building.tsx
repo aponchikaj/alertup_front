@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getBuilding } from "../../apis/building";
+import { getMe } from "../../apis/me";
 import { Link, useParams } from "react-router-dom";
 
 const Building = () => {
@@ -8,6 +9,7 @@ const Building = () => {
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
   const [buildingData, setBuildingData] = useState<any>(null);
+  const [isOwner, setIsOwner] = useState<boolean>(false);
 
 
   useEffect(() => {
@@ -23,6 +25,66 @@ const Building = () => {
         }
 
         setBuildingData(res.Message);
+
+        // Check if current user is the owner
+        const meRes = await getMe();
+        
+        // Try alternative methods if getMe fails
+        let currentUserId = meRes?.user?._id;
+        
+        if (!currentUserId && meRes?.Message?._id) {
+          currentUserId = meRes.Message._id;
+        }
+        
+        if (!currentUserId && meRes?.Message?.user?._id) {
+          currentUserId = meRes.Message.user._id;
+        }
+        
+        if (!currentUserId) {
+          // Try to get user ID from localStorage token first
+          const userToken = localStorage.getItem('userToken');
+          
+          if (userToken) {
+            try {
+              // Decode JWT token to get user ID
+              const tokenParts = userToken.split('.');
+              if (tokenParts.length === 3) {
+                const payload = JSON.parse(atob(tokenParts[1]));
+                currentUserId = payload.userId || payload.userID || payload.user_id || payload._id;
+              }
+            } catch (error) {
+              // Failed to decode JWT token from localStorage
+            }
+          }
+          
+          // If still no user ID, try cookies
+          if (!currentUserId) {
+            const cookies = document.cookie.split(';');
+            for (const cookie of cookies) {
+              const [name, value] = cookie.trim().split('=');
+              if (name === 'token' || name === 'authToken' || name === 'jwt') {
+                try {
+                  // Decode JWT token to get user ID
+                  const tokenParts = value.split('.');
+                  if (tokenParts.length === 3) {
+                    const payload = JSON.parse(atob(tokenParts[1]));
+                    currentUserId = payload.userId;
+                    break;
+                  }
+                } catch (error) {
+                  // Failed to decode JWT token
+                }
+              }
+            }
+          }
+        }
+        
+        if (currentUserId) {
+          const isUserOwner = currentUserId === res.Message.owner._id;
+          setIsOwner(isUserOwner);
+        } else {
+          setIsOwner(false);
+        }
       } catch {
         setServerError("Something went wrong.");
       } finally {
@@ -108,6 +170,16 @@ const Building = () => {
                 </span>
               </p>
             </div>
+
+            {/* Emergency Routing Button - Only for building owners */}
+            {isOwner && (
+              <Link
+                to={`/building/${buildingData._id}/nodes`}
+                className="mt-4 w-full py-2 bg-[#FF7B22] text-white rounded-lg hover:bg-[#FF7B22]/80 text-center font-semibold"
+              >
+                🚨 Manage Emergency Routes
+              </Link>
+            )}
           </div>
 
           {/* MAPS SECTION */}

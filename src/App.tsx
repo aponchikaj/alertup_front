@@ -4,24 +4,25 @@ import Navbar from "./components/navbar";
 import Footer from "./components/footer";
 import GuestGuard from "./guards/guestguard";
 import AuthGuard from "./guards/authguard";
+import BuildingOwnerGuard from "./guards/buildingOwnerGuard";
 import ServerGate from "./pages/other/loading";
 import { Analytics } from "@vercel/analytics/react";
 
 // Lazy-loaded pages
 const Home = lazy(() => import("./pages/home"));
 const Scan = lazy(() => import("./pages/scan/scan"));
+const QRScanRoutePage = lazy(() => import("./pages/qr/qrScanRoutePageFixed"));
 const Contact = lazy(() => import("./pages/contact/contact"));
 const Register = lazy(() => import("./pages/auth/register"));
 const Login = lazy(() => import("./pages/auth/login"));
-const Premium = lazy(() => import("./pages/premium/premium"));
 const Reset = lazy(() => import("./pages/reset/reset"));
 const Dashboard = lazy(() => import("./pages/dashboard/dashboard"));
 const NewBuilding = lazy(() => import("./pages/buildings/newBuilding"));
 const Mybuildings = lazy(() => import("./pages/buildings/mybuildings"));
-const Checkout = lazy(() => import("./pages/premium/checkout"));
-const Success = lazy(() => import("./pages/premium/success"));
+const NodeManager = lazy(() => import("./pages/buildings/nodeManager"));
 const Building = lazy(() => import("./pages/buildings/building"));
 const Floor = lazy(() => import("./pages/buildings/floor"));
+const RouteDisplay = lazy(() => import("./pages/route/routeDisplay"));
 const Settings = lazy(() => import("./pages/settings/settings"));
 const PageNotFound = lazy(() => import("./pages/other/pageNotFound"));
 
@@ -36,10 +37,9 @@ const App = () => {
             {/* Public Routes */}
             <Route path="/" element={<Home />} />
             <Route path="/scan" element={<Scan />} />
+            <Route path="/scan/route/:qrId" element={<QRScanRoutePage />} />
             <Route path="/contact" element={<Contact />} />
-            <Route path="/premium" element={<Premium />} />
-            <Route path="/building/:buildingID" element={<Building />} />
-            <Route path="/building/:id/:floor" element={<Floor />} />
+            <Route path="/route/:qrId" element={<RouteDisplay />} />
 
             {/* Guest-only Routes */}
             <Route
@@ -69,22 +69,6 @@ const App = () => {
 
             {/* Auth-only Routes */}
             <Route
-              path="/checkout/:plan"
-              element={
-                <AuthGuard>
-                  <Checkout />
-                </AuthGuard>
-              }
-            />
-            <Route
-              path="/premium/success"
-              element={
-                <AuthGuard>
-                  <Success />
-                </AuthGuard>
-              }
-            />
-            <Route
               path="/dashboard"
               element={
                 <AuthGuard>
@@ -113,6 +97,30 @@ const App = () => {
               element={
                 <AuthGuard>
                   <Settings />
+                </AuthGuard>
+              }
+            />
+
+            {/* Building Management Routes - Auth Required */}
+            <Route
+              path="/building/:buildingID"
+              element={
+                <Building />
+              }
+            />
+            <Route
+              path="/building/:id/:floor"
+              element={
+                <Floor />
+              }
+            />
+            <Route
+              path="/building/:buildingId/nodes"
+              element={
+                <AuthGuard>
+                  <BuildingOwnerGuard>
+                    <NodeManager />
+                  </BuildingOwnerGuard>
                 </AuthGuard>
               }
             />
