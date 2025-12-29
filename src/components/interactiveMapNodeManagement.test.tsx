@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen, fireEvent } from '@testing-library/react';
+// import userEvent from '@testing-library/user-event';
 import { BrowserRouter } from 'react-router-dom';
 import InteractiveMap from './interactiveMap';
 import { type Node } from '../apis/nodesApi';
@@ -80,7 +80,7 @@ describe('InteractiveMap Node Management', () => {
 
   it('handles node dragging with shift key', async () => {
     const mockOnNodeUpdate = jest.fn();
-    const user = userEvent.setup();
+    // const user = userEvent.setup();
     
     renderWithRouter(
       <InteractiveMap 

@@ -177,11 +177,11 @@ describe('NodeManager - Complete Functionality', () => {
 
       // Simulate node drag (this would normally be done through InteractiveMap)
       // For testing, we'll call the update function directly
-      const handleNodeUpdate = jest.fn();
+      // const handleNodeUpdate = jest.fn();
       // In the actual component, this would be called from InteractiveMap
       
       // Mock the drag operation
-      const updatedNode = { ...mockNodes[0], x: 150, y: 250 };
+      // const updatedNode = { ...mockNodes[0], x: 150, y: 250 };
       mockNodesApi.updateNode('node1', { x: 150, y: 250 });
 
       expect(mockNodesApi.updateNode).toHaveBeenCalledWith('node1', { x: 150, y: 250 });
