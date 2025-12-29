@@ -290,12 +290,6 @@ const InteractiveMap = ({
     onNodeHover(node?._id || null);
   }, [onNodeHover]);
 
-  // Reset view
-  const resetView = useCallback(() => {
-    setScale(1);
-    setTranslateX(0);
-    setTranslateY(0);
-  }, []);
 
   // Get responsive dimensions
   const getResponsiveDimensions = useCallback(() => {
@@ -315,7 +309,6 @@ const InteractiveMap = ({
   // Update dimensions when window resizes
   useEffect(() => {
     const handleResize = () => {
-      const newDimensions = getResponsiveDimensions();
       // You might want to update parent component or adjust layout here
     };
 
