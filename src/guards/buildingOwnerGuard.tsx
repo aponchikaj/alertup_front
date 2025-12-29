@@ -18,7 +18,14 @@ const BuildingOwnerGuard = ({ children }: { children: any }) => {
           return;
         }
 
-        setUser(meRes.user);
+        // Get user data from the correct location in response
+        const userData = meRes.user || meRes.Message?.user || meRes.Message;
+        if (!userData || !userData._id) {
+          setIsOwner(false);
+          return;
+        }
+
+        setUser(userData);
 
         // If no buildingId provided, just check authentication
         if (!buildingId) {
@@ -30,7 +37,7 @@ const BuildingOwnerGuard = ({ children }: { children: any }) => {
         const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://alertup-backend.onrender.com';
         const buildingRes = await axios.get(`${API_BASE_URL}/api/building/id/${buildingId}`);
         
-        if (buildingRes.data.Success && buildingRes.data.Message.owner._id === meRes.user._id) {
+        if (buildingRes.data.Success && buildingRes.data.Message.owner._id === userData._id) {
           setIsOwner(true);
         } else {
           setIsOwner(false);
