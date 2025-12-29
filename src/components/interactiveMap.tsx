@@ -42,8 +42,37 @@ const InteractiveMap = ({
   const [inputCoordinates, setInputCoordinates] = useState({ x: '', y: '' });
   const [selectedNodeForCoords, setSelectedNodeForCoords] = useState<string | null>(null);
 
+  // Get responsive dimensions
+  const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+  
   // Filter nodes for current floor
   const floorNodes = nodes.filter(n => n.floorNumber === selectedFloor);
+
+  // Update dimensions based on screen size
+  useEffect(() => {
+    const updateDimensions = () => {
+      if (typeof window !== 'undefined') {
+        const screenWidth = window.innerWidth;
+        let newWidth = width;
+        let newHeight = height;
+        
+        if (screenWidth < 640) { // Mobile
+          newWidth = 350;
+          newHeight = 280;
+        } else if (screenWidth < 1024) { // Tablet
+          newWidth = 500;
+          newHeight = 400;
+        }
+        // Desktop uses default
+        
+        setDimensions({ width: newWidth, height: newHeight });
+      }
+    };
+
+    updateDimensions();
+    window.addEventListener('resize', updateDimensions);
+    return () => window.removeEventListener('resize', updateDimensions);
+  }, [width, height]);
 
   // Reset view when SVG content changes
   useEffect(() => {
@@ -58,7 +87,7 @@ const InteractiveMap = ({
   const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    const newScale = Math.min(Math.max(scale * delta, 0.1), 5);
+    const newScale = Math.min(Math.max(scale * delta, 0.5), 3);
     
     // Get mouse position relative to container
     const rect = containerRef.current?.getBoundingClientRect();
@@ -69,13 +98,13 @@ const InteractiveMap = ({
     
     // Calculate new translation to zoom towards mouse position
     const scaleChange = newScale - scale;
-    const newTranslateX = translateX - (mouseX - width / 2) * scaleChange;
-    const newTranslateY = translateY - (mouseY - height / 2) * scaleChange;
+    const newTranslateX = translateX - (mouseX - dimensions.width / 2) * scaleChange;
+    const newTranslateY = translateY - (mouseY - dimensions.height / 2) * scaleChange;
     
     setScale(newScale);
     setTranslateX(newTranslateX);
     setTranslateY(newTranslateY);
-  }, [scale, translateX, translateY, width, height]);
+  }, [scale, translateX, translateY, dimensions]);
 
   // Handle mouse down for panning
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -112,10 +141,10 @@ const InteractiveMap = ({
   const screenToSvgCoords = useCallback((screenX: number, screenY: number) => {
     const baseX = (screenX - translateX) / scale;
     const baseY = (screenY - translateY) / scale;
-    const svgX = (baseX / width) * svgDimensions.width;
-    const svgY = (baseY / height) * svgDimensions.height;
+    const svgX = (baseX / dimensions.width) * svgDimensions.width;
+    const svgY = (baseY / dimensions.height) * svgDimensions.height;
     return { x: Math.round(svgX), y: Math.round(svgY) };
-  }, [width, height, scale, translateX, translateY, svgDimensions]);
+  }, [dimensions, scale, translateX, translateY, svgDimensions]);
 
   // Handle node mouse down for dragging
   const handleNodeMouseDown = useCallback((e: React.MouseEvent, node: Node) => {
@@ -203,15 +232,15 @@ const InteractiveMap = ({
     // Use actual SVG dimensions instead of hardcoded values
     const svgWidth = svgDimensions.width;
     const svgHeight = svgDimensions.height;
-    const baseX = (node.x / svgWidth) * width;
-    const baseY = (node.y / svgHeight) * height;
+    const baseX = (node.x / svgWidth) * dimensions.width;
+    const baseY = (node.y / svgHeight) * dimensions.height;
     
     // Apply map transformation
     const transformedX = baseX * scale + translateX;
     const transformedY = baseY * scale + translateY;
     
     return { x: transformedX, y: transformedY };
-  }, [width, height, scale, translateX, translateY, svgDimensions]);
+  }, [dimensions, scale, translateX, translateY, svgDimensions]);
 
   // Render connections between nodes
   const renderConnections = useCallback(() => {
@@ -268,17 +297,34 @@ const InteractiveMap = ({
     setTranslateY(0);
   }, []);
 
-  // Zoom in/out
-  const zoomIn = useCallback(() => {
-    setScale(prev => Math.min(prev * 1.2, 5));
+  // Get responsive dimensions
+  const getResponsiveDimensions = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      const width = window.innerWidth;
+      if (width < 640) { // Mobile
+        return { width: 350, height: 280 };
+      } else if (width < 1024) { // Tablet
+        return { width: 500, height: 400 };
+      } else { // Desktop
+        return { width: 800, height: 600 };
+      }
+    }
+    return { width: 800, height: 600 }; // Default
   }, []);
 
-  const zoomOut = useCallback(() => {
-    setScale(prev => Math.max(prev * 0.8, 0.1));
-  }, []);
+  // Update dimensions when window resizes
+  useEffect(() => {
+    const handleResize = () => {
+      const newDimensions = getResponsiveDimensions();
+      // You might want to update parent component or adjust layout here
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [getResponsiveDimensions]);
 
   return (
-    <div className="relative bg-gray-100 rounded-lg overflow-hidden border border-gray-300" style={{ width, height }}>
+    <div className="relative bg-gray-100 rounded-lg overflow-hidden border border-gray-300" style={{ width: dimensions.width, height: dimensions.height }}>
       {/* Map Container */}
       <div
         ref={containerRef}
@@ -316,7 +362,7 @@ const InteractiveMap = ({
 
         {/* Connections Layer */}
         {svgContent && (
-          <svg className="absolute inset-0 pointer-events-none" style={{ width, height }} viewBox={`0 0 ${svgDimensions.width} ${svgDimensions.height}`}>
+          <svg className="absolute inset-0 pointer-events-none" style={{ width: dimensions.width, height: dimensions.height }} viewBox={`0 0 ${svgDimensions.width} ${svgDimensions.height}`}>
             {renderConnections()}
           </svg>
         )}
@@ -364,53 +410,15 @@ const InteractiveMap = ({
           <div>SVG: ({Math.round(screenToSvgCoords(mousePosition.x, mousePosition.y).x)}, {Math.round(screenToSvgCoords(mousePosition.x, mousePosition.y).y)})</div>
           <div>Zoom: {Math.round(scale * 100)}%</div>
         </div>
-      </div>
 
-      {/* Controls */}
-      <div className="absolute top-4 right-4 flex flex-col gap-2">
-        <button
-          onClick={zoomIn}
-          className="w-10 h-10 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center justify-center transition-colors shadow-md"
-          title="Zoom In"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-          </svg>
-        </button>
-        
-        <button
-          onClick={zoomOut}
-          className="w-10 h-10 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center justify-center transition-colors shadow-md"
-          title="Zoom Out"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-          </svg>
-        </button>
-        
-        <button
-          onClick={resetView}
-          className="w-10 h-10 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center justify-center transition-colors shadow-md"
-          title="Reset View"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Zoom Indicator */}
-      <div className="absolute bottom-4 right-4 bg-white border border-gray-300 text-gray-700 px-3 py-1 rounded-lg text-sm shadow-md">
-        {Math.round(scale * 100)}%
-      </div>
-
-      {/* Instructions */}
-      <div className="absolute bottom-4 left-4 bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-xs max-w-xs shadow-md">
-        <p>🖱️ Scroll to zoom</p>
-        <p>🤚 Click & drag to pan</p>
-        <p>📍 Click nodes to select</p>
-        <p>⚡ Shift+drag nodes to move</p>
-        <p>🎯 Right-click nodes to edit coords</p>
+        {/* Instructions */}
+        <div className="absolute bottom-4 left-4 bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-xs max-w-xs shadow-md">
+          <p>🖱️ Scroll to zoom</p>
+          <p>🤚 Click & drag to pan</p>
+          <p>📍 Click nodes to select</p>
+          <p>⚡ Shift+drag nodes to move</p>
+          <p>🎯 Right-click nodes to edit coords</p>
+        </div>
       </div>
 
       {/* Coordinate Input Modal */}
