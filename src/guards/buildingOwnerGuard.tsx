@@ -27,7 +27,7 @@ const BuildingOwnerGuard = ({ children }: { children: any }) => {
         }
 
         // Check if user owns the specific building
-        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://alertup-backend.onrender.com';
         const buildingRes = await axios.get(`${API_BASE_URL}/api/building/id/${buildingId}`);
         
         if (buildingRes.data.Success && buildingRes.data.Message.owner._id === meRes.user._id) {
