@@ -42,5 +42,9 @@ export const APIS = {
         deleteAccount:`${MAIN_API_URL}settings/account`,
         logoutAccount:`${MAIN_API_URL}settings/logout`
     },
-    connectAPI:`${MAIN_API_URL}connect`
+    connectAPI:`${MAIN_API_URL}connect`,
+    reviews:{
+        checkReviewSent:`${MAIN_API_URL}review/already`,
+        sendReview:`${MAIN_API_URL}review/alertup`
+    }
 }

@@ -4,6 +4,7 @@ import Sponsors from "../components/sponsors";
 import { Link } from "react-router-dom";
 import { ContactAPI } from "../apis/contact";
 import { getMe } from "../apis/me";
+import Reviews from "../components/reviews";
 
 const Home = () => {
 
@@ -170,6 +171,10 @@ const Home = () => {
                 <div className="w-[200px] h-[1px] bg-[#FF7B22]" />
                 <Sponsors />
                 <div className="w-[200px] h-[1px] bg-[#FF7B22]" />
+            </main>
+
+            <main className="w-full h-auto bg-[#353535] p-[10px] flex items-center justify-center">
+                <Reviews/>  
             </main>
 
             {/* ABOUT */}
