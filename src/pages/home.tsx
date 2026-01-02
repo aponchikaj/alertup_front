@@ -114,7 +114,6 @@ const Home = () => {
                             </span>
                             . Instant access to evacuation routes through QR codes.
                         </p>
-                        <p className="text-sm text-[#FF7B22]">Beta</p>
                         {!isLogged ? (
                             <ul className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-white mt-2">
                                 <Link to={'/login'} className="font-thin text-lg hover:scale-110 hover:text-[#FF7B22] duration-200">
