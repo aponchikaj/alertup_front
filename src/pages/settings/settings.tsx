@@ -10,6 +10,7 @@ import {
   deleteAccount,
   logoutFromAccount
 } from "../../apis/settings";
+import {enable2fa,deactivate2fa,verify2fa} from '../../apis/twoFactorAuth'
 import { useNavigate } from "react-router-dom";
 
 const Settings = () => {
@@ -30,6 +31,10 @@ const Settings = () => {
   const [accountVerificationCode, setAccountVerificationCode] = useState("");
 
   const [userPassword, setUserPassword] = useState("");
+
+  const [twoFaCode,setTwoFaCode] = useState()
+  const [twoFaMode,setTwoFaMode] = useState("")
+  const [twoFaSent,setTwoFaSent] = useState(false)
 
   useEffect(() => {
     document.title = "Settings - AlertUp";
@@ -53,6 +58,44 @@ const Settings = () => {
 
     getUserSettings();
   }, []);
+
+  const activate2FA = async()=>{
+    try{
+      const res = await enable2fa()
+      if(!res) {setServerError("Something went wrong."); return;}
+      if(res.Success==false) {setServerError(res.Message); return;}
+      setTwoFaMode("activate")
+      setTwoFaSent(true)
+      return;
+    }catch{
+      setServerError("Something went wrong.")
+    }
+  }
+
+  const deactivate2FA = async()=>{
+    try{
+      const res = await deactivate2fa()
+      if(!res) {setServerError("Something went wrong."); return;}
+      if(res.Success==false){setServerError(res.Message);return;}
+      setTwoFaMode("deactivate")
+      setTwoFaSent(true)
+      return;
+    }catch{console.log("Something went wrong.");setServerError("Something went wrong.")}
+  }
+
+  const verify2FA = async()=>{
+    try{
+      const res = await verify2fa({verificationCode:twoFaCode,verificationType:twoFaMode})
+      if(!res){setServerError("Something went wrong.");return;}
+      if(res.Success==false){setServerError(res.Message);return;}
+
+      window.location.reload();
+      return;
+    }catch{
+      console.log("Something went wrong.")
+      setServerError("Something went wrong.")
+    }
+  }
 
   const saveUserSettings = async () => {
     setLoading(true);
@@ -235,6 +278,36 @@ const Settings = () => {
               </button>
             </section>
 
+            {/* 2FA ON / OFF    --------------------------------------------------------------------*/}
+            <section className="w-full bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-6 shadow-xl space-y-4">
+              <section className="w-full p-[6px] flex flex-col justify-center text-start justify-start">
+                <h1 className="text-2xl font-bold mb-4 text-wrap">2fa</h1>
+                <p className="text-sm">Make your account safer</p>
+              </section>
+              {
+                userData.TwoFactorEnabled == false && twoFaSent==false && (
+                  <button onClick={activate2FA} className="w-full bg-[#FF7B22] hover:bg-[#e06b1b] transition text-black font-semibold py-2 rounded-xl">Activate</button>
+                )
+              }
+
+              {
+                userData.TwoFactorEnabled == true && twoFaSent==false && (
+                  <button onClick={deactivate2FA} className="w-full bg-[#FF7B22] hover:bg-[#e06b1b] transition text-black font-semibold py-2 rounded-xl">Deactivate</button>
+                )
+              }
+
+              {
+                twoFaSent == true && (
+                  <>
+                  <InputField maxLen={6} label="Code" type="number" value={twoFaCode} onChange={(e:any)=>{
+                    setTwoFaCode(e.target.value)
+                  }} />
+                  <button onClick={verify2FA} className="w-full bg-[#FF7B22] hover:bg-[#e06b1b] transition text-black font-semibold py-2 rounded-xl">Submit</button>
+                  </>
+                )
+              }
+            </section>
+
             {/* CHANGE PASSWORD */}
             <section className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-6 shadow-xl space-y-4">
               <h2 className="text-2xl font-bold mb-4">Change Password</h2>
@@ -294,6 +367,7 @@ const Settings = () => {
                     <InputField
                       label="Verification Code"
                       value={accountVerificationCode}
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
                       onChange={(e:any) => setAccountVerificationCode(e.target.value)}
                     />
                   )}
@@ -328,7 +402,7 @@ const Settings = () => {
             <section className="flex justify-center mt-4">
               <button
                 onClick={logout}
-                className="bg-white/10 hover:bg-white/20 transition text-white font-semibold py-2 px-6 rounded-xl"
+                className="bg-red-600 hover:bg-red-700 transition cursor-pointer w-full text-white font-semibold py-2 px-6 rounded-xl"
               >
                 Logout
               </button>
@@ -340,13 +414,14 @@ const Settings = () => {
   );
 };
 
-const InputField = ({ label, type = "text", value, onChange }: any) => (
+const InputField = ({ label, type = "text", value, onChange, maxLen }: any) => (
   <div className="flex flex-col space-y-1">
     <label className="text-white/70 font-medium">{label}</label>
     <input
       type={type}
       value={value}
       onChange={onChange}
+      maxLength={maxLen}
       className="bg-black/20 border border-white/10 rounded-xl p-2 text-white focus:outline-none focus:ring-2 focus:ring-[#FF7B22]"
     />
   </div>
