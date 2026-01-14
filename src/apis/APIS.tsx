@@ -19,11 +19,11 @@ export const APIS = {
         deactivate2fa:`${MAIN_API_URL}2fa/deactivate`,
         verify2fa:`${MAIN_API_URL}2fa/verify`
     },
-    // premium:{
-    //     getPremiumPlans:`${MAIN_API_URL}premium/plans`,
-    //     purchasePremium:`${MAIN_API_URL}premium/purchase`,
-    //     confirmPremium:`${MAIN_API_URL}premium/confirm`
-    // },
+    premium:{
+        getPremiumPlans:`${MAIN_API_URL}premium/plans`,
+        purchasePremium:`${MAIN_API_URL}premium/purchase`,
+        confirmPremium:`${MAIN_API_URL}premium/confirm`
+    },
     getDashboard:`${MAIN_API_URL}dashboard`,
     buildings:{
         newBuilding:`${MAIN_API_URL}building/new`,
