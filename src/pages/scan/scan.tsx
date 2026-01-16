@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import PageHeader from '../../components/pageHeader';
 import Scanner from '../../components/scanner';
+import {Link} from 'react-router-dom'
 
 const Scan = () => {
   const [qrCodeMessage, setQrCodeMessage] = useState("");
@@ -62,7 +63,7 @@ const Scan = () => {
           {/* Message Display */}
           <section className="flex flex-col items-center text-center mt-4">
             {qrCodeMessage === "" ? (
-              <p className="text-sm text-[#FF7B22]">Scan an AlertUp QR code to view emergency routes</p>
+              <p className="text-sm text-white">Or create <Link to={'/new'}><span className="text-[#FF7B22] hover:text-[#FF7B22]/60 ease-in-out duration-200 hover:scale-105">New</span></Link> </p>
             ) : (
               <p className="text-sm text-red-500">{qrCodeMessage}</p>
             )}
