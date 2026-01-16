@@ -65,7 +65,6 @@ const ServerGate = ({ children }: { children: JSX.Element }) => {
             <p className="text-sm opacity-60">Retry attempt {retryCount}/{MAX_RETRIES}</p>
           )}
           <p className="text-sm opacity-80 mt-4">Hosted on free service</p>
-          <p className="text-xs opacity-60 mt-2">API: {MAIN_API_URL}</p>
         </div>
       </main>
     );
