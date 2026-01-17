@@ -100,8 +100,6 @@ const App = () => {
                 </AuthGuard>
               }
             />
-
-            {/* Building Management Routes - Auth Required */}
             <Route
               path="/building/:buildingID"
               element={

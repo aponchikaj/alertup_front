@@ -5,6 +5,10 @@ import { Link } from "react-router-dom";
 import { ContactAPI } from "../apis/contact";
 import { getMe } from "../apis/me";
 import Reviews from "../components/reviews";
+import './styles/styles.css'
+import DEFENCE_ICON from "../assets/images/defence.png"
+import PHONE_ICON from '../assets/images/smartphone.png'
+import TREASURE_ICON from '../assets/images/treasure-map.png'
 
 const Home = () => {
 
@@ -43,6 +47,7 @@ const Home = () => {
         message:""
     })
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const SendMessage = async(e:any)=>{
         e.preventDefault()
         setContactLoading(true)
@@ -91,7 +96,7 @@ const Home = () => {
             <header className="w-full bg-[#353535] flex flex-col items-center justify-center gap-4 px-3 py-4">
                 <section className="w-full h-[12vh]" />
 
-                <section className="w-full flex items-center justify-center mb-[10px]">
+                <section className="w-full flex items-center justify-center mb-[10px] forAnim">
                     <div className="rounded-[50px] p-[6px] border border-[#FF7B22] bg-black hover:shadow-xl hover:translate-y-[-3px] ease-in-out duration-200 w-[200px] text-center">
                         <h1 className="text-white text-sm md:text-md font-thin hover:font-medium cursor-pointer">
                             Scan & Be safe
@@ -103,11 +108,11 @@ const Home = () => {
 
                     {/* LEFT */}
                     <section className="w-full md:w-1/3 flex flex-col items-center md:items-start justify-center text-center md:text-start gap-4 px-2">
-                        <h1 className="text-white text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-light leading-tight">
+                        <h1 className="text-white text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-light leading-tight forAnim">
                             Alert<span className="text-[#FF7B22] text-2xl md:text-3xl">up</span>
                         </h1>
 
-                        <p className="text-white text-sm sm:text-md md:text-lg max-w-md">
+                        <p className="text-white text-sm sm:text-md md:text-lg max-w-md forAnim">
                             Scan Once & Find the{" "}
                             <span className="text-[#FF7B22] font-medium">
                                 Safest Way
@@ -115,7 +120,7 @@ const Home = () => {
                             . Instant access to evacuation routes through QR codes.
                         </p>
                         {!isLogged ? (
-                            <ul className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-white mt-2">
+                            <ul className="flex forAnim flex-wrap items-center justify-center md:justify-start gap-4 text-white mt-2">
                                 <Link to={'/login'} className="font-thin text-lg hover:scale-110 hover:text-[#FF7B22] duration-200">
                                     Log in
                                 </Link>
@@ -125,14 +130,14 @@ const Home = () => {
                                 </Link>
                             </ul>
                         ) : (
-                            <Link to={'/dashboard'} className="text-white text-lg font-thin hover:scale-110 hover:text-[#FF7B22] duration-200">
+                            <Link to={'/dashboard'} className="text-white forAnim text-lg font-thin hover:scale-110 hover:text-[#FF7B22] duration-200">
                                 Dashboard
                             </Link>
                         )}
                     </section>
 
                     {/* RIGHT */}
-                    <section className="w-full md:w-1/3 flex flex-col items-center justify-center gap-4">
+                    <section className="w-full md:w-1/3 flex flex-col items-center justify-center gap-4 forAnim">
                         <div className="flex md:hidden ">
                             <Scanner
                                 w={250}
@@ -162,10 +167,51 @@ const Home = () => {
                 </main>
             </header>
 
-            {/* SPACER */}
             <section className="w-full py-4 bg-[#353535]" />
 
-            {/* SPONSORS */}
+            {/* OUR THINGS */}
+            <main className="w-full h-auto md:h-[60vh] lg:h-[50vh] flex items-center justify-center bg-[#353535]">
+                <section className="w-[90%] md:w-[70%] h-full rounded-[10px] backdrop-shadow-xl shadow-2xl bg-[#353535]/150 border border-[#FF7B22]/30 flex flex-col items-center justify-center forAnim p-[10px] ease-in-out duration-200 hover:-translate-y-1" >
+                    <h1 className="text-2xl text-center md:text-[30px] text-white font-bold ease-in-out duration-200 hover:text-[#FF7B22] p-[10px]">Our services</h1>
+                    <div className="w-[80%] md:w-[70%] lg:w-[50%] h-[1px] bg-[#FF7B22]" />
+                    <section className="w-full p-[10px] flex items-center justify-center flex-wrap h-full">
+                        <ul className="w-full p-[10px] flex flex-col md:flex-row items-center justify-center text-center md:justify-around h-full gap-10">
+
+                            <section className="flex flex-col gap-2 items-center justify-center w-full md:w-1/3">
+                                <section className="text-center flex items-center justify-center">
+                                    <img src={DEFENCE_ICON} alt="defence" className="w-[50px] md:w-[70px] lg:w-[80px] text-center" />
+                                </section>
+                                <section className="text-center text-white w-full md:w-1/2 p-[5px]">
+                                    <h1 className="md:text-lg font-semibold">Emergency Instructions</h1>
+                                    <p className="py-[5px] text-sm md:text-md text-gray-300">Clear, step-by-step safety guidance tailored to the building and emergency type.</p>
+                                </section>
+                            </section>
+
+                            <section className="flex flex-col gap-2 items-center justify-center w-full md:w-1/3">
+                                <section className="text-center flex items-center justify-center">
+                                    <img src={TREASURE_ICON} alt="treasure" className="w-[50px] md:w-[70px] lg:w-[80px]" />
+                                </section>
+                                <section className="text-center text-white w-full md:w-1/2 p-[5px]">
+                                    <h1 className="md:text-lg font-semibold">Escape Route Maps</h1>
+                                    <p className="py-[5px] text-sm md:text-md text-gray-300">Simple visual evacuation maps that show exits and safe paths inside the building.</p>
+                                </section>
+                            </section>
+
+                             <section className="flex flex-col gap-2 items-center justify-center w-full md:w-1/3">
+                                <section className="text-center flex items-center justify-center">
+                                    <img src={PHONE_ICON} alt="phone" className="w-[50px] md:w-[70px] lg:w-[80px]" />
+                                </section>
+                                <section className="text-center text-white w-full md:w-1/2 p-[5px]">
+                                    <h1 className="md:text-lg font-semibold">QR Code Access</h1>
+                                    <p className="py-[5px] text-sm md:text-md text-gray-300">No app needed. Scan a QR code and instantly access emergency safety information.</p>
+                                </section>
+                            </section>
+
+                        </ul>
+                    </section>
+                </section>
+            </main>
+
             <main className="w-full py-6 flex flex-col items-center justify-center gap-4 bg-[#353535]">
                 <div className="w-[200px] h-[1px] bg-[#FF7B22]" />
                 <Sponsors />
@@ -176,7 +222,6 @@ const Home = () => {
                 <Reviews/>  
             </main>
 
-            {/* ABOUT */}
             <main className="w-full py-6 px-4 flex flex-col items-center justify-center gap-4 bg-[#353535] text-center">
                 <h1 className="text-xl md:text-2xl font-medium text-[#FF7B22]">
                     What's this?
@@ -195,7 +240,6 @@ const Home = () => {
                 </p>
             </main>
 
-            {/* CONTACT */}
             <main className="w-full bg-[#353535] py-10 px-4 flex items-center justify-center">
             <form
                 onSubmit={SendMessage}
