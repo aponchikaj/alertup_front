@@ -40,6 +40,7 @@ const NodeManager = () => {
       return;
     }
 
+    // eslint-disable-next-line react-hooks/immutability
     loadBuildingAndNodes();
   }, [buildingId]);
 
@@ -119,6 +120,7 @@ const NodeManager = () => {
       const nodeData = { ...newNode, buildingId: buildingId!, floorNumber: selectedFloor };
       
       const result = await createNode(nodeData);
+      console.log(result)
       
       if (result.success) {
         setNodes([...nodes, result.node]);

@@ -103,6 +103,7 @@ const Login = () => {
               setTwoFaCode(e.target.value)
             }
             required
+            typeof="number"
           />
 
           {/* Submit */}

@@ -52,6 +52,7 @@ const QRCodeScanPage: React.FC = () => {
         } else {
           setError(response.data.message || 'Failed to load route data');
         }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
         console.error('Error fetching route data:', err);
         setError(err.message || 'Failed to load route data');

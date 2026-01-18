@@ -1,22 +1,40 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useEffect, useState } from "react";
 import { getBuilding } from "../../apis/building";
 import { getMe } from "../../apis/me";
 import { Link, useParams } from "react-router-dom";
+import { EMERGENCY_MODE_FUNCTION } from "../../apis/administration";
 
 const Building = () => {
   const { buildingID } = useParams();
 
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [buildingData, setBuildingData] = useState<any>(null);
+  const [ownerData,setOwnerData] = useState<any>(null)
   const [isOwner, setIsOwner] = useState<boolean>(false);
 
+  const [emergencyMode,setEmergencyMode] = useState("off")
+  const EmergencyModeFunction = async()=>{
+    try{
+      const res = await EMERGENCY_MODE_FUNCTION(buildingData._id)
+      if(!res) setServerError("Something went wrong while using emergency mode function.")
+      if(res.Success==false) setServerError(res.Message)
+      
+      if(res.Success==true) window.location.reload()
+    }catch{
+      setServerError("Couldn't use emergency mode function.")
+    }
+  }
 
   useEffect(() => {
     const getBuildingData = async () => {
       setLoading(true);
       try {
         const res = await getBuilding({ buildingID });
+        // console.log(res)
 
         if (!res || res.Success === false) {
           setServerError(res?.Message || "Something went wrong.");
@@ -24,7 +42,9 @@ const Building = () => {
           return;
         }
 
+        setEmergencyMode(res.Message.emergencyMode == false ? "off" : "on")
         setBuildingData(res.Message);
+        setOwnerData(res.Owner)
 
         // Check if current user is the owner
         const meRes = await getMe();
@@ -80,7 +100,7 @@ const Building = () => {
         }
         
         if (currentUserId) {
-          const isUserOwner = currentUserId === res.Message.owner._id;
+          const isUserOwner = currentUserId === res.Message.owner;
           setIsOwner(isUserOwner);
         } else {
           setIsOwner(false);
@@ -134,9 +154,18 @@ const Building = () => {
 
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <Stat label="Floors" value={buildingData.floors} />
-              <Stat label="Global Scans" value={buildingData.globalScans.length} />
-              <Stat label="Maps" value={buildingData.maps.length} />
+              <Stat label="Global Scans" value={buildingData.globalScans ? buildingData.globalScans.length : null} />
+              <Stat label="Maps" value={buildingData.maps ? buildingData.maps.length : null} />
             </div>
+
+            {isOwner && (
+              <button
+                onClick={EmergencyModeFunction}
+                className="mt-4 w-full py-2 bg-[#FF7B22] text-white rounded-lg hover:bg-red-500/80 text-center font-semibold"
+              >
+                Emergency mode: {emergencyMode}
+              </button>
+            )}
           </div>
 
           {/* STATUS CARD */}
@@ -160,18 +189,17 @@ const Building = () => {
               <p className="text-sm">
                 Owner:
                 <span className="block mt-1 text-white/70 break-all">
-                  {buildingData.owner.username}
+                  {ownerData.userType == "Company" ? ownerData.company : ownerData.name + ' ' + ownerData.lastname}
                 </span>
               </p>
               <p className="text-sm">
                 Owner Email:
                 <span className="block mt-1 text-white/70 break-all">
-                  {buildingData.owner.email}
+                  {ownerData.email}
                 </span>
               </p>
             </div>
 
-            {/* Emergency Routing Button - Only for building owners */}
             {isOwner && (
               <Link
                 to={`/building/${buildingData._id}/nodes`}
@@ -180,17 +208,26 @@ const Building = () => {
                 🚨 Manage Emergency Routes
               </Link>
             )}
+
+            {isOwner && (
+              <Link
+                to={`/building/${buildingData._id}/logs`}
+                className="mt-4 w-full py-2 bg-[#FF7B22] text-white rounded-lg hover:bg-[#FF7B22]/80 text-center font-semibold"
+              >
+                Check Logs
+              </Link>
+            )}
           </div>
 
           {/* MAPS SECTION */}
           <div className="lg:col-span-3 bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-6 shadow-xl">
             <h3 className="text-xl font-semibold mb-4">Maps</h3>
 
-            {buildingData.maps.length === 0 ? (
+            {buildingData.maps && buildingData.maps.length === 0 ? (
                 <p className="text-white/60">No maps available</p>
                 ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    {buildingData.maps.map((map: any) => (
+                    {buildingData.maps && buildingData.maps.map((map: any) => (
                     <Link
                         key={map._id}
                         to={`/building/${buildingData._id}/${map.floor}`}
@@ -213,6 +250,7 @@ const Building = () => {
   );
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const Stat = ({ label, value }: { label: string; value: any }) => (
   <div className="bg-black/30 rounded-xl p-4 text-center border border-white/10">
     <p className="text-sm text-white/60">{label}</p>

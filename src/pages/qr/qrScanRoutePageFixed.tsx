@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import PageHeader from '../../components/pageHeader';
 import axios from 'axios';
+import { evacuatedFunc } from '../../apis/building';
 
 interface FloorNode {
   id: string;
@@ -85,6 +86,7 @@ const QRScanRoutePageFixed: React.FC = () => {
       console.error('Error fetching route data:', err);
       
       if (err && typeof err === 'object' && 'response' in err) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const axiosError = err as any;
         if (axiosError.response?.status === 404) {
           setError('QR code not found. Please scan a valid emergency QR code.');
@@ -147,9 +149,15 @@ const QRScanRoutePageFixed: React.FC = () => {
     window.history.back();
   };
 
-  const handleGoHome = () => {
+  const handleEvacuated = async() => {
+    const res = await evacuatedFunc(routeData?.buildingId)
+    if(!res || res.Success==false) window.location.href = '/'
     window.location.href = '/';
   };
+
+  const handleGoHome = ()=>{
+    window.location.href = '/'
+  }
 
   if (loading) {
     return (
@@ -580,10 +588,10 @@ const QRScanRoutePageFixed: React.FC = () => {
                     <p className="font-medium text-white">Floor {routeData.floorNumber}</p>
                   </div>
                   
-                  <div>
+                  {/* <div>
                     <p className="text-sm text-gray-400">QR Code ID</p>
                     <p className="font-medium text-xs text-gray-300">{qrId}</p>
-                  </div>
+                  </div> */}
                   
                   <div>
                     <p className="text-sm text-gray-400">Last Updated</p>
@@ -604,11 +612,11 @@ const QRScanRoutePageFixed: React.FC = () => {
                   ← Back
                 </button>
                 <button
-                  onClick={handleGoHome}
+                  onClick={handleEvacuated}
                   className="w-full px-4 py-3 bg-[#FF7B22] text-white font-semibold rounded-lg hover:bg-[#FF7B22]/80 transition-colors"
                   aria-label="Go to home page"
                 >
-                  Home
+                  Evacuated
                 </button>
               </div>
             </div>

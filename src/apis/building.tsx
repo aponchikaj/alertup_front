@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import axios from "axios";
 import { APIS } from "./APIS";
 
@@ -52,7 +53,7 @@ export const deactivateBuilding = async (id: string) => {
 };
 
 export const getBuilding = async(data:any)=>{
-  // console.log(data.buildingID)
+  console.log(data.buildingID)
   try{
     const res= (await axios.get(APIS.buildings.getBuilding+data.buildingID,{withCredentials:true})).data
     if(!res){
@@ -69,6 +70,19 @@ export const getFloor = async(data:any)=>{
   // console.log(data)
   try{
     const res= (await axios.get(APIS.buildings.getFloor+data.id+'/'+data.floor,{withCredentials:true})).data
+    if(!res){
+      return {Success:false,Message:"Something went wrong."}
+    }
+    return res;
+  }catch{
+    return {Success:false,Message:"Something went wrong."}
+  }
+}
+
+export const evacuatedFunc = async(data:any)=>{
+  console.log(data)
+  try{
+    const res= (await axios.post(APIS.buildings.evacuated,{buildingId:data},{withCredentials:true})).data
     if(!res){
       return {Success:false,Message:"Something went wrong."}
     }

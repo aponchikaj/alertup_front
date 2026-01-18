@@ -36,6 +36,7 @@ export interface ConnectNodesRequest {
 export const createNode = async (nodeData: CreateNodeRequest): Promise<{ success: boolean; node: Node; message: string }> => {
   try {
     const response = await axios.post(`${API_BASE_URL}/api/nodes`, nodeData, { withCredentials: true });
+    console.log(response)
     return response.data;
   } catch (error: any) {
     console.error('Error creating node:', error);

@@ -249,13 +249,13 @@ const InteractiveMap = ({
   }, []);
 
   // Zoom controls
-  const zoomIn = useCallback(() => {
-    setScale(prev => Math.min(prev * 1.2, 5));
-  }, []);
+  // const zoomIn = useCallback(() => {
+  //   setScale(prev => Math.min(prev * 1.2, 5));
+  // }, []);
 
-  const zoomOut = useCallback(() => {
-    setScale(prev => Math.max(prev * 0.8, 0.1));
-  }, []);
+  // const zoomOut = useCallback(() => {
+    // setScale(prev => Math.max(prev * 0.8, 0.1));
+  // }, []);
 
   return (
     <div className="relative bg-gray-100 rounded-lg overflow-hidden border border-gray-300 w-full h-full">
@@ -391,17 +391,17 @@ const InteractiveMap = ({
 
       {/* Controls */}
       <div className="absolute top-4 right-4 flex flex-col gap-2">
-        <button
-          onClick={zoomIn}
+        {/* <button
+          // onClick={zoomIn}
           className="w-10 h-10 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center justify-center transition-colors shadow-md"
           title="Zoom In"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        > */}
+          {/* <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
           </svg>
-        </button>
+        </button> */}
         
-        <button
+        {/* <button
           onClick={zoomOut}
           className="w-10 h-10 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center justify-center transition-colors shadow-md"
           title="Zoom Out"
@@ -409,7 +409,7 @@ const InteractiveMap = ({
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
           </svg>
-        </button>
+        </button> */}
         
         <button
           onClick={resetView}

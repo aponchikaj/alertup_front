@@ -31,7 +31,8 @@ export const APIS = {
         deactivateBuilding:`${MAIN_API_URL}building/deactivate/`,
         deleteBuilding:`${MAIN_API_URL}building/delete/`,
         getBuilding:`${MAIN_API_URL}building/id/`,
-        getFloor:`${MAIN_API_URL}building/scan/`
+        getFloor:`${MAIN_API_URL}building/scan/`,
+        evacuated:`${MAIN_API_URL}building/evacuated`
     },
     settings:{
         getSettings:`${MAIN_API_URL}settings`,
@@ -52,5 +53,10 @@ export const APIS = {
     reviews:{
         checkReviewSent:`${MAIN_API_URL}review/already`,
         sendReview:`${MAIN_API_URL}review/alertup`
+    },
+    administration:{
+        getBuildingLogs:`${MAIN_API_URL}administration/logs`,
+        clearBuildingLogs:`${MAIN_API_URL}administration/logs/clear`,
+        emergencyMode:`${MAIN_API_URL}administration/emergency`
     }
 }

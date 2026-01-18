@@ -177,6 +177,7 @@ const Settings = () => {
         setServerError(res?.Message || "Something went wrong.");
         return;
       }
+      window.location.reload()
       setServerError("Success!");
     } catch {
       setServerError("Something went wrong.");
@@ -233,13 +234,36 @@ const Settings = () => {
 
         {userData && (
           <>
+
+            {/* ACCOUNT VERIFICATION */}
+            {
+              userData.verified == false ?
+              <section className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-6 shadow-xl space-y-4">
+                <h2 className="text-2xl font-bold mb-4">Verify Account</h2>
+                {accountVerificationCodeStep === 2 && (
+                  <InputField
+                    label="Verification Code"
+                    value={accountVerificationCode}
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    onChange={(e:any) => setAccountVerificationCode(e.target.value)}
+                  />
+                )}
+                <button
+                  onClick={verifyAccount}
+                  className="w-full bg-[#FF7B22] hover:bg-[#e06b1b] transition text-black font-semibold py-2 rounded-xl"
+                >
+                  {accountVerificationCodeStep === 1 ? "Send Code" : "Verify Account"}
+                </button>
+              </section>
+              : null
+            }
             {/* USER INFO */}
             <section className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-6 shadow-xl space-y-4">
               <h2 className="text-2xl font-bold mb-4">Profile Info</h2>
 
               {
                 userData.userType == "Individual" ? (
-                  <section className="w-full p-[10px] flex items-center justify-center">
+                  <section className="w-full p-[10px] flex flex-col items-center justify-center gap-2">
                     <InputField
                       label="Name"
                       value={userData.name}
@@ -358,29 +382,6 @@ const Settings = () => {
               </button>
             </section>
 
-            {/* ACCOUNT VERIFICATION */}
-              {
-                userData.verified == false ?
-                <section className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-6 shadow-xl space-y-4">
-                  <h2 className="text-2xl font-bold mb-4">Verify Account</h2>
-                  {accountVerificationCodeStep === 2 && (
-                    <InputField
-                      label="Verification Code"
-                      value={accountVerificationCode}
-                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                      onChange={(e:any) => setAccountVerificationCode(e.target.value)}
-                    />
-                  )}
-                  <button
-                    onClick={verifyAccount}
-                    className="w-full bg-[#FF7B22] hover:bg-[#e06b1b] transition text-black font-semibold py-2 rounded-xl"
-                  >
-                    {accountVerificationCodeStep === 1 ? "Send Code" : "Verify Account"}
-                  </button>
-                </section>
-                : null
-              }
-
             {/* DELETE ACCOUNT */}
             <section className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-6 shadow-xl space-y-4">
               <h2 className="text-2xl font-bold mb-4 text-red-500">Delete Account</h2>
@@ -415,14 +416,14 @@ const Settings = () => {
 };
 
 const InputField = ({ label, type = "text", value, onChange, maxLen }: any) => (
-  <div className="flex flex-col space-y-1">
+  <div className="flex flex-col space-y-1 w-full">
     <label className="text-white/70 font-medium">{label}</label>
     <input
       type={type}
       value={value}
       onChange={onChange}
       maxLength={maxLen}
-      className="bg-black/20 border border-white/10 rounded-xl p-2 text-white focus:outline-none focus:ring-2 focus:ring-[#FF7B22]"
+      className="bg-black/20 border w-full border-white/10 rounded-xl p-2 text-white focus:outline-none focus:ring-2 focus:ring-[#FF7B22]"
     />
   </div>
 );

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createNewBuilding } from "../../apis/building";
 import { useNavigate } from "react-router-dom";
+import { getMe } from "../../apis/me";
 
 interface BuildingSchema {
   buildingName: string;
@@ -15,6 +16,7 @@ const NewBuilding = () => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
+  // const [isUserVerified,setIsUserVerified] = useState(null)
 
   const [buildingData, setBuildingData] = useState<BuildingSchema>({
     buildingName: "",
@@ -23,11 +25,19 @@ const NewBuilding = () => {
     maps: [],
   });
 
+  const checkVerification = async()=>{
+    const res = await getMe()
+    console.log(res)
+    if(!res || res.Success==false) navigate('/login')
+    if(res.Message.verified == false) navigate('/settings')
+  }
+
   /* ----------------------------------
      PAGE SETUP - NO PREMIUM RESTRICTIONS
   ----------------------------------- */
   useEffect(() => {
     document.title = "New - Alertup";
+    checkVerification()
     // No premium checks - unlimited access for all users
   }, []);
 
