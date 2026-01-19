@@ -243,7 +243,7 @@ const QRScanRoutePageFixed: React.FC = () => {
   }
 
   return (
-    <main className="w-full h-screen p-2 flex flex-col bg-[#353535]">
+    <main className="w-full h-auto p-2 flex flex-col bg-[#353535]">
       {/* Spacer for header */}
       <section className="h-[10vh] w-full" />
 
@@ -253,7 +253,7 @@ const QRScanRoutePageFixed: React.FC = () => {
       </section>
 
       {/* Main Content */}
-      <main className="w-full h-[70vh] md:h-full flex-1 overflow-y-auto px-4 pb-8">
+      <main className="w-full h-auto md:h-full flex-1 px-4 pb-8">
         <div className="max-w-7xl mx-auto">
           {/* Building Info Card */}
           <div className="mb-6 p-6 bg-white/5 rounded-lg border border-white/10">
