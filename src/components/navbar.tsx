@@ -42,6 +42,7 @@ const Navbar = () => {
     { to: '/scan', title: 'Scan' },
     { to: '/mybuildings', title: 'Buildings' },
     { to: '/new', title: 'New' },
+    { to: '/contact', title: 'Contact' },
   ];
 
   // Render Navbar

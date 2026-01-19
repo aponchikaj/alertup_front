@@ -40,10 +40,26 @@ const Contact = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-[#353535] px-4">
+    <main className="min-h-screen w-full border flex flex-col md:flex-row gap-3 items-center justify-around bg-[#353535] px-4">
+      <div className="w-full h-[10vh] md:hidden" />
+      <section className="text-center flex flex-col items-center justify-center md:items-start md:text-start w-full md:w-1/2">
+        <h1 className="text-white text-2xl md:text-[30px] font-bold">About</h1>
+        <p className="text-white font-thin w-full">
+          AlertUp is a smart safety platform designed to help people stay calm, informed, and protected during emergencies.
+
+          In critical situations like fires, earthquakes, or other building emergencies, panic and lack of information can cost lives. AlertUp solves this by providing instant access to emergency guidance through a simple QR code system. By scanning a QR code placed inside a building, users can immediately see evacuation routes, safety instructions, and real-time alerts specific to their location.
+
+          For building owners and administrators, AlertUp offers powerful tools to manage safety more effectively. These include activity logs, emergency mode controls, analytics, and centralized administration dashboards that help monitor and improve building safety preparedness.
+
+          AlertUp is built with a clear mission:
+          to make emergency response faster, clearer, and accessible to everyone.
+
+          We believe safety should not depend on knowing the building layout or waiting for instructions. With AlertUp, critical information is always one scan away.
+        </p>
+      </section>
       <form
         onSubmit={SendMessage}
-        className="w-full max-w-md bg-white/5 backdrop-blur-lg rounded-2xl p-6 md:p-8 shadow-xl border border-white/10 text-white"
+        className="w-full max-w-md bg-white/5 backdrop-blur-lg rounded-2xl p-6 md:p-8 shadow-xl border border-white/10 text-white w-full md:w-1/2"
       >
         <h1 className="text-2xl font-bold text-center mb-6">
           Contact Us
@@ -113,7 +129,7 @@ const Contact = () => {
           </button>
         )}
       </form>
-    </div>
+    </main>
   );
 };
 
