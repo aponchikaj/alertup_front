@@ -67,7 +67,7 @@ const Navbar = () => {
           </Link>
         ))}
 
-        <div className="h-[1px] w-full bg-[#FF7B22] my-4" />
+        {isLogged == false && <div className="h-[1px] w-full bg-[#FF7B22] my-4" />}
 
         {isLogged && (
           <Link onClick={() => toggleMenu(false)} to="/settings" className="hover:scale-110 ease-in-out duration-200">
