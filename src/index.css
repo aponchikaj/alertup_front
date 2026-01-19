@@ -8,3 +8,21 @@
 @theme{
   --font-sans:'main';
 }
+
+body::-webkit-scrollbar {
+  width: 7px; /* width of the vertical scrollbar */
+}
+
+body::-webkit-scrollbar-track {
+  background: #353535; /* color of the track */
+  border-radius: 10px;
+}
+
+body::-webkit-scrollbar-thumb {
+  background: #FF7B22;
+  border-radius: 5px;
+}
+
+body::-webkit-scrollbar-thumb:hover {
+  background: #ff7a22bb; /* color of the thumb on hover */
+}
