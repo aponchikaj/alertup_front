@@ -121,16 +121,16 @@ const Home = () => {
                         </p>
                         {!isLogged ? (
                             <ul className="flex forAnim flex-wrap items-center justify-center md:justify-start gap-4 text-white mt-2">
-                                <Link to={'/login'} className="font-thin text-lg hover:scale-110 hover:text-[#FF7B22] duration-200">
+                                <Link to={'/login'} className="font-thin text-lg hover:text-[#FF7B22] duration-200">
                                     Log in
                                 </Link>
-                                <div className="hidden md:flex h-5 w-[1px] bg-[#FF7B22]" />
-                                <Link to={'/register'} className="font-thin text-lg hover:scale-110 hover:text-[#FF7B22] duration-200">
+                                {/* <div className="hidden md:flex h-5 w-[1px] bg-[#FF7B22]" /> */}
+                                <Link to={'/register'} className="font-thin text-lg hover:bg-[#FF7B22]/80 bg-[#FF7B22] p-[8px] rounded-[30px] duration-200 ">
                                     Join now
                                 </Link>
                             </ul>
                         ) : (
-                            <Link to={'/dashboard'} className="text-white forAnim text-lg font-thin hover:scale-110 hover:text-[#FF7B22] duration-200">
+                            <Link to={'/dashboard'} className="text-white forAnim font-thin text-lg hover:bg-[#FF7B22]/80 bg-[#FF7B22] p-[8px] rounded-[30px] duration-200">
                                 Dashboard
                             </Link>
                         )}

@@ -436,7 +436,7 @@ const QRScanRoutePageFixed: React.FC = () => {
                           <circle
                             cx={node.x}
                             cy={node.y}
-                            r={isSelected ? 12 : isHovered ? 10 : 8}
+                            r={isSelected ? 30 : isHovered ? 25 :20}
                             fill={
                               isCurrentNode ? '#EF4444' : // red for current
                               isExitNode ? '#10B981' : // green for exit

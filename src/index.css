@@ -10,7 +10,7 @@
 }
 
 body::-webkit-scrollbar {
-  width: 7px; /* width of the vertical scrollbar */
+  width: 5px; /* width of the vertical scrollbar */
 }
 
 body::-webkit-scrollbar-track {
