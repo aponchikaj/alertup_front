@@ -618,6 +618,9 @@ const QRScanRoutePageFixed: React.FC = () => {
                 >
                   Evacuated
                 </button>
+                {
+                  
+                }
               </div>
             </div>
           </div>
