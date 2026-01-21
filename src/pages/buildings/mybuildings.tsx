@@ -95,9 +95,9 @@ const Mybuildings = () => {
   };
 
   return (
-    <main className="p-4 min-h-screen bg-[#1f1f1f]">
+    <main className="p-4 min-h-screen bg-[#353535]">
       <section className="w-full h-[10vh]" />
-      <h1 className="text-3xl md:text-4xl font-bold mb-6 text-center text-white">
+      <h1 className="text-2xl font-medium mb-6 text-center text-white">
         My Buildings
       </h1>
 
@@ -121,7 +121,7 @@ const Mybuildings = () => {
           >
             <Link to={`/building/${b._id}`}>
               <div>
-                <h2 className="text-xl md:text-2xl font-semibold mb-2">{b.buildingName}</h2>
+                <h2 className="text-xl font-medium mb-2">{b.buildingName}</h2>
                 <p className="text-sm md:text-base">
                   <span className="font-medium">Floors:</span> {b.floors}
                 </p>

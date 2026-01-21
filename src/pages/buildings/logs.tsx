@@ -105,7 +105,7 @@ export default function Logs(){
                         {   
                             LOGS &&
                             LOGS.map((m,i)=>(
-                                <p  className={`text-white w-full  px-[10px] border-[#FF7B22]/50 ${m.isEmergency==true ? "bg-red-500" : "bg-black"} font-bold `} key={i}>{m.logMessage} - {m.createdAt} - {m.logType}</p>
+                                <p  className={`text-white w-full  px-[10px] border-[#FF7B22]/50  font-medium `} key={i}>{m.logMessage} - {new Date(m.createdAt).toLocaleString()} - {m.logType}</p>
                             ))
                         }
                     </ul>

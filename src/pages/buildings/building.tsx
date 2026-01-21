@@ -119,7 +119,7 @@ const Building = () => {
     <main className="w-full min-h-screen bg-[#353535] text-white flex flex-col items-center justify-center">
         {/* <section className="w-full h-[10vh] " /> */}
       {/* Top spacing for navbar */}
-      <div className="h-[10vh]" />
+      <div className="h-[13vh]" />
 
       {/* Page Title */}
       <header className="w-full max-w-6xl px-4 mb-6">
@@ -152,7 +152,7 @@ const Building = () => {
               Last updated: {new Date(buildingData.updatedAt).toLocaleString()}
             </p>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-center">
               <Stat label="Floors" value={buildingData.floors} />
               <Stat label="Global Scans" value={buildingData.globalScans ? buildingData.globalScans.length : null} />
               <Stat label="Maps" value={buildingData.maps ? buildingData.maps.length : null} />
@@ -209,14 +209,21 @@ const Building = () => {
               </Link>
             )}
 
-            {isOwner && (
+            {isOwner && buildingData.emergencyMode == true && (
               <Link
                 to={`/building/${buildingData._id}/logs`}
-                className="mt-4 w-full py-2 bg-[#FF7B22] text-white rounded-lg hover:bg-[#FF7B22]/80 text-center font-semibold"
+                className={`mt-4 w-full py-2 bg-[#FF7B22] text-white rounded-lg hover:bg-[#FF7B22]/80 text-center font-semibold `}
               >
                 Check Logs
               </Link>
             )}
+
+            <Link
+                to={`/building/${buildingData._id}/analytics`}
+                className={`mt-4 w-full py-2 bg-[#FF7B22] text-white rounded-lg hover:bg-[#FF7B22]/80 text-center font-semibold `}
+              >
+                Analytics
+            </Link>
           </div>
 
           {/* MAPS SECTION */}

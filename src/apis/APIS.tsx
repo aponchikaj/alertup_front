@@ -57,6 +57,8 @@ export const APIS = {
     administration:{
         getBuildingLogs:`${MAIN_API_URL}administration/logs`,
         clearBuildingLogs:`${MAIN_API_URL}administration/logs/clear`,
-        emergencyMode:`${MAIN_API_URL}administration/emergency`
+        emergencyMode:`${MAIN_API_URL}administration/emergency`,
+        getBuildingAnalytics:`${MAIN_API_URL}administration/analytics/`,
+        getEmergencyAnalytics:`${MAIN_API_URL}administration/analytics/`
     }
 }

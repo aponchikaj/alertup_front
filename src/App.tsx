@@ -8,6 +8,8 @@ import BuildingOwnerGuard from "./guards/buildingOwnerGuard";
 import ServerGate from "./pages/other/loading";
 import { Analytics } from "@vercel/analytics/react";
 import Logs from "./pages/buildings/logs";
+import AnalyticsPage from "./pages/buildings/analytics";
+import EmergencyAnalytics from "./pages/buildings/emergencyAnalytics";
 
 // Lazy-loaded pages
 const Home = lazy(() => import("./pages/home"));
@@ -130,6 +132,28 @@ const App = () => {
                 <AuthGuard>
                   <BuildingOwnerGuard>
                     <Logs />
+                  </BuildingOwnerGuard>
+                </AuthGuard>
+              }
+            />
+
+            <Route
+              path="/building/:buildingId/analytics"
+              element={
+                <AuthGuard>
+                  <BuildingOwnerGuard>
+                    <AnalyticsPage />
+                  </BuildingOwnerGuard>
+                </AuthGuard>
+              }
+            />
+
+            <Route
+              path="/building/:buildingId/:emergencyId/analytics"
+              element={
+                <AuthGuard>
+                  <BuildingOwnerGuard>
+                    <EmergencyAnalytics />
                   </BuildingOwnerGuard>
                 </AuthGuard>
               }
