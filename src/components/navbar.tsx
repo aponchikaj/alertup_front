@@ -32,7 +32,6 @@ import {
   PlusIcon,
   ScanIcon,
   SettingsIcon,
-  UserIcon,
 } from "./ui/icons";
 import { LanguageToggle } from "./ui/languageToggle";
 import { useI18n } from "../i18n/LanguageProvider";
@@ -40,40 +39,38 @@ import { useI18n } from "../i18n/LanguageProvider";
 /* ============================================================================
    Navbar
    ----------------------------------------------------------------------------
-   A floating glass pill that tucks away while you scroll down and returns the
-   moment you scroll up. Three things it must get right:
+   Deliberately sparse. The bar holds four things at most — logo, a couple of
+   links, one action, one menu — because a navigation bar competing with the
+   page for attention is a navigation bar people stop reading.
 
-   1. Scanning is the primary visitor action, so it is a button, not a link
-      buried among the others.
-   2. A signed-in person needs somewhere to go and a way out — the account menu
-      carries dashboard/buildings/settings and, finally, log out (there was no
-      way to sign out from the bar at all before).
-   3. Every string is translatable, including the accessible names, which were
-      the last hardcoded English left in this component.
+   Everything that is a *setting* rather than a *destination* (theme, language)
+   lives in the menu. Scanning lives there too: visitors reach a scan page from
+   a printed code, not from this bar, so it does not earn a permanent slot.
    ========================================================================= */
 
 type NavItem = { to: string; label: string; end?: boolean };
 
+/** Two links each. Anything more and nothing stands out. */
 const GUEST_LINKS: NavItem[] = [
-  { to: "/", label: "common.home", end: true },
   { to: "/pricing", label: "common.pricing" },
   { to: "/help", label: "common.help" },
-  { to: "/contact", label: "common.contact" },
 ];
 
 const MEMBER_LINKS: NavItem[] = [
   { to: "/dashboard", label: "common.dashboard" },
   { to: "/mybuildings", label: "common.buildings" },
-  { to: "/pricing", label: "common.pricing" },
-  { to: "/help", label: "common.help" },
 ];
 
-/** Items inside the account dropdown (desktop) and the drawer's account block. */
-const ACCOUNT_LINKS: Array<NavItem & { icon: typeof UserIcon }> = [
+const MENU_LINKS: Array<NavItem & { icon: typeof ScanIcon }> = [
+  { to: "/scan", label: "nav.scanCta", icon: ScanIcon },
   { to: "/dashboard", label: "common.dashboard", icon: ChartIcon },
   { to: "/mybuildings", label: "nav.myBuildings", icon: BuildingIcon },
   { to: "/new", label: "nav.addBuilding", icon: PlusIcon },
   { to: "/settings", label: "common.settings", icon: SettingsIcon },
+];
+
+const GUEST_MENU_LINKS: Array<NavItem & { icon: typeof ScanIcon }> = [
+  { to: "/scan", label: "nav.scanCta", icon: ScanIcon },
 ];
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -83,23 +80,12 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
     isActive
       ? "font-semibold text-ink"
-      : "font-medium text-ink-muted hover:bg-surface-hover hover:text-ink",
+      : "font-medium text-ink-muted hover:text-ink",
   );
 
-const drawerLinkClass = ({ isActive }: { isActive: boolean }) =>
-  cn(
-    "flex min-h-12 items-center gap-3 rounded-xl px-4 text-base",
-    "transition-colors duration-200",
-    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-    isActive
-      ? "bg-brand-subtle font-semibold text-brand-text"
-      : "font-medium text-ink-muted hover:bg-surface-hover hover:text-ink",
-  );
-
-const iconButtonClass = cn(
-  "grid h-10 w-10 place-items-center rounded-full",
-  "border border-line bg-surface text-ink-muted",
-  "transition-colors duration-200 hover:bg-surface-hover hover:text-ink",
+const menuItemClass = cn(
+  "flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-sm",
+  "text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink",
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
 );
 
@@ -110,23 +96,17 @@ const Navbar = () => {
   const navigate = useNavigate();
 
   const [menuOpen, setMenuOpen] = useState(false);
-  const [accountOpen, setAccountOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [hidden, setHidden] = useState(false);
 
   const location = useLocation();
-  const headerRef = useRef<HTMLElement>(null);
   const barRef = useRef<HTMLElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
-  const drawerRef = useRef<HTMLDivElement>(null);
-  const scrimRef = useRef<HTMLButtonElement>(null);
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const accountRef = useRef<HTMLDivElement>(null);
-  const accountButtonRef = useRef<HTMLButtonElement>(null);
-  const isClosingRef = useRef(false);
 
   const links = isLogged ? MEMBER_LINKS : GUEST_LINKS;
+  const menuLinks = isLogged ? MENU_LINKS : GUEST_MENU_LINKS;
 
   const accountName = useMemo(() => {
     if (!user) return "";
@@ -138,26 +118,17 @@ const Navbar = () => {
     return typeof user.email === "string" ? user.email : "";
   }, [user]);
 
-  const accountInitial = accountName.trim().charAt(0).toUpperCase() || "?";
+  // Close on navigation, otherwise the panel hangs over the new page.
+  useEffect(() => setMenuOpen(false), [location.pathname]);
 
-  // Close both overlays on navigation, otherwise they hang over the new page.
-  useEffect(() => {
-    isClosingRef.current = false;
-    setMenuOpen(false);
-    setAccountOpen(false);
-  }, [location.pathname]);
-
-  /* --- Scroll behaviour ---------------------------------------------------
-     `scrolled` deepens the glass once the page moves; `hidden` tucks the bar
-     away while scrolling down and brings it back the moment the user scrolls
-     up — content gets the full viewport, navigation stays one flick away. */
+  /* Scroll: deepen the glass once the page moves, and tuck the bar away while
+     scrolling down so content gets the full viewport. */
   useEffect(() => {
     let lastY = window.scrollY;
     const onScrollHandler = () => {
       const y = window.scrollY;
       setScrolled(y > 8);
-      // Never hide near the top, while an overlay is open, or on tiny jitters.
-      if (menuOpen || accountOpen || Math.abs(y - lastY) < 6) {
+      if (menuOpen || Math.abs(y - lastY) < 6) {
         lastY = y;
         return;
       }
@@ -167,11 +138,9 @@ const Navbar = () => {
     onScrollHandler();
     window.addEventListener("scroll", onScrollHandler, { passive: true });
     return () => window.removeEventListener("scroll", onScrollHandler);
-  }, [menuOpen, accountOpen]);
+  }, [menuOpen]);
 
-  /* --- Entrance (anime.js) ------------------------------------------------
-     The pill drops in once on app load, then its items cascade. Runs on the
-     inner bar so it never fights the hide/show transform on the header. */
+  /* Entrance — the pill drops in once, then its items cascade. */
   useLayoutEffect(() => {
     const bar = barRef.current;
     if (!bar || reducedMotion()) return;
@@ -197,7 +166,7 @@ const Navbar = () => {
     return () => scope.revert();
   }, []);
 
-  /* --- Reading progress (anime.js scroll sync) ---------------------------- */
+  /* Reading progress — a hairline whose width tracks scroll depth. */
   useLayoutEffect(() => {
     const el = progressRef.current;
     if (!el || reducedMotion()) return;
@@ -212,19 +181,54 @@ const Navbar = () => {
     };
   }, []);
 
-  /* --- Account dropdown ---------------------------------------------------
-     Closes on outside pointerdown and on Escape, and returns focus to its
-     trigger so keyboard users are not dropped at the top of the document. */
+  const closeMenu = useCallback(() => {
+    setMenuOpen(false);
+    menuButtonRef.current?.focus();
+  }, []);
+
+  /* One panel for every breakpoint: a dropdown beside the trigger on desktop,
+     a sheet from the bottom on phones. Same content, same code path. */
+  useLayoutEffect(() => {
+    if (!menuOpen || reducedMotion()) return;
+    const panel = panelRef.current;
+    if (!panel) return;
+
+    const items = panel.querySelectorAll<HTMLElement>("[data-menu-item]");
+    const tl = createTimeline();
+    tl.add(panel, {
+      opacity: [0, 1],
+      translateY: [-8, 0],
+      scale: [0.98, 1],
+      duration: 240,
+      ease: "outQuint",
+    }).add(
+      items,
+      {
+        opacity: [0, 1],
+        translateY: [-6, 0],
+        duration: 260,
+        delay: stagger(28),
+        ease: "outQuint",
+      },
+      "-=160",
+    );
+    return () => {
+      tl.cancel();
+    };
+  }, [menuOpen]);
+
+  // Outside click, Escape, and scroll lock while the panel is open.
   useEffect(() => {
-    if (!accountOpen) return;
+    if (!menuOpen) return;
 
     const onPointerDown = (e: PointerEvent) => {
-      if (!accountRef.current?.contains(e.target as Node)) setAccountOpen(false);
+      const target = e.target as Node;
+      if (panelRef.current?.contains(target)) return;
+      if (menuButtonRef.current?.contains(target)) return;
+      setMenuOpen(false);
     };
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      setAccountOpen(false);
-      accountButtonRef.current?.focus();
+      if (e.key === "Escape") closeMenu();
     };
 
     document.addEventListener("pointerdown", onPointerDown);
@@ -233,104 +237,14 @@ const Navbar = () => {
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [accountOpen]);
-
-  useLayoutEffect(() => {
-    const panel = accountRef.current?.querySelector<HTMLElement>("[data-account-panel]");
-    if (!accountOpen || !panel || reducedMotion()) return;
-    animate(panel, {
-      opacity: [0, 1],
-      translateY: [-8, 0],
-      scale: [0.97, 1],
-      duration: 200,
-      ease: "outQuint",
-    });
-  }, [accountOpen]);
-
-  /* --- Drawer open (anime.js timeline) ------------------------------------ */
-  useLayoutEffect(() => {
-    if (!menuOpen || reducedMotion()) return;
-    const drawer = drawerRef.current;
-    const scrim = scrimRef.current;
-    if (!drawer || !scrim) return;
-
-    const items = drawer.querySelectorAll<HTMLElement>("[data-drawer-item]");
-    const tl = createTimeline();
-    tl.add(scrim, { opacity: [0, 1], duration: 220, ease: "linear" })
-      .add(
-        drawer,
-        { translateX: ["-102%", "0%"], duration: 340, ease: "outQuint" },
-        "<",
-      )
-      .add(
-        items,
-        {
-          opacity: [0, 1],
-          translateX: [-18, 0],
-          duration: 380,
-          delay: stagger(40),
-          ease: "outQuint",
-        },
-        "-=200",
-      );
-    return () => {
-      tl.cancel();
-    };
-  }, [menuOpen]);
-
-  /** Animates the drawer out, then unmounts and returns focus. */
-  const closeMenu = useCallback(() => {
-    if (isClosingRef.current) return;
-    const finish = () => {
-      isClosingRef.current = false;
-      setMenuOpen(false);
-      menuButtonRef.current?.focus();
-    };
-
-    const drawer = drawerRef.current;
-    const scrim = scrimRef.current;
-    if (reducedMotion() || !drawer || !scrim) {
-      finish();
-      return;
-    }
-
-    isClosingRef.current = true;
-    const tl = createTimeline({ onComplete: finish });
-    tl.add(drawer, { translateX: "-102%", duration: 260, ease: "inQuint" }).add(
-      scrim,
-      { opacity: 0, duration: 220, ease: "linear" },
-      "<",
-    );
-  }, []);
-
-  // Scroll lock + Escape while the drawer is open.
-  useEffect(() => {
-    if (!menuOpen) return;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    closeButtonRef.current?.focus();
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeMenu();
-    };
-    document.addEventListener("keydown", onKeyDown);
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", onKeyDown);
-    };
   }, [menuOpen, closeMenu]);
 
-  /** Sign out, then refresh the auth context so guards re-evaluate. */
   const handleLogout = useCallback(async () => {
-    setAccountOpen(false);
     setMenuOpen(false);
     try {
       await logoutFromAccount();
     } catch {
-      // The cookie is cleared server-side on a best-effort basis; either way
-      // the local session is dropped below.
+      // Best effort server-side; the local session is dropped either way.
     }
     await refresh();
     navigate("/", { replace: true });
@@ -338,7 +252,6 @@ const Navbar = () => {
 
   return (
     <>
-      {/* Keyboard users can jump the nav instead of tabbing it on every page. */}
       <a
         href="#main"
         className={cn(
@@ -349,17 +262,14 @@ const Navbar = () => {
         {t("nav.skipToContent")}
       </a>
 
-      {/* Reading progress — outside the header so it stays visible even while
-          the bar is tucked away. */}
       <div
         ref={progressRef}
         aria-hidden="true"
         style={{ transform: "scaleX(0)" }}
-        className="fixed inset-x-0 top-0 z-50 h-0.5 origin-left bg-gradient-to-r from-brand-300 via-brand to-brand-600"
+        className="fixed inset-x-0 top-0 z-50 h-0.5 origin-left bg-brand"
       />
 
       <header
-        ref={headerRef}
         className={cn(
           "fixed inset-x-0 top-0 z-40 px-3 pt-3 sm:px-5",
           "transition-transform duration-300 ease-out",
@@ -370,13 +280,13 @@ const Navbar = () => {
           ref={barRef}
           aria-label={t("nav.mainLabel")}
           className={cn(
-            "mx-auto flex w-full max-w-6xl items-center justify-between gap-3",
+            "mx-auto flex w-full max-w-5xl items-center justify-between gap-4",
             "rounded-2xl border px-3 sm:px-4",
-            "h-14 lg:h-16",
+            "h-14",
             "backdrop-blur-xl transition-[background-color,border-color,box-shadow] duration-300",
             scrolled
-              ? "border-line bg-canvas/90 shadow-md"
-              : "border-line/70 bg-canvas/75 shadow-sm",
+              ? "border-line bg-canvas/90 shadow-sm"
+              : "border-transparent bg-canvas/70",
           )}
         >
           <span data-nav-item>
@@ -385,296 +295,164 @@ const Navbar = () => {
               className="rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
               aria-label={t("nav.homeAria")}
             >
-              <Logo size={30} />
+              <Logo size={28} />
             </Link>
           </span>
 
-          {/* Desktop links */}
-          <ul className="hidden items-center gap-0.5 lg:flex">
+          {/* Two links. Anything more and nothing stands out. */}
+          <ul className="hidden items-center gap-1 md:flex">
             {links.map((link) => (
               <li key={link.to} data-nav-item>
                 <NavLink to={link.to} end={link.end} className={navLinkClass}>
-                  {({ isActive }) => (
-                    <>
-                      {t(link.label)}
-                      <span
-                        aria-hidden="true"
-                        className={cn(
-                          "absolute inset-x-3.5 bottom-1 h-0.5 rounded-full bg-brand",
-                          "origin-center transition-transform duration-200 ease-out",
-                          isActive ? "scale-x-100" : "scale-x-0",
-                        )}
-                      />
-                    </>
-                  )}
+                  {t(link.label)}
                 </NavLink>
               </li>
             ))}
           </ul>
 
           <div className="flex items-center gap-2">
-            {/* Scanning is the primary visitor action — it gets a button, not a
-                link lost among the others. Icon-only on small screens. */}
-            <span data-nav-item className="hidden sm:block">
-              <ButtonLink to="/scan" variant="secondary" size="sm">
-                <ScanIcon size={17} aria-hidden="true" />
-                {t("nav.scanCta")}
-              </ButtonLink>
-            </span>
-            <span data-nav-item className="sm:hidden">
-              <Link to="/scan" aria-label={t("nav.scanCta")} className={iconButtonClass}>
-                <ScanIcon size={19} />
-              </Link>
-            </span>
+            {!isLogged && (
+              <span data-nav-item className="hidden sm:block">
+                <ButtonLink to="/register" variant="primary" size="sm">
+                  {t("common.getStarted")}
+                </ButtonLink>
+              </span>
+            )}
 
-            <span data-nav-item className="hidden sm:block">
-              <LanguageToggle />
-            </span>
-            <span data-nav-item className="hidden sm:block">
-              <ThemeToggle />
-            </span>
+            <span data-nav-item className="relative">
+              <button
+                ref={menuButtonRef}
+                type="button"
+                onClick={() => setMenuOpen((open) => !open)}
+                aria-label={isLogged ? t("nav.accountMenu") : t("nav.openMenu")}
+                aria-expanded={menuOpen}
+                aria-haspopup="menu"
+                className={cn(
+                  "grid h-10 w-10 place-items-center rounded-full transition-colors duration-200",
+                  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                  isLogged
+                    ? "bg-brand text-sm font-semibold text-brand-ink hover:opacity-90"
+                    : "border border-line bg-surface text-ink hover:bg-surface-hover",
+                )}
+              >
+                {isLogged ? (
+                  <span aria-hidden="true">
+                    {accountName.trim().charAt(0).toUpperCase() || "?"}
+                  </span>
+                ) : menuOpen ? (
+                  <CloseIcon size={19} />
+                ) : (
+                  <MenuIcon size={19} />
+                )}
+              </button>
 
-            {isLogged ? (
-              <div ref={accountRef} data-nav-item className="relative hidden lg:block">
-                <button
-                  ref={accountButtonRef}
-                  type="button"
-                  onClick={() => setAccountOpen((open) => !open)}
-                  aria-label={t("nav.accountMenu")}
-                  aria-expanded={accountOpen}
-                  aria-haspopup="menu"
-                  className={cn(
-                    "grid h-10 w-10 place-items-center rounded-full",
-                    "border border-line bg-brand text-sm font-semibold text-brand-ink",
-                    "transition-transform duration-200 hover:scale-105",
-                    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                  )}
-                >
-                  <span aria-hidden="true">{accountInitial}</span>
-                </button>
-
-                {accountOpen && (
+              {menuOpen && (
+                <>
+                  {/* Phone: a scrim so the panel reads as a layer, not a tooltip. */}
                   <div
-                    data-account-panel
+                    aria-hidden="true"
+                    className="fixed inset-0 z-40 bg-scrim sm:hidden"
+                  />
+                  <div
+                    ref={panelRef}
                     role="menu"
-                    aria-label={t("nav.accountMenu")}
+                    aria-label={t("nav.menuLabel")}
                     className={cn(
-                      "absolute right-0 top-full z-50 mt-2 w-64 origin-top-right",
-                      "overflow-hidden rounded-2xl border border-line bg-surface shadow-xl",
+                      "z-50 overflow-hidden border border-line bg-surface shadow-xl",
+                      // Phone: bottom sheet. Desktop: dropdown under the trigger.
+                      "fixed inset-x-3 bottom-3 rounded-2xl",
+                      "sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-2 sm:w-60 sm:origin-top-right",
                     )}
                   >
-                    <div className="border-b border-line px-4 py-3">
-                      <p className="truncate text-sm font-semibold text-ink">
-                        {accountName}
-                      </p>
-                      {typeof user?.email === "string" && user.email !== accountName ? (
-                        <p className="truncate text-xs text-ink-subtle">{user.email}</p>
-                      ) : null}
-                    </div>
+                    {isLogged && accountName ? (
+                      <div
+                        data-menu-item
+                        className="border-b border-line px-4 py-3"
+                      >
+                        <p className="truncate text-sm font-semibold text-ink">
+                          {accountName}
+                        </p>
+                        {typeof user?.email === "string" &&
+                        user.email !== accountName ? (
+                          <p className="truncate text-xs text-ink-subtle">
+                            {user.email}
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
 
                     <ul className="p-1.5">
-                      {ACCOUNT_LINKS.map(({ to, label, icon: Icon }) => (
-                        <li key={to}>
+                      {menuLinks.map(({ to, label, icon: Icon }) => (
+                        <li key={to} data-menu-item>
                           <Link
                             to={to}
                             role="menuitem"
-                            onClick={() => setAccountOpen(false)}
-                            className={cn(
-                              "flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm",
-                              "text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink",
-                              "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                            )}
+                            onClick={() => setMenuOpen(false)}
+                            className={menuItemClass}
                           >
                             <Icon size={17} aria-hidden="true" />
                             {t(label)}
                           </Link>
                         </li>
                       ))}
+
+                      {/* The two links from the bar, for widths that hide them. */}
+                      {links.map((link) => (
+                        <li key={link.to} data-menu-item className="md:hidden">
+                          <Link
+                            to={link.to}
+                            role="menuitem"
+                            onClick={() => setMenuOpen(false)}
+                            className={menuItemClass}
+                          >
+                            <span className="w-[17px]" aria-hidden="true" />
+                            {t(link.label)}
+                          </Link>
+                        </li>
+                      ))}
                     </ul>
 
-                    <div className="border-t border-line p-1.5">
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={handleLogout}
-                        className={cn(
-                          "flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-sm",
-                          "text-danger-text transition-colors hover:bg-danger-subtle",
-                          "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                        )}
-                      >
-                        <LogOutIcon size={17} aria-hidden="true" />
-                        {t("common.logout")}
-                      </button>
+                    {/* Settings, not destinations — they belong here, not in the bar. */}
+                    <div
+                      data-menu-item
+                      className="flex items-center justify-between gap-2 border-t border-line px-3 py-2.5"
+                    >
+                      <LanguageToggle />
+                      <ThemeToggle />
+                    </div>
+
+                    <div data-menu-item className="border-t border-line p-1.5">
+                      {isLogged ? (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={handleLogout}
+                          className={cn(
+                            menuItemClass,
+                            "text-danger-text hover:bg-danger-subtle hover:text-danger-text",
+                          )}
+                        >
+                          <LogOutIcon size={17} aria-hidden="true" />
+                          {t("common.logout")}
+                        </button>
+                      ) : (
+                        <div className="flex flex-col gap-1.5 p-1.5">
+                          <ButtonLink to="/register" variant="primary" fullWidth>
+                            {t("common.getStarted")}
+                          </ButtonLink>
+                          <ButtonLink to="/login" variant="secondary" fullWidth>
+                            {t("common.login")}
+                          </ButtonLink>
+                        </div>
+                      )}
                     </div>
                   </div>
-                )}
-              </div>
-            ) : (
-              <div className="hidden items-center gap-2 lg:flex">
-                <span data-nav-item>
-                  <ButtonLink to="/login" variant="ghost" size="sm">
-                    {t("common.login")}
-                  </ButtonLink>
-                </span>
-                <span data-nav-item>
-                  <ButtonLink to="/register" variant="primary" size="sm">
-                    {t("common.getStarted")}
-                  </ButtonLink>
-                </span>
-              </div>
-            )}
-
-            <span data-nav-item className="lg:hidden">
-              <button
-                ref={menuButtonRef}
-                type="button"
-                onClick={() => setMenuOpen(true)}
-                aria-label={t("nav.openMenu")}
-                aria-expanded={menuOpen}
-                aria-controls="mobile-menu"
-                className={cn(iconButtonClass, "text-ink")}
-              >
-                <MenuIcon size={20} />
-              </button>
+                </>
+              )}
             </span>
           </div>
         </nav>
       </header>
-
-      {/* Mobile drawer */}
-      {menuOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <button
-            ref={scrimRef}
-            type="button"
-            tabIndex={-1}
-            aria-hidden="true"
-            onClick={closeMenu}
-            className="absolute inset-0 h-full w-full cursor-default bg-scrim"
-          />
-
-          <div
-            ref={drawerRef}
-            id="mobile-menu"
-            role="dialog"
-            aria-modal="true"
-            aria-label={t("nav.menuLabel")}
-            className={cn(
-              "absolute inset-y-0 left-0 flex w-[min(20rem,85vw)] flex-col",
-              "border-r border-line bg-canvas shadow-xl",
-            )}
-          >
-            <div className="flex items-center justify-between border-b border-line px-5 py-4">
-              <Logo size={30} />
-              <button
-                ref={closeButtonRef}
-                type="button"
-                onClick={closeMenu}
-                aria-label={t("nav.closeMenu")}
-                className={cn(
-                  "grid h-10 w-10 place-items-center rounded-full",
-                  "text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink",
-                  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                )}
-              >
-                <CloseIcon size={20} />
-              </button>
-            </div>
-
-            {isLogged && accountName ? (
-              <div
-                data-drawer-item
-                className="flex items-center gap-3 border-b border-line px-5 py-4"
-              >
-                <span
-                  aria-hidden="true"
-                  className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand text-sm font-semibold text-brand-ink"
-                >
-                  {accountInitial}
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-ink">
-                    {accountName}
-                  </span>
-                  {typeof user?.email === "string" && user.email !== accountName ? (
-                    <span className="block truncate text-xs text-ink-subtle">
-                      {user.email}
-                    </span>
-                  ) : null}
-                </span>
-              </div>
-            ) : null}
-
-            <ul className="flex flex-1 flex-col gap-1 overflow-y-auto p-4">
-              <li data-drawer-item>
-                <NavLink to="/scan" className={drawerLinkClass}>
-                  <ScanIcon size={19} aria-hidden="true" />
-                  {t("nav.scanCta")}
-                </NavLink>
-              </li>
-
-              {links.map((link) => (
-                <li key={link.to} data-drawer-item>
-                  <NavLink to={link.to} end={link.end} className={drawerLinkClass}>
-                    {t(link.label)}
-                  </NavLink>
-                </li>
-              ))}
-
-              {isLogged &&
-                ACCOUNT_LINKS.filter(
-                  (item) => !links.some((link) => link.to === item.to),
-                ).map(({ to, label, icon: Icon }) => (
-                  <li key={to} data-drawer-item>
-                    <NavLink to={to} className={drawerLinkClass}>
-                      <Icon size={19} aria-hidden="true" />
-                      {t(label)}
-                    </NavLink>
-                  </li>
-                ))}
-            </ul>
-
-            <div className="flex items-center gap-2 border-t border-line px-4 py-3 sm:hidden">
-              <LanguageToggle />
-              <ThemeToggle />
-            </div>
-
-            {isLogged ? (
-              <div data-drawer-item className="border-t border-line p-4">
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className={cn(
-                    "flex min-h-12 w-full items-center gap-3 rounded-xl px-4 text-base font-medium",
-                    "text-danger-text transition-colors hover:bg-danger-subtle",
-                    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                  )}
-                >
-                  <LogOutIcon size={19} aria-hidden="true" />
-                  {t("common.logout")}
-                </button>
-              </div>
-            ) : (
-              <div
-                data-drawer-item
-                className="flex flex-col gap-2 border-t border-line p-4"
-              >
-                <ButtonLink to="/register" variant="primary" fullWidth>
-                  {t("common.getStarted")}
-                </ButtonLink>
-                <ButtonLink to="/login" variant="secondary" fullWidth>
-                  {t("common.login")}
-                </ButtonLink>
-              </div>
-            )}
-
-            <p className="border-t border-line px-5 py-4 text-xs text-ink-subtle">
-              {t("footer.builtIn", { year: new Date().getFullYear() })}
-            </p>
-          </div>
-        </div>
-      )}
     </>
   );
 };

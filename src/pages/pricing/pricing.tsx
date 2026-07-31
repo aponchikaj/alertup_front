@@ -101,6 +101,11 @@ const TIERS: readonly Tier[] = [
   },
 ];
 
+/** The three tiers you can buy yourself, compared side by side. */
+const SELF_SERVE_TIERS = TIERS.filter((tier) => tier.id !== "enterprise");
+/** Enterprise is a conversation, not a checkout — it gets its own full-width card. */
+const ENTERPRISE_TIER = TIERS.find((tier) => tier.id === "enterprise");
+
 const Pricing = () => {
   const rootRef = usePageAnimations();
   const { t } = useI18n();
@@ -136,46 +141,46 @@ const Pricing = () => {
         </Container>
       </section>
 
-      {/* ================= PLANS ================= */}
+      {/* ================= PLANS =================
+          Three self-serve tiers share a grid; Enterprise sits below on its own.
+          Four equal columns squeezed every card to about 280px, and Enterprise
+          does not belong in that comparison anyway — it has no price to line up
+          and its call to action is a conversation, not a signup. Giving it the
+          full width lets the three real choices breathe. */}
       <Section tone="subtle" aria-label={t("pricing.eyebrow")}>
-        <Container width="wide" className="flex flex-col gap-10">
+        <Container width="wide" className="flex flex-col gap-8">
           <div
             data-reveal-group
-            className="grid w-full items-stretch gap-6 sm:grid-cols-2 xl:grid-cols-4"
+            className="mx-auto grid w-full max-w-5xl items-stretch gap-6 md:grid-cols-3"
           >
-            {TIERS.map((tier) => (
+            {SELF_SERVE_TIERS.map((tier) => (
               <div key={tier.id} data-reveal-item className="h-full">
                 <Card
                   className={cn(
-                    "flex h-full flex-col gap-6 p-7",
+                    "flex h-full flex-col gap-7 p-8",
                     tier.featured &&
                       "border-brand-border shadow-lg ring-1 ring-brand-border",
                   )}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex flex-col gap-1.5">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex min-h-7 items-center justify-between gap-3">
                       <h2 className="text-lg font-semibold text-ink">
                         {t(tier.nameKey)}
                       </h2>
-                      <p className="text-sm text-ink-muted">{t(tier.descKey)}</p>
+                      {tier.featured && (
+                        <Badge tone="brand" className="shrink-0">
+                          <StarIcon size={13} />
+                          {t("pricing.mostPopular")}
+                        </Badge>
+                      )}
                     </div>
-                    {tier.featured && (
-                      <Badge tone="brand" className="shrink-0">
-                        <StarIcon size={13} />
-                        {t("pricing.mostPopular")}
-                      </Badge>
-                    )}
+                    <p className="text-sm leading-relaxed text-ink-muted">
+                      {t(tier.descKey)}
+                    </p>
                   </div>
 
                   <p className="flex flex-wrap items-baseline gap-1">
-                    <span
-                      className={cn(
-                        "font-semibold tracking-tight text-ink",
-                        tier.recurring || tier.id === "free"
-                          ? "text-4xl"
-                          : "text-3xl",
-                      )}
-                    >
+                    <span className="text-4xl font-semibold tracking-tight text-ink">
                       {t(tier.priceKey)}
                     </span>
                     {tier.recurring && (
@@ -185,14 +190,14 @@ const Pricing = () => {
                     )}
                   </p>
 
-                  <ul className="flex flex-1 flex-col gap-3 border-t border-line pt-6">
+                  <ul className="flex flex-1 flex-col gap-3 border-t border-line pt-7">
                     {tier.featureKeys.map((key) => (
                       <li
                         key={key}
-                        className="flex items-start gap-2.5 text-[0.9375rem] text-ink-muted"
+                        className="flex items-start gap-2.5 text-[0.9375rem] leading-relaxed text-ink-muted"
                       >
                         <CheckCircleIcon
-                          size={19}
+                          size={18}
                           className="mt-0.5 shrink-0 text-success-text"
                         />
                         {t(key)}
@@ -200,25 +205,67 @@ const Pricing = () => {
                     ))}
                   </ul>
 
-                  <div className="flex flex-col gap-2.5">
-                    <ButtonLink
-                      to={tier.ctaTo}
-                      variant={tier.ctaVariant}
-                      fullWidth
-                    >
-                      {t(tier.ctaKey)}
-                      {tier.featured && <ArrowRightIcon size={18} />}
-                    </ButtonLink>
-                    {tier.noteKey && (
-                      <p className="text-center text-xs leading-relaxed text-ink-subtle">
-                        {t(tier.noteKey)}
-                      </p>
-                    )}
-                  </div>
+                  <ButtonLink to={tier.ctaTo} variant={tier.ctaVariant} fullWidth>
+                    {t(tier.ctaKey)}
+                    {tier.featured && <ArrowRightIcon size={18} />}
+                  </ButtonLink>
                 </Card>
               </div>
             ))}
           </div>
+
+          {/* --- Enterprise: full width, laid out side by side --- */}
+          {ENTERPRISE_TIER && (
+            <div data-reveal className="mx-auto w-full max-w-5xl">
+              <Card className="flex flex-col gap-8 p-8 sm:p-10 lg:flex-row lg:items-center lg:gap-12">
+                <div className="flex flex-1 flex-col gap-5">
+                  <div className="flex flex-col gap-2">
+                    <h2 className="text-xl font-semibold text-ink">
+                      {t(ENTERPRISE_TIER.nameKey)}
+                    </h2>
+                    <p className="max-w-xl text-sm leading-relaxed text-ink-muted">
+                      {t(ENTERPRISE_TIER.descKey)}
+                    </p>
+                  </div>
+
+                  {/* Two columns of features so a long list stays scannable. */}
+                  <ul className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
+                    {ENTERPRISE_TIER.featureKeys.map((key) => (
+                      <li
+                        key={key}
+                        className="flex items-start gap-2.5 text-[0.9375rem] leading-relaxed text-ink-muted"
+                      >
+                        <CheckCircleIcon
+                          size={18}
+                          className="mt-0.5 shrink-0 text-success-text"
+                        />
+                        {t(key)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="flex w-full shrink-0 flex-col gap-3 border-t border-line pt-6 lg:w-64 lg:border-l lg:border-t-0 lg:pl-12 lg:pt-0">
+                  <p className="text-2xl font-semibold tracking-tight text-ink">
+                    {t(ENTERPRISE_TIER.priceKey)}
+                  </p>
+                  <ButtonLink
+                    to={ENTERPRISE_TIER.ctaTo}
+                    variant={ENTERPRISE_TIER.ctaVariant}
+                    fullWidth
+                  >
+                    {t(ENTERPRISE_TIER.ctaKey)}
+                    <ArrowRightIcon size={18} />
+                  </ButtonLink>
+                  {ENTERPRISE_TIER.noteKey && (
+                    <p className="text-xs leading-relaxed text-ink-subtle">
+                      {t(ENTERPRISE_TIER.noteKey)}
+                    </p>
+                  )}
+                </div>
+              </Card>
+            </div>
+          )}
 
           {/* --- Footnote --- */}
           <div
