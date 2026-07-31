@@ -28,6 +28,8 @@ const NodeManager = lazy(() => import("./pages/buildings/nodeManager"));
 const Building = lazy(() => import("./pages/buildings/building"));
 const Floor = lazy(() => import("./pages/buildings/floor"));
 const Settings = lazy(() => import("./pages/settings/settings"));
+const Members = lazy(() => import("./pages/buildings/members"));
+const InviteAccept = lazy(() => import("./pages/invite/inviteAccept"));
 const PageNotFound = lazy(() => import("./pages/other/pageNotFound"));
 const Pricing = lazy(() => import("./pages/pricing/pricing"));
 const Help = lazy(() => import("./pages/help/help"));
@@ -81,6 +83,11 @@ const App = () => {
             <Route path="/scan/route/:qrId" element={<QRScanRoutePage />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/route/:qrId" element={<LegacyRouteRedirect />} />
+
+            {/* Invitation landing page. Public on purpose: the recipient may
+                not have an account yet, and the page itself decides whether to
+                offer sign-in, refuse a mismatched account, or accept. */}
+            <Route path="/invite/accept" element={<InviteAccept />} />
 
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/help" element={<Help />} />
@@ -169,6 +176,17 @@ const App = () => {
                 <BuildingOwnerGuard>
                   <NodeManager />
                 </BuildingOwnerGuard>
+              }
+            />
+
+            {/* Team & permissions. AuthGuard only — the page itself decides
+                which tabs and controls the viewer's permissions justify. */}
+            <Route
+              path="/building/:buildingId/members"
+              element={
+                <AuthGuard>
+                  <Members />
+                </AuthGuard>
               }
             />
 

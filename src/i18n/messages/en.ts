@@ -377,6 +377,11 @@ export const en = {
     permManageRolesHint: "Create roles and change what members can do.",
     permViewAnalytics: "View analytics",
     permViewAnalyticsHint: "See scan history and emergency reports.",
+    errorEscalation: "You can only grant permissions you hold yourself.",
+    errorRoleInUse: "Members are still using this role. Move them to another role first.",
+    errorDuplicateRole: "A role with that name already exists here.",
+    errorInviteEmail:
+      "The invitation email could not be delivered, so nothing was created. Check the address and try again.",
   },
 
   invite: {

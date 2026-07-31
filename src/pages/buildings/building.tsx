@@ -18,11 +18,17 @@ import {
   MapIcon,
   RouteIcon,
   UserIcon,
+  UsersIcon,
 } from "../../components/ui/icons";
+import { useAuth } from "../../auth/useAuth";
 
 const Building = () => {
   const rootRef = usePageAnimations();
   const { buildingID } = useParams();
+  // Team management is reachable by the owner and by anyone with a membership
+  // in this building — the page itself decides which controls they get.
+  const { memberships } = useAuth();
+  const isMember = Boolean(buildingID && memberships[buildingID]);
 
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
@@ -260,6 +266,17 @@ const Building = () => {
                   >
                     <FileTextIcon size={18} />
                     Check logs
+                  </ButtonLink>
+                )}
+
+                {(isOwner || isMember) && (
+                  <ButtonLink
+                    to={`/building/${buildingData._id}/members`}
+                    variant="secondary"
+                    fullWidth
+                  >
+                    <UsersIcon size={18} />
+                    Team
                   </ButtonLink>
                 )}
 

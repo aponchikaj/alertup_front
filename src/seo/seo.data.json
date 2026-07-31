@@ -319,6 +319,13 @@
       "description": "Floors, evacuation maps and QR codes for this building on AlertUp."
     },
     {
+      "path": "/invite/accept",
+      "index": false,
+      "follow": false,
+      "title": "Accept your AlertUp invitation",
+      "description": "Join a building team on AlertUp using the invitation you were sent."
+    },
+    {
       "path": "/404",
       "index": false,
       "title": "Page not found",
