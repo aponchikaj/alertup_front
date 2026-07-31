@@ -12,7 +12,14 @@ import {
  *  browser chrome doesn't sit on a mismatched bar. */
 const syncBrowserChrome = (resolved: ResolvedTheme) => {
   const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-  if (meta) meta.content = resolved === "dark" ? "#121110" : "#faf8f6";
+  if (!meta) return;
+  // Read the painted value rather than repeating it — these were hardcoded to
+  // a warm off-white/off-black that the monochrome palette no longer uses, so
+  // the phone's chrome sat on a visibly different colour to the page.
+  const canvas = getComputedStyle(document.documentElement)
+    .getPropertyValue("--canvas")
+    .trim();
+  meta.content = canvas || (resolved === "dark" ? "#0a0a0a" : "#ffffff");
 };
 
 const applyTheme = (resolved: ResolvedTheme) => {
