@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../../auth/useAuth";
 import { LoginUser, Login2faUser } from "../../apis/auth";
 import { usePageAnimations } from "../../lib/animations";
 import { PageShell } from "../../components/ui/layout";
@@ -36,6 +37,10 @@ const AuthFooterLinks = () => (
 const Login = () => {
   const rootRef = usePageAnimations();
   const navigate = useNavigate();
+  // The auth context reads /api/me once on mount. Signing in changes the
+  // answer, so it has to be told — without this the session cookie is set but
+  // the whole app still renders as a guest until a hard reload.
+  const { refresh } = useAuth();
 
   const [loginData, setLoginData] = useState({
     user: "",
@@ -76,7 +81,8 @@ const Login = () => {
 
       if (res.token) localStorage.setItem("userToken", res.token);
 
-      navigate("/", { replace: true });
+      await refresh();
+      navigate("/dashboard", { replace: true });
     } catch (err) {
       console.error(err);
       setServerError("Something went wrong.");
@@ -106,7 +112,8 @@ const Login = () => {
 
       if (res.token) localStorage.setItem("userToken", res.token);
 
-      navigate("/", { replace: true });
+      await refresh();
+      navigate("/dashboard", { replace: true });
     } catch {
       console.error("Something went wrong.");
       setServerError("Something went wrong.");

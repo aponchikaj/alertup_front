@@ -12,6 +12,7 @@ import LightRays from "../components/ui/lightRays";
 import { FAQ, HOW_TO } from "../seo/seo.config";
 import { faqJsonLd, howToJsonLd } from "../seo/structuredData";
 import { useI18n } from "../i18n/LanguageProvider";
+import { useTheme } from "../theme/useTheme";
 import { usePageAnimations } from "../lib/animations";
 import { resolveQrTarget } from "../lib/qrTarget";
 import { cn } from "../lib/cn";
@@ -106,6 +107,8 @@ type ContactStatus = "idle" | "sent" | "error";
 const Home = () => {
   const rootRef = usePageAnimations();
   const { t } = useI18n();
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
   const [isLogged, setIsLogged] = useState(false);
 
   useEffect(() => {
@@ -185,27 +188,39 @@ const Home = () => {
       <Seo jsonLd={[faqJsonLd(), howToJsonLd()]} />
 
       {/* ================= HERO =================
-          Dark in both themes, via the .on-dark token scope: the light rays are
-          white, so they need a dark surface to exist on at all. Scoping the
-          palette rather than overriding colours means every component inside
-          — badge, buttons, the scanner card — follows without special cases. */}
-      <section className="on-dark relative overflow-hidden">
-        <LightRays
-          raysOrigin="top-center"
-          raysColor="#ffffff"
-          raysSpeed={0.9}
-          lightSpread={0.6}
-          rayLength={2.4}
-          followMouse
-          mouseInfluence={0.08}
-          saturation={0}
-          fadeDistance={1.1}
-        />
-        {/* Floor-plan grid, very faint, under the rays. */}
+          Follows the theme. Light rays are emitted light — they only read as
+          rays against a dark surface, and forcing the hero dark in light mode
+          just looked broken. So dark mode gets the rays; light mode gets the
+          floor-plan grid it always had. */}
+      <section className="relative overflow-hidden bg-canvas">
+        {isDark ? (
+          <LightRays
+            raysOrigin="top-center"
+            raysColor="#ffffff"
+            raysSpeed={0.9}
+            lightSpread={0.6}
+            rayLength={2.4}
+            followMouse
+            mouseInfluence={0.08}
+            saturation={0}
+            fadeDistance={1.1}
+          />
+        ) : null}
         <div
-          className="bg-grid pointer-events-none absolute inset-0 opacity-30"
+          className={cn(
+            "bg-grid pointer-events-none absolute inset-0",
+            isDark && "opacity-25",
+          )}
           aria-hidden="true"
         />
+        {/* Soft glow behind the scanner column, light mode only — under the
+            rays it would just muddy them. */}
+        {!isDark && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -top-32 right-[-10%] h-[28rem] w-[28rem] rounded-full bg-brand/10 blur-3xl"
+          />
+        )}
 
         <Container
           width="wide"
