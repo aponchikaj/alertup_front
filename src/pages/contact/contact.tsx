@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ContactAPI } from "../../apis/contact";
 import Seo from "../../seo/Seo";
 import { breadcrumbJsonLd } from "../../seo/structuredData";
+import { useI18n } from "../../i18n/LanguageProvider";
 import { usePageAnimations } from "../../lib/animations";
 import { PageShell } from "../../components/ui/layout";
 import { Card } from "../../components/ui/card";
@@ -10,37 +12,48 @@ import { Button } from "../../components/ui/button";
 import { TextField, TextAreaField } from "../../components/ui/field";
 import { MailIcon } from "../../components/ui/icons";
 
+/** Explicit states. The previous code used the literal "Sent." as both the
+ *  success sentinel and the message body, and the catch block set it too — so
+ *  a network failure rendered the success alert. */
+type Status = "idle" | "sent" | "error";
+
 const Contact = () => {
   const rootRef = usePageAnimations();
+  const { t } = useI18n();
+  const [searchParams] = useSearchParams();
 
-  const [contactMessage, setContactMessage] = useState("");
+  const [status, setStatus] = useState<Status>("idle");
+  const [errorText, setErrorText] = useState("");
   const [contactLoading, setContactLoading] = useState(false);
 
-  const [contactData, setContactData] = useState({
+  const [contactData, setContactData] = useState(() => ({
     email: "",
-    reason: "",
+    // Arriving from the Enterprise card on /pricing — start the reason for them.
+    reason:
+      searchParams.get("plan") === "enterprise"
+        ? t("contact.reasonEnterprise")
+        : "",
     message: "",
-  });
+  }));
 
-  const SendMessage = async (e: React.FormEvent) => {
+  const sendMessage = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setContactLoading(true);
-    setContactMessage("");
+    setStatus("idle");
+    setErrorText("");
 
     try {
       const res = await ContactAPI(contactData);
-
       if (res?.Success === false) {
-        setContactMessage(res.Message);
-        setContactLoading(false);
+        setErrorText(res.Message || t("contact.failed"));
+        setStatus("error");
         return;
       }
-
-      setContactMessage("Sent.");
-      setContactLoading(false);
-    } catch (err) {
-      console.error("Error occurred", err);
-      setContactMessage("Sent.");
+      setStatus("sent");
+    } catch {
+      setErrorText(t("contact.failed"));
+      setStatus("error");
+    } finally {
       setContactLoading(false);
     }
   };
@@ -50,8 +63,8 @@ const Contact = () => {
       <Seo
         jsonLd={[
           breadcrumbJsonLd([
-            { name: "Home", path: "/" },
-            { name: "Contact", path: "/contact" },
+            { name: t("common.home"), path: "/" },
+            { name: t("contact.breadcrumb"), path: "/contact" },
           ]),
         ]}
       />
@@ -64,32 +77,29 @@ const Contact = () => {
                 <MailIcon size={24} />
               </span>
               <h1 className="text-2xl font-semibold text-ink sm:text-3xl">
-                Contact us
+                {t("contact.title")}
               </h1>
               <p className="max-w-md text-sm text-ink-muted sm:text-base">
-                Questions about setting up your building? We answer every
-                message.
+                {t("contact.lead")}
               </p>
             </div>
 
-            {contactMessage !== "" && (
+            {status !== "idle" && (
               <Alert
-                tone={contactMessage === "Sent." ? "success" : "danger"}
+                tone={status === "sent" ? "success" : "danger"}
                 className="mb-5"
               >
-                {contactMessage === "Sent."
-                  ? "Message sent — we'll get back to you soon."
-                  : contactMessage}
+                {status === "sent" ? t("contact.sent") : errorText}
               </Alert>
             )}
 
-            <form onSubmit={SendMessage} className="flex flex-col gap-4">
+            <form onSubmit={sendMessage} className="flex flex-col gap-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <TextField
-                  label="Email"
+                  label={t("home.emailLabel")}
                   type="email"
                   autoComplete="email"
-                  placeholder="you@example.com"
+                  placeholder={t("common.emailPlaceholder")}
                   value={contactData.email}
                   onChange={(e) =>
                     setContactData({ ...contactData, email: e.target.value })
@@ -97,8 +107,8 @@ const Contact = () => {
                   required
                 />
                 <TextField
-                  label="Reason"
-                  placeholder="e.g. Setting up my building"
+                  label={t("home.reasonLabel")}
+                  placeholder={t("home.reasonPlaceholder")}
                   value={contactData.reason}
                   onChange={(e) =>
                     setContactData({ ...contactData, reason: e.target.value })
@@ -107,8 +117,8 @@ const Contact = () => {
                 />
               </div>
               <TextAreaField
-                label="Message"
-                placeholder="Tell us what you need…"
+                label={t("home.messageLabel")}
+                placeholder={t("home.messagePlaceholder")}
                 rows={6}
                 value={contactData.message}
                 onChange={(e) =>
@@ -121,9 +131,9 @@ const Contact = () => {
                 size="lg"
                 fullWidth
                 loading={contactLoading}
-                loadingLabel="Sending…"
+                loadingLabel={t("common.sending")}
               >
-                Send message
+                {t("common.send")}
               </Button>
             </form>
           </Card>

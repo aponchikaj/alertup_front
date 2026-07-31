@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type ComponentType, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import Scanner from "../components/scanner";
 import Sponsors from "../components/sponsors";
@@ -10,51 +10,101 @@ import Seo from "../seo/Seo";
 // builders read the same data so the markup can never drift from the copy.
 import { FAQ, HOW_TO } from "../seo/seo.config";
 import { faqJsonLd, howToJsonLd } from "../seo/structuredData";
+import { useI18n } from "../i18n/LanguageProvider";
 import { usePageAnimations } from "../lib/animations";
 import { resolveQrTarget } from "../lib/qrTarget";
+import { cn } from "../lib/cn";
 import { Container, Section, SectionHeading } from "../components/ui/layout";
 import { Button, ButtonLink } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { Alert, Badge } from "../components/ui/feedback";
 import { TextField, TextAreaField } from "../components/ui/field";
+import type { IconProps } from "../components/ui/icon";
 import {
   ArrowRightIcon,
-  BuildingIcon,
   CheckCircleIcon,
-  MapIcon,
-  QrCodeIcon,
+  ExitDoorIcon,
+  LayersIcon,
+  MapPinIcon,
   RouteIcon,
+  ScanIcon,
+  SearchIcon,
   ShieldCheckIcon,
   SmartphoneIcon,
   ZapIcon,
 } from "../components/ui/icons";
 
-const SERVICES = [
-  {
-    icon: ShieldCheckIcon,
-    title: "Emergency Instructions",
-    text: "Clear, step-by-step safety guidance tailored to the building and the type of emergency.",
-  },
+type IconComponent = ComponentType<IconProps>;
+
+/* The three pillars of the platform, in positioning order: everyday
+   wayfinding first, emergency second, the AI concierge third. */
+const SERVICES: ReadonlyArray<{
+  icon: IconComponent;
+  titleKey: string;
+  textKey: string;
+}> = [
   {
     icon: RouteIcon,
-    title: "Escape Route Maps",
-    text: "Simple visual evacuation maps that show exits and safe paths inside the building.",
+    titleKey: "home.serviceWayfindingTitle",
+    textKey: "home.serviceWayfindingText",
   },
   {
-    icon: QrCodeIcon,
-    title: "QR Code Access",
-    text: "No app needed. Scan a QR code and instantly access emergency safety information.",
+    icon: ShieldCheckIcon,
+    titleKey: "home.serviceEmergencyTitle",
+    textKey: "home.serviceEmergencyText",
   },
+  {
+    icon: SearchIcon,
+    titleKey: "home.serviceAiTitle",
+    textKey: "home.serviceAiText",
+  },
+];
+
+const TRUST_POINTS: ReadonlyArray<{ icon: IconComponent; labelKey: string }> = [
+  { icon: ZapIcon, labelKey: "home.trustInstant" },
+  { icon: LayersIcon, labelKey: "home.trustFloors" },
+  { icon: SmartphoneIcon, labelKey: "home.trustPhones" },
+];
+
+const ABOUT_POINT_KEYS = [
+  "home.aboutPoint1",
+  "home.aboutPoint2",
+  "home.aboutPoint3",
 ] as const;
 
-const TRUST_POINTS = [
-  { icon: ZapIcon, label: "Instant — no app install" },
-  { icon: BuildingIcon, label: "Per-building & per-floor maps" },
-  { icon: SmartphoneIcon, label: "Works on any phone" },
-] as const;
+/** Nothing here is live data — it is a still of what a visitor sees after a
+ *  scan: where they are, the floor change, and where they are heading. */
+const MOCKUP_STEPS: ReadonlyArray<{
+  icon: IconComponent;
+  labelKey: string;
+  valueKey: string;
+  emphasis?: boolean;
+}> = [
+  {
+    icon: MapPinIcon,
+    labelKey: "wayfinding.yourLocation",
+    valueKey: "home.mockupFloor",
+  },
+  {
+    icon: LayersIcon,
+    labelKey: "wayfinding.changeFloor",
+    valueKey: "home.mockupStep",
+  },
+  {
+    icon: ExitDoorIcon,
+    labelKey: "wayfinding.destination",
+    valueKey: "home.mockupDestination",
+    emphasis: true,
+  },
+];
+
+/** Non-empty values map to a dictionary key, so the banner text translates. */
+type QrError = "" | "home.qrRejected" | "home.qrOpenFailed";
+type ContactStatus = "idle" | "sent" | "error";
 
 const Home = () => {
   const rootRef = usePageAnimations();
+  const { t } = useI18n();
   const [isLogged, setIsLogged] = useState(false);
 
   useEffect(() => {
@@ -75,7 +125,8 @@ const Home = () => {
 
   /* --- Contact ----------------------------------------------------------- */
 
-  const [contactMessage, setContactMessage] = useState("");
+  const [contactStatus, setContactStatus] = useState<ContactStatus>("idle");
+  const [contactError, setContactError] = useState("");
   const [contactLoading, setContactLoading] = useState(false);
   const [contactData, setContactData] = useState({
     email: "",
@@ -86,16 +137,20 @@ const Home = () => {
   const sendMessage = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setContactLoading(true);
+    setContactStatus("idle");
+    setContactError("");
     try {
       const res = await ContactAPI(contactData);
       if (res?.Success === false) {
-        setContactMessage(res.Message);
+        setContactError(res.Message || t("contact.failed"));
+        setContactStatus("error");
         return;
       }
-      setContactMessage("Sent.");
+      setContactStatus("sent");
     } catch {
-      // Was "Sent." — reporting success from the failure path.
-      setContactMessage("Couldn't send your message. Please try again.");
+      // Was reporting success from the failure path.
+      setContactError(t("contact.failed"));
+      setContactStatus("error");
     } finally {
       setContactLoading(false);
     }
@@ -103,7 +158,7 @@ const Home = () => {
 
   /* --- QR scanning -------------------------------------------------------- */
 
-  const [qrCodeMessage, setQrCodeMessage] = useState("");
+  const [qrError, setQrError] = useState<QrError>("");
 
   const getQR = (data: string) => {
     if (!data) return;
@@ -111,14 +166,14 @@ const Home = () => {
     // any URL merely containing "alertup".
     const target = resolveQrTarget(data);
     if (!target) {
-      setQrCodeMessage("Other QR codes can't be used.");
+      setQrError("home.qrRejected");
       return;
     }
     try {
       window.location.href = target;
-      setQrCodeMessage("");
+      setQrError("");
     } catch {
-      setQrCodeMessage("Unable to open QR link.");
+      setQrError("home.qrOpenFailed");
     }
   };
 
@@ -146,25 +201,25 @@ const Home = () => {
           <div className="flex flex-col items-center gap-6 text-center lg:items-start lg:text-left">
             <span data-hero>
               <Badge tone="brand" className="px-3 py-1.5 text-[0.8125rem]">
-                <ShieldCheckIcon size={15} />
-                Scan once &amp; be safe
+                <ScanIcon size={15} />
+                {t("home.badge")}
               </Badge>
             </span>
 
-            {/* The page's only <h1>. The wordmark stays visual; the
+            {/* The page's only <h1>. The two-line treatment stays visual; the
                 screen-reader text carries what the page is actually about,
                 which is also what search engines index. */}
             <h1
               data-hero
               className="text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl"
             >
-              <span className="sr-only">
-                AlertUp — QR code evacuation routes and escape maps for buildings
-              </span>
+              <span className="sr-only">{t("home.srTitle")}</span>
               <span aria-hidden="true">
-                <span className="text-ink">Every second</span>
+                <span className="text-ink">{t("home.heroTitleTop")}</span>
                 <br />
-                <span className="text-gradient-brand">finds the exit.</span>
+                <span className="text-gradient-brand">
+                  {t("home.heroTitleBottom")}
+                </span>
               </span>
             </h1>
 
@@ -172,26 +227,27 @@ const Home = () => {
               data-hero
               className="max-w-xl text-base leading-relaxed text-ink-muted sm:text-lg"
             >
-              Scan once and find the{" "}
-              <span className="font-semibold text-brand-text">safest way out</span>.
-              AlertUp turns official escape maps into instant QR-code evacuation
-              routes — for any building, on any phone.
+              {t("home.heroLead1")}
+              <span className="font-semibold text-brand-text">
+                {t("home.heroLeadHighlight")}
+              </span>
+              {t("home.heroLead2")}
             </p>
 
             <div data-hero className="flex flex-wrap items-center justify-center gap-3 lg:justify-start">
               {isLogged ? (
                 <ButtonLink to="/dashboard" size="lg">
-                  Open dashboard
+                  {t("common.openDashboard")}
                   <ArrowRightIcon size={18} />
                 </ButtonLink>
               ) : (
                 <>
                   <ButtonLink to="/register" size="lg">
-                    Get started free
+                    {t("common.getStartedFree")}
                     <ArrowRightIcon size={18} />
                   </ButtonLink>
                   <ButtonLink to="/login" variant="secondary" size="lg">
-                    Log in
+                    {t("common.login")}
                   </ButtonLink>
                 </>
               )}
@@ -199,7 +255,7 @@ const Home = () => {
                 href="#how-it-works"
                 className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-4 text-[0.9375rem] font-medium text-ink-muted transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
-                How it works
+                {t("home.howItWorks")}
               </a>
             </div>
 
@@ -207,13 +263,13 @@ const Home = () => {
               data-hero
               className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 lg:justify-start"
             >
-              {TRUST_POINTS.map(({ icon: PointIcon, label }) => (
+              {TRUST_POINTS.map(({ icon: PointIcon, labelKey }) => (
                 <li
-                  key={label}
+                  key={labelKey}
                   className="flex items-center gap-1.5 text-sm text-ink-subtle"
                 >
                   <PointIcon size={15} className="text-brand-text" />
-                  {label}
+                  {t(labelKey)}
                 </li>
               ))}
             </ul>
@@ -224,20 +280,20 @@ const Home = () => {
             <Card className="w-full max-w-sm p-6 sm:p-8">
               <Scanner brandMark onScan={getQR} />
               <div className="mt-5 flex flex-col items-center gap-1 border-t border-line pt-5 text-center">
-                {qrCodeMessage ? (
+                {qrError ? (
                   <p role="alert" className="text-sm font-medium text-danger-text">
-                    {qrCodeMessage}
+                    {t(qrError)}
                   </p>
                 ) : (
                   <p className="text-sm text-ink-subtle">
-                    Own a building?
+                    {t("home.ownBuilding")}
                   </p>
                 )}
                 <Link
                   to="/new"
-                  className="text-sm font-semibold text-brand-text underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring rounded-sm"
+                  className="rounded-sm text-sm font-semibold text-brand-text underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >
-                  Create a QR route for it
+                  {t("home.createRoute")}
                 </Link>
               </div>
             </Card>
@@ -250,21 +306,23 @@ const Home = () => {
         <Container width="wide" className="flex flex-col gap-12">
           <div data-reveal>
             <SectionHeading
-              eyebrow="What you get"
-              title={<span id="services-title">Safety that fits on a sticker</span>}
-              description="Everything a visitor needs in an emergency, behind one small printed code."
+              eyebrow={t("home.servicesEyebrow")}
+              title={<span id="services-title">{t("home.servicesTitle")}</span>}
+              description={t("home.servicesLead")}
             />
           </div>
 
           <ul data-reveal-group className="grid gap-5 md:grid-cols-3">
-            {SERVICES.map(({ icon: ServiceIcon, title, text }) => (
-              <li key={title} data-reveal-item className="h-full">
+            {SERVICES.map(({ icon: ServiceIcon, titleKey, textKey }) => (
+              <li key={titleKey} data-reveal-item className="h-full">
                 <Card interactive className="flex h-full flex-col gap-4 p-7">
                   <span className="grid h-12 w-12 place-items-center rounded-xl bg-brand-subtle text-brand-text">
                     <ServiceIcon size={24} />
                   </span>
-                  <h3 className="text-lg font-semibold text-ink">{title}</h3>
-                  <p className="text-sm leading-relaxed text-ink-muted">{text}</p>
+                  <h3 className="text-lg font-semibold text-ink">{t(titleKey)}</h3>
+                  <p className="text-sm leading-relaxed text-ink-muted">
+                    {t(textKey)}
+                  </p>
                 </Card>
               </li>
             ))}
@@ -278,45 +336,77 @@ const Home = () => {
           <div data-reveal="left" className="flex flex-col gap-5">
             <SectionHeading
               align="left"
-              eyebrow="Why AlertUp"
-              title={<span id="about-title">Official maps, one scan away</span>}
-              description="Building owners create a digital profile, upload their official escape and evacuation maps, and generate QR codes for every location. Printed and placed through the building, each code opens the safest route to an exit the moment it's scanned."
+              eyebrow={t("home.aboutEyebrow")}
+              title={<span id="about-title">{t("home.aboutTitle")}</span>}
+              description={t("home.aboutLead")}
             />
             <ul className="flex flex-col gap-3">
-              {[
-                "Emergency instructions tailored to the building and emergency type",
-                "Per-floor escape route maps showing exits and safe paths",
-                "QR access with nothing to install",
-              ].map((point) => (
-                <li key={point} className="flex items-start gap-2.5 text-[0.9375rem] text-ink-muted">
+              {ABOUT_POINT_KEYS.map((key) => (
+                <li
+                  key={key}
+                  className="flex items-start gap-2.5 text-[0.9375rem] text-ink-muted"
+                >
                   <CheckCircleIcon size={19} className="mt-0.5 shrink-0 text-success-text" />
-                  {point}
+                  {t(key)}
                 </li>
               ))}
             </ul>
           </div>
 
+          {/* A still of the product: the route a visitor gets after scanning
+              at the main entrance and searching for a shop upstairs. */}
           <div data-reveal="right" className="relative">
-            <Card className="p-8">
-              <div className="flex items-center gap-4 border-b border-line pb-5">
-                <span className="grid h-12 w-12 place-items-center rounded-xl bg-brand-subtle text-brand-text">
-                  <MapIcon size={24} />
-                </span>
-                <div>
-                  <p className="font-semibold text-ink">Floor 2 — East wing</p>
-                  <p className="text-sm text-ink-subtle">Nearest exit: Stairwell B</p>
-                </div>
+            <Card className="p-6 sm:p-8">
+              {/* Search bar — presentational, so it is a <p>, not an <input>. */}
+              <div className="flex items-center gap-3 rounded-xl border border-line bg-surface-2 px-4 py-3">
+                <SearchIcon size={18} className="shrink-0 text-ink-subtle" />
+                <p className="truncate text-[0.9375rem] font-medium text-ink">
+                  {t("home.mockupDestination")}
+                </p>
               </div>
-              <div className="flex flex-col gap-3 pt-5">
-                {HOW_TO.steps.slice(0, 3).map((step, i) => (
-                  <div key={step.name} className="flex items-center gap-3">
-                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand text-xs font-bold text-brand-ink">
-                      {i + 1}
-                    </span>
-                    <p className="text-sm text-ink-muted">{step.name}</p>
-                  </div>
-                ))}
-              </div>
+
+              <ol className="mt-6 flex flex-col border-t border-line pt-6">
+                {MOCKUP_STEPS.map(
+                  ({ icon: StepIcon, labelKey, valueKey, emphasis }, i) => (
+                    <li
+                      key={valueKey}
+                      className="relative flex gap-4 pb-6 last:pb-0"
+                    >
+                      {i < MOCKUP_STEPS.length - 1 && (
+                        <span
+                          aria-hidden="true"
+                          // left-5 = the 40px marker's centre; the line runs
+                          // from just under it to the next marker.
+                          className="absolute bottom-0 left-5 top-11 w-px -translate-x-1/2 bg-line-strong"
+                        />
+                      )}
+                      <span
+                        className={cn(
+                          "relative grid h-10 w-10 shrink-0 place-items-center rounded-full border",
+                          emphasis
+                            ? "border-brand bg-brand text-brand-ink"
+                            : "border-line bg-surface-2 text-ink-muted",
+                        )}
+                      >
+                        <StepIcon size={19} />
+                      </span>
+                      <div className="flex min-w-0 flex-col gap-1 pt-1">
+                        <span className="text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-ink-subtle">
+                          {t(labelKey)}
+                        </span>
+                        <span
+                          className={cn(
+                            "text-[0.9375rem] font-medium",
+                            emphasis ? "text-brand-text" : "text-ink",
+                          )}
+                        >
+                          {t(valueKey)}
+                        </span>
+                      </div>
+                    </li>
+                  ),
+                )}
+              </ol>
             </Card>
             <div
               aria-hidden="true"
@@ -332,14 +422,15 @@ const Home = () => {
         <Container width="wide" className="flex flex-col gap-12">
           <div data-reveal>
             <SectionHeading
-              eyebrow="How it works"
+              eyebrow={t("home.howItWorks")}
               title={<span id="how-it-works-title">{HOW_TO.name}</span>}
               description={HOW_TO.description}
             />
           </div>
 
-          <ol data-reveal-group className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+          <ol data-reveal-group className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
             {HOW_TO.steps.map((step, i) => (
+              // The HowTo JSON-LD points each step at #step-N — keep the ids.
               <li
                 key={step.name}
                 id={`step-${i + 1}`}
@@ -362,8 +453,37 @@ const Home = () => {
         </Container>
       </Section>
 
+      {/* ================= PRICING TEASER ================= */}
+      {/* Deliberately thin — /pricing does the selling. */}
+      <Section aria-labelledby="pricing-teaser-title">
+        <Container>
+          <Card
+            data-reveal
+            className="flex flex-col items-center gap-5 p-7 text-center sm:flex-row sm:items-center sm:justify-between sm:p-9 sm:text-left"
+          >
+            <div className="flex flex-col gap-1.5">
+              <h2
+                id="pricing-teaser-title"
+                className="text-xl font-semibold text-ink sm:text-2xl"
+              >
+                {t("pricing.title")}
+              </h2>
+              <p className="max-w-xl text-sm text-ink-muted sm:text-base">
+                {t("pricing.lead")}
+              </p>
+            </div>
+            <ButtonLink to="/pricing" variant="secondary" className="shrink-0">
+              {t("common.pricing")}
+              <ArrowRightIcon size={18} />
+            </ButtonLink>
+          </Card>
+        </Container>
+      </Section>
+
       {/* ================= SOCIAL PROOF ================= */}
-      <Section aria-label="Partners and feedback">
+      {/* Deliberately unnamed: <Sponsors /> and <Reviews /> each bring their
+          own heading, so labelling the wrapper would only duplicate them. */}
+      <Section tone="subtle">
         <Container className="flex flex-col items-center gap-12">
           <div data-reveal>
             <Sponsors align="center" />
@@ -377,12 +497,12 @@ const Home = () => {
       {/* ================= FAQ ================= */}
       {/* The visible counterpart of the FAQPage schema. Google only honours
           FAQ rich results when the answers are on the page. */}
-      <Section tone="subtle" id="faq" aria-labelledby="faq-title">
+      <Section id="faq" aria-labelledby="faq-title">
         <Container width="prose" className="flex flex-col gap-10">
           <div data-reveal>
             <SectionHeading
-              eyebrow="FAQ"
-              title={<span id="faq-title">Frequently asked questions</span>}
+              eyebrow={t("home.faqEyebrow")}
+              title={<span id="faq-title">{t("home.faqTitle")}</span>}
             />
           </div>
 
@@ -414,36 +534,34 @@ const Home = () => {
       </Section>
 
       {/* ================= CONTACT ================= */}
-      <Section aria-labelledby="contact-title">
+      <Section tone="subtle" aria-labelledby="contact-title">
         <Container width="prose">
           <Card data-reveal className="p-7 sm:p-10">
             <div className="mb-7 flex flex-col gap-2 text-center">
               <h2 id="contact-title" className="text-2xl font-semibold text-ink sm:text-3xl">
-                Contact us
+                {t("home.contactTitle")}
               </h2>
               <p className="text-sm text-ink-muted sm:text-base">
-                Questions about setting up your building? We answer every message.
+                {t("home.contactLead")}
               </p>
             </div>
 
-            {contactMessage !== "" && (
+            {contactStatus !== "idle" && (
               <Alert
-                tone={contactMessage === "Sent." ? "success" : "danger"}
+                tone={contactStatus === "sent" ? "success" : "danger"}
                 className="mb-5"
               >
-                {contactMessage === "Sent."
-                  ? "Message sent — we'll get back to you soon."
-                  : contactMessage}
+                {contactStatus === "sent" ? t("home.contactSent") : contactError}
               </Alert>
             )}
 
             <form onSubmit={sendMessage} className="flex flex-col gap-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <TextField
-                  label="Email"
+                  label={t("home.emailLabel")}
                   type="email"
                   autoComplete="email"
-                  placeholder="you@example.com"
+                  placeholder={t("common.emailPlaceholder")}
                   value={contactData.email}
                   onChange={(e) =>
                     setContactData({ ...contactData, email: e.target.value })
@@ -451,8 +569,8 @@ const Home = () => {
                   required
                 />
                 <TextField
-                  label="Reason"
-                  placeholder="e.g. Setting up my building"
+                  label={t("home.reasonLabel")}
+                  placeholder={t("home.reasonPlaceholder")}
                   value={contactData.reason}
                   onChange={(e) =>
                     setContactData({ ...contactData, reason: e.target.value })
@@ -461,8 +579,8 @@ const Home = () => {
                 />
               </div>
               <TextAreaField
-                label="Message"
-                placeholder="Tell us what you need…"
+                label={t("home.messageLabel")}
+                placeholder={t("home.messagePlaceholder")}
                 rows={6}
                 value={contactData.message}
                 onChange={(e) =>
@@ -475,9 +593,9 @@ const Home = () => {
                 size="lg"
                 fullWidth
                 loading={contactLoading}
-                loadingLabel="Sending…"
+                loadingLabel={t("common.sending")}
               >
-                Send message
+                {t("common.send")}
               </Button>
             </form>
           </Card>
