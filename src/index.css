@@ -266,6 +266,18 @@
     transition: background-color 0.2s ease, color 0.2s ease;
   }
 
+  /* Georgian body text.
+     The default UI stack resolves Georgian through whatever fallback the OS
+     picks, which varies from decent (Android) to cramped (older Windows).
+     Naming Georgian-capable faces first gives consistent glyphs without
+     shipping a webfont — the display faces are already Georgian-specific, so
+     only body copy needed this. LanguageProvider sets <html lang>, which is
+     what :lang(ka) keys off. */
+  :lang(ka) {
+    font-family: "Noto Sans Georgian", "BPG Nino Mtavruli", "Sylfaen",
+      var(--font-sans);
+  }
+
   h1,
   h2,
   h3,

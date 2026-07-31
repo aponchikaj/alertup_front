@@ -193,7 +193,7 @@ export const request = async <T = unknown>(path: string, options: RequestOptions
     if (signal) signal.removeEventListener('abort', onExternalAbort);
   }
 
-  const data = await parseBody(response);
+  const data = normalizeEnvelope(await parseBody(response));
 
   if (!response.ok) {
     throw new ApiError(
@@ -205,6 +205,36 @@ export const request = async <T = unknown>(path: string, options: RequestOptions
 
   return data as T;
 };
+
+/**
+ * Envelope compatibility shim.
+ *
+ * The API was standardised on `{ success, message, data }`. Screens written
+ * against the old `{ Success, Message }` shape are still being migrated, so
+ * responses are mirrored across both spellings: existing pages keep reading
+ * the capitalised keys while new code uses the lowercase ones.
+ *
+ * REMOVE once `grep -rn "\.Success\|\.Message" src/` comes back empty. Both
+ * spellings are only ever added, never overwritten, so a server that already
+ * sends one form is left untouched.
+ */
+function normalizeEnvelope(body: unknown): unknown {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return body;
+  const record = body as Record<string, unknown>;
+
+  const hasLower = 'success' in record || 'message' in record;
+  const hasUpper = 'Success' in record || 'Message' in record;
+  if (!hasLower || hasUpper) return body;
+
+  const mirrored: Record<string, unknown> = { ...record };
+  if ('success' in record) mirrored.Success = record.success;
+  if ('message' in record) {
+    // Legacy screens read payloads out of `Message`; the new shape puts them
+    // in `data` and leaves `message` as human-readable text.
+    mirrored.Message = 'data' in record ? record.data : record.message;
+  }
+  return mirrored;
+}
 
 export const get = <T = unknown>(path: string, options?: Omit<RequestOptions, 'method' | 'body'>) =>
   request<T>(path, { ...options, method: 'GET' });
