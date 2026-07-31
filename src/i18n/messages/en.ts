@@ -319,6 +319,9 @@ export const en = {
     createTitle: "Add a building",
     createLead:
       "Name the building, then upload a floor plan for each level. You can place routes and shops afterwards in the map editor.",
+    createFloorsHint:
+      "Floors will be created as Floor 1 to Floor {count}. You can rename them, upload plans and draw routes in the editor.",
+    createCta: "Create and open the editor",
     createNameRequired: "Building name is required.",
     createFailed: "Couldn't create the building.",
     buildingName: "Building name",

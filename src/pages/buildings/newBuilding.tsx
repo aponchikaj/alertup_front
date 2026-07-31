@@ -7,184 +7,94 @@ import { PageHeader, PageShell } from "../../components/ui/layout";
 import { Button, ButtonLink } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Alert } from "../../components/ui/feedback";
-import { Field, TextField } from "../../components/ui/field";
-import {
-  ArrowLeftIcon,
-  ArrowRightIcon,
-  MailIcon,
-  PlusIcon,
-} from "../../components/ui/icons";
+import { TextField } from "../../components/ui/field";
+import { ArrowRightIcon, MailIcon } from "../../components/ui/icons";
 import { useI18n } from "../../i18n/LanguageProvider";
 
-interface BuildingSchema {
-  buildingName: string;
-  floors: number;
-  floorNames: string[];
-  maps: File[];
-}
+/* ============================================================================
+   New building
+   ----------------------------------------------------------------------------
+   One step: a name and a floor count, then straight into the map editor.
+
+   This used to be a two-step wizard that demanded an image for every floor
+   before it would create anything — so you had to go and find plans before you
+   could even make the building, and the editor (where plans are actually
+   useful) was somewhere you had to discover separately. Floor plans are
+   optional here now: the editor draws an empty floor perfectly well, and its
+   floor panel takes an image whenever you have one.
+   ========================================================================= */
+
+const MAX_FLOORS = 200;
 
 const NewBuilding = () => {
   const rootRef = usePageAnimations();
   const navigate = useNavigate();
   const { t } = useI18n();
 
-  const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
   /** null = still checking; false = logged in but email not verified. */
   const [verified, setVerified] = useState<boolean | null>(null);
 
-  const [buildingData, setBuildingData] = useState<BuildingSchema>({
-    buildingName: "",
-    floors: 1,
-    floorNames: [],
-    maps: [],
-  });
+  const [buildingName, setBuildingName] = useState("");
+  const [floors, setFloors] = useState(1);
 
-  const checkVerification = async () => {
-    const res = await getMe();
-    if (!res || res.Success == false) {
-      navigate("/login");
-      return;
-    }
-    // Unverified accounts see an explanation instead of being silently
-    // bounced to /settings — that redirect read as a broken "New" button.
-    // Requires an explicit true. `!== false` treated a missing field — which is
-    // what a string error Message yields — as verified.
-    setVerified(res.Message?.verified === true);
-  };
-
-  /* ----------------------------------
-     PAGE SETUP - NO PREMIUM RESTRICTIONS
-  ----------------------------------- */
   useEffect(() => {
-    checkVerification()
-    // No premium checks - unlimited access for all users
-  }, []);
+    const checkVerification = async () => {
+      const res = await getMe();
+      if (!res || res.Success === false) {
+        navigate("/login");
+        return;
+      }
+      // Unverified accounts see an explanation rather than a silent bounce to
+      // /settings, which read as a broken "New" button.
+      setVerified(res.Message?.verified === true);
+    };
+    checkVerification();
+  }, [navigate]);
 
-  /* ----------------------------------
-     KEEP FLOORS / ARRAYS IN SYNC
-  ----------------------------------- */
-  useEffect(() => {
-    setBuildingData((prev) => ({
-      ...prev,
-      floorNames: prev.floorNames.slice(0, prev.floors),
-      maps: prev.maps.slice(0, prev.floors),
-    }));
-  }, [buildingData.floors]);
-
-  /* ----------------------------------
-     FILE HANDLER
-  ----------------------------------- */
-  const handleFileChange = (index: number, file: File) => {
-    const newMaps = [...buildingData.maps];
-    newMaps[index] = file;
-    setBuildingData({ ...buildingData, maps: newMaps });
-  };
-
-  /* ----------------------------------
-     STEP CONTROL
-  ----------------------------------- */
-  const goNext = () => {
-    if (!buildingData.buildingName.trim()) {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!buildingName.trim()) {
       setServerError(t("buildings.createNameRequired"));
       return;
     }
-    setServerError("");
-    setStep(2);
-  };
 
-  const goBack = () => {
-    setStep(1);
-  };
-
-  /* ----------------------------------
-     SUBMIT
-  ----------------------------------- */
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
     setServerError("");
     setLoading(true);
 
     try {
-        const formData = new FormData();
-        formData.append("buildingName", buildingData.buildingName);
-        formData.append("floors", buildingData.floors.toString());
+      const formData = new FormData();
+      formData.append("buildingName", buildingName.trim());
+      formData.append("floors", String(floors));
+      // Named for the visitor, not the database: "Floor 1" reads correctly on a
+      // printed sign. Renameable in the editor.
+      for (let i = 1; i <= floors; i++) {
+        formData.append("floorNames[]", t("wayfinding.floor", { number: i }));
+      }
 
-        buildingData.floorNames.forEach((name) => {
-        formData.append("floorNames[]", name); // must append each floor name
-        });
-
-        buildingData.maps.forEach((file) => {
-        if (file) formData.append("maps", file); // append each map file
-        });
-
-        const res = await createNewBuilding(formData); // FormData: the browser sets the multipart boundary
-        if (!res || res.Success === false) {
+      const res = await createNewBuilding(formData);
+      if (!res || res.Success === false) {
         setServerError(res?.Message || t("buildings.createFailed"));
         setLoading(false);
         return;
-        }
+      }
 
-        navigate("/mybuildings");
-    } catch (err) {
-        setServerError(t("buildings.createFailed"));
-        setLoading(false);
+      // Straight into the editor — that is the point of creating a building.
+      const buildingId = res.buildingID || res.Message?.buildingID;
+      if (buildingId) {
+        navigate(`/building/${buildingId}/nodes`, { replace: true });
+        return;
+      }
+      // No id came back: the building exists, so send them somewhere useful
+      // rather than stranding them on a form that looks like it failed.
+      navigate("/mybuildings", { replace: true });
+    } catch {
+      setServerError(t("buildings.createFailed"));
+      setLoading(false);
     }
-    };
-
-
-  /* ----------------------------------
-     FLOOR INPUTS
-  ----------------------------------- */
-  const renderFloorInputs = () => {
-    return Array.from({ length: buildingData.floors }).map((_, i) => (
-      <fieldset
-        key={i}
-        className="flex flex-col gap-4 rounded-xl border border-line bg-surface-2 p-4"
-      >
-        <legend className="px-1.5 text-sm font-semibold text-ink">
-          {t("wayfinding.floor", { number: i + 1 })}
-        </legend>
-        <TextField
-          label={t("buildings.floorName")}
-          value={buildingData.floorNames[i] || ""}
-          onChange={(e) => {
-            const names = [...buildingData.floorNames];
-            names[i] = e.target.value;
-            setBuildingData({ ...buildingData, floorNames: names });
-          }}
-          required
-        />
-
-        <Field
-          label={t("buildings.floorMapLabel", { number: i + 1 })}
-          required
-          hint={t("buildings.floorMapHint")}
-        >
-          {({ id, describedBy }) => (
-            <input
-              id={id}
-              type="file"
-              accept="image/*"
-              aria-describedby={describedBy}
-              onChange={(e) => {
-                if (e.target.files?.[0]) {
-                  handleFileChange(i, e.target.files[0]);
-                }
-              }}
-              required
-              className="w-full cursor-pointer rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink-muted transition-colors file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-brand-subtle file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-text hover:border-line-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            />
-          )}
-        </Field>
-      </fieldset>
-    ));
   };
 
-  /* ----------------------------------
-     RENDER
-  ----------------------------------- */
   return (
     <div ref={rootRef}>
       <PageShell>
@@ -195,8 +105,6 @@ const NewBuilding = () => {
           />
         </div>
 
-        {/* Unverified accounts get an explanation and a path forward instead
-            of a silent redirect. */}
         {verified === false && (
           <div className="pt-8" data-reveal>
             <Card className="mx-auto w-full max-w-xl p-6 text-center sm:p-8">
@@ -219,87 +127,55 @@ const NewBuilding = () => {
         )}
 
         {verified !== false && (
-        <div className="pt-8" data-reveal>
-          <Card className="mx-auto w-full max-w-xl p-6 sm:p-8">
-            <p className="mb-5 text-xs font-semibold uppercase tracking-[0.14em] text-brand-text">
-              {t("buildings.stepOf", { current: step, total: 2 })}
-            </p>
-
-            {serverError && (
-              <Alert tone="danger" className="mb-5">
-                {serverError}
-              </Alert>
-            )}
-
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-              {/* STEP 1 */}
-              {step === 1 && (
-                <>
-                  <TextField
-                    label={t("buildings.buildingName")}
-                    value={buildingData.buildingName}
-                    onChange={(e) =>
-                      setBuildingData({
-                        ...buildingData,
-                        buildingName: e.target.value,
-                      })
-                    }
-                    required
-                  />
-
-                  <TextField
-                    label={t("buildings.numberOfFloors")}
-                    type="number"
-                    min={1}
-                    value={buildingData.floors}
-                    onChange={(e) => {
-                      const value = Number(e.target.value);
-                      setBuildingData({
-                        ...buildingData,
-                        floors: Math.max(1, value),
-                      });
-                    }}
-                    required
-                  />
-
-                  <Button type="button" onClick={goNext} fullWidth className="mt-2">
-                    {t("common.next")}
-                    <ArrowRightIcon size={18} />
-                  </Button>
-                </>
+          <div className="pt-8" data-reveal>
+            <Card className="mx-auto w-full max-w-xl p-6 sm:p-8">
+              {serverError && (
+                <Alert tone="danger" className="mb-5">
+                  {serverError}
+                </Alert>
               )}
 
-              {/* STEP 2 */}
-              {step === 2 && (
-                <>
-                  {renderFloorInputs()}
+              <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+                <TextField
+                  label={t("buildings.buildingName")}
+                  value={buildingName}
+                  onChange={(e) => setBuildingName(e.target.value)}
+                  autoFocus
+                  required
+                />
 
-                  <div className="mt-2 flex gap-3">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={goBack}
-                      fullWidth
-                    >
-                      <ArrowLeftIcon size={18} />
-                      {t("common.back")}
-                    </Button>
+                <TextField
+                  label={t("buildings.numberOfFloors")}
+                  type="number"
+                  min={1}
+                  max={MAX_FLOORS}
+                  value={floors}
+                  onChange={(e) => {
+                    const value = Number(e.target.value);
+                    // Guards the empty field (NaN) as well as silly values.
+                    setFloors(
+                      Number.isFinite(value)
+                        ? Math.min(MAX_FLOORS, Math.max(1, Math.trunc(value)))
+                        : 1,
+                    );
+                  }}
+                  hint={t("buildings.createFloorsHint", { count: floors })}
+                  required
+                />
 
-                    <Button
-                      type="submit"
-                      fullWidth
-                      loading={loading}
-                      loadingLabel={t("buildings.working")}
-                    >
-                      <PlusIcon size={18} />
-                      {t("common.create")}
-                    </Button>
-                  </div>
-                </>
-              )}
-            </form>
-          </Card>
-        </div>
+                <Button
+                  type="submit"
+                  fullWidth
+                  className="mt-1"
+                  loading={loading}
+                  loadingLabel={t("buildings.working")}
+                >
+                  {t("buildings.createCta")}
+                  <ArrowRightIcon size={18} />
+                </Button>
+              </form>
+            </Card>
+          </div>
         )}
       </PageShell>
     </div>
