@@ -14,6 +14,13 @@ import {
   CheckCircleIcon,
   SpinnerIcon,
 } from '../../components/ui/icons';
+import { EmergencyProvider } from '../../emergency/EmergencyProvider';
+import { useEmergency } from '../../emergency/useEmergency';
+import { EmergencyOverlay } from '../../components/emergency/EmergencyOverlay';
+import { EmergencyBanner } from '../../components/emergency/EmergencyBanner';
+import { WayfindingPanel } from '../../components/wayfinding/WayfindingPanel';
+import { AiChatLauncher } from '../../components/ai/AiChatLauncher';
+import { useI18n } from '../../i18n/LanguageProvider';
 
 interface FloorNode {
   id: string;
@@ -57,6 +64,16 @@ interface FloorMap {
   imageUrl?: string;
 }
 
+/**
+ * Live emergency state, added by the v2 backend. Optional so this page keeps
+ * working verbatim against an older deployment that does not send it.
+ */
+interface ScanEmergencyState {
+  active: boolean;
+  message: string | null;
+  emergencyId: string | null;
+}
+
 interface RouteData {
   qrId: string;
   buildingId: string;
@@ -76,11 +93,75 @@ interface RouteData {
   floorMap: FloorMap | null;
   timestamp: string;
   scanCount: number;
+  emergency?: ScanEmergencyState;
 }
+
+/**
+ * Emergency surfaces layered over the scan page.
+ *
+ * Kept as a child component so it sits inside EmergencyProvider. The overlay
+ * appears the instant an emergency is reported — the scan payload seeds the
+ * provider, so it paints on first render rather than waiting for the stream.
+ */
+const EmergencyLayer: React.FC<{ onShowExitRoute: () => void }> = ({
+  onShowExitRoute,
+}) => {
+  const emergency = useEmergency();
+  const { t } = useI18n();
+  if (!emergency) return null;
+
+  return (
+    <>
+      {emergency.phase === 'bypassed' ? (
+        <EmergencyBanner onViewRoute={onShowExitRoute} />
+      ) : null}
+
+      {emergency.phase === 'resolvedNotice' ? (
+        <Alert tone="success" className="mb-4" title={t('emergency.resolvedTitle')}>
+          <p>{t('emergency.resolvedBody')}</p>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="mt-3"
+            onClick={emergency.dismissResolvedNotice}
+          >
+            {t('emergency.dismiss')}
+          </Button>
+        </Alert>
+      ) : null}
+
+      <EmergencyOverlay
+        open={emergency.phase === 'emergency'}
+        message={emergency.message}
+        onShowRoute={() => {
+          onShowExitRoute();
+          emergency.bypass();
+        }}
+        onBypass={emergency.bypass}
+      />
+    </>
+  );
+};
+
+/** Hides the AI launcher while the emergency overlay is demanding attention. */
+const AiLayer: React.FC<{ buildingId: string; nodeId: string; locale: 'en' | 'ka' }> = ({
+  buildingId,
+  nodeId,
+  locale,
+}) => {
+  const emergency = useEmergency();
+  return (
+    <AiChatLauncher
+      hidden={emergency?.phase === 'emergency'}
+      context={{ buildingId, nodeId, locale }}
+    />
+  );
+};
 
 const QRScanRoutePageFixed: React.FC = () => {
   const { qrId } = useParams<{ qrId: string }>();
   const rootRef = usePageAnimations();
+  const { lang } = useI18n();
 
   const [routeData, setRouteData] = useState<RouteData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -325,8 +406,28 @@ const QRScanRoutePageFixed: React.FC = () => {
     );
   }
 
+  const scrollToExitRoute = () => {
+    document
+      .getElementById('emergency-route-map')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return (
+    <EmergencyProvider
+      buildingId={routeData.buildingId}
+      initialSnapshot={
+        routeData.emergency
+          ? {
+              isEmergency: routeData.emergency.active,
+              message: routeData.emergency.message,
+              emergencyId: routeData.emergency.emergencyId,
+              startedAt: null,
+            }
+          : null
+      }
+    >
     <div ref={rootRef}>
+      <EmergencyLayer onShowExitRoute={scrollToExitRoute} />
       <PageShell width="wide">
         {/* Header — the only animated element; route content below renders
             instantly, nothing safety-critical waits on an animation. */}
@@ -350,8 +451,19 @@ const QRScanRoutePageFixed: React.FC = () => {
           </Alert>
         )}
 
+        {/* Everyday wayfinding. Additive: the emergency map below is
+            unchanged, and this panel only takes over once the visitor picks a
+            destination. */}
+        <Card className="mt-8 p-6">
+          <WayfindingPanel
+            buildingId={routeData.buildingId}
+            originNodeId={routeData.nodeId}
+            originFloorNumber={routeData.floorNumber}
+          />
+        </Card>
+
         {/* Main Grid Layout */}
-        <div className="grid grid-cols-1 gap-6 pt-8 lg:grid-cols-3">
+        <div id="emergency-route-map" className="grid grid-cols-1 gap-6 pt-8 lg:grid-cols-3">
           {/* Map Display */}
           <div className="lg:col-span-2">
             <Card className="p-6">
@@ -723,7 +835,14 @@ const QRScanRoutePageFixed: React.FC = () => {
           </div>
         </Card>
       </PageShell>
+
+      <AiLayer
+        buildingId={routeData.buildingId}
+        nodeId={routeData.nodeId}
+        locale={lang}
+      />
     </div>
+    </EmergencyProvider>
   );
 };
 
