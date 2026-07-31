@@ -424,6 +424,12 @@ export const en = {
     legendRoute: "Your route",
   },
 
+  settings: {
+    languageTitle: "Language",
+    languageDescription:
+      "Choose the language for the interface. This is remembered on this device.",
+  },
+
   ai: {
     title: "Wayfinder AI",
     subtitle: "Ask about shops, exits and directions",

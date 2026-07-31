@@ -5,14 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build && npm run seo",
+    "build": "tsc -b && vite build && npm run seo && npm run seo:check",
     "seo": "node scripts/generate-seo.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "jest --forceExit",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage --forceExit",
-    "preview:static": "node scripts/serve-dist.mjs"
+    "preview:static": "node scripts/serve-dist.mjs",
+    "seo:check": "node scripts/check-seo.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.18",

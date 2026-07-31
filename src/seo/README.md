@@ -133,6 +133,57 @@ URLs still fall through to the shell.
 > path with the root `index.html`. To check prerendering locally, serve `dist/`
 > with a plain static server (`npx serve dist`) instead.
 
+## Checking it (`npm run seo:check`)
+
+`seo.data.json` is hand-edited and drives everything downstream, so a typo there
+is invisible in the app and only surfaces weeks later as a ranking problem.
+`scripts/check-seo.mjs` runs as the last step of `npm run build` and fails it on
+the mistakes that actually cost traffic:
+
+- a missing, duplicate, or over-long title or description
+- a `content.links` entry pointing at a route that isn't registered
+- an indexable route that wasn't prerendered, or a `:param` route marked indexable
+- a sitemap URL that is `noindex`, or a `Disallow:` that shadows a `noindex` page
+- an `app.html` shell that is indexable or carries a canonical
+- JSON-LD that doesn't parse, or a node with no `@type`
+- a share image below 600×315
+
+Snippet lengths are warnings, not errors — Google truncates rather than
+penalises, so those are a judgement call rather than a build blocker.
+
+It also runs standalone, before a build, when you're just editing copy:
+
+```bash
+npm run seo:check
+```
+
+## Previewing what production serves (`npm run preview:static`)
+
+`vite preview` answers **every** path with the root `index.html`, which hides the
+prerendered files entirely and will convince you the system is broken.
+`scripts/serve-dist.mjs` applies Vercel's real order — exact file, then directory
+index, then the `app.html` rewrite — and tags each response with an
+`X-Resolved-By` header so you can see which rule fired:
+
+```bash
+npm run build
+npm run preview:static
+```
+
+`directory-index` means that route is genuinely prerendered. `spa-fallback`
+means it isn't, and the `noindex` shell answered instead.
+
+## Languages
+
+The app ships English and Georgian, but the language is chosen client-side and
+**the URL never changes**. One URL can only be indexed once, so today the
+Georgian content is invisible to search entirely — there is nothing for Google
+to index it as, and no `hreflang` to declare it.
+
+Fixing that means locale-prefixed routes (`/ka/scan`), a `hreflang` pair on every
+page, and a `ka` branch in the prerender loop. That is a routing change, not an
+SEO-config change, which is why it is called out here rather than done.
+
 ## The social image
 
 `public/og-image.svg` is the source. The build rasterizes it to a 1200×630

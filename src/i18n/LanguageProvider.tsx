@@ -39,11 +39,20 @@ interface I18nContextValue {
 
 const I18nContext = createContext<I18nContextValue | null>(null);
 
+/**
+ * English until someone chooses otherwise.
+ *
+ * The browser locale is deliberately NOT consulted. Guessing from it meant a
+ * first-time visitor with a Georgian phone landed on a Georgian site with no
+ * obvious way back, and the marketing copy, the SEO metadata and the shared
+ * link previews are all authored in English — so the guess also disagreed with
+ * whatever brought them here. The choice lives in Settings and is remembered.
+ */
 const initialLang = (): Language => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored === "en" || stored === "ka") return stored;
-    return navigator.language?.toLowerCase().startsWith("ka") ? "ka" : "en";
+    return "en";
   } catch {
     return "en";
   }

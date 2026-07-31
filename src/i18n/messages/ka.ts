@@ -423,6 +423,12 @@ export const ka: Messages = {
     legendRoute: "შენი მარშრუტი",
   },
 
+  settings: {
+    languageTitle: "ენა",
+    languageDescription:
+      "აირჩიე ინტერფეისის ენა. არჩევანი დაიმახსოვრება ამ მოწყობილობაზე.",
+  },
+
   ai: {
     title: "Wayfinder AI",
     subtitle: "იკითხე მაღაზიების, გასასვლელების და მიმართულებების შესახებ",

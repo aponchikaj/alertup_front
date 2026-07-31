@@ -8,8 +8,8 @@
     "themeColor": "#000000",
     "backgroundColor": "#ffffff",
     "titleTemplate": "%s | AlertUp",
-    "defaultTitle": "AlertUp — Indoor Wayfinding & Emergency Routes from a QR Code",
-    "defaultDescription": "Scan one QR code to find any shop, office or room inside a building — with step-by-step routes across floors, lifts and escalators. The same codes switch to evacuation routes in an emergency. No app to install.",
+    "defaultTitle": "AlertUp — Indoor Wayfinding & Emergency Routes by QR Code",
+    "defaultDescription": "Scan one QR code to find any shop, office or room inside a building, with routes across floors and lifts. Codes switch to evacuation routes in an emergency. No app to install.",
     "defaultImage": "/og-image.png",
     "defaultImageAlt": "AlertUp — scan a code, search for where you're going, follow the route",
     "founder": "Lazare Mirziashvili",
@@ -36,11 +36,11 @@
     {
       "path": "/",
       "index": true,
-      "priority": 1.0,
+      "priority": 1,
       "changefreq": "weekly",
       "useDefaultTitle": true,
-      "title": "AlertUp — Indoor Wayfinding & Emergency Routes from a QR Code",
-      "description": "Scan one QR code to find any shop, office or room inside a building — with step-by-step routes across floors, lifts and escalators. The same codes switch to evacuation routes in an emergency.",
+      "title": "AlertUp — Indoor Wayfinding & Emergency Routes by QR Code",
+      "description": "Scan one QR code to find any shop, office or room inside a building, with routes across floors and lifts. Codes switch to evacuation routes in an emergency.",
       "keywords": [
         "indoor wayfinding",
         "indoor navigation QR code",
@@ -83,7 +83,7 @@
       "priority": 0.9,
       "changefreq": "monthly",
       "title": "Scan a QR Code to Find Your Way Inside a Building",
-      "description": "Point your camera at an AlertUp code to open that floor's map, search for where you're going and follow the route. Works in any mobile browser — nothing to download.",
+      "description": "Point your camera at an AlertUp code to open that floor's map, search for where you're going and follow the route. No app — it runs in your browser.",
       "keywords": [
         "scan indoor map QR code",
         "find a shop in a mall",
@@ -218,7 +218,7 @@
       "priority": 0.7,
       "changefreq": "monthly",
       "title": "Pricing — Free for Your First Building",
-      "description": "Start free with one building and unlimited floors. Paid plans add shop search, Wayfinder AI, team roles and analytics. Enterprise plans for airports, hospitals and campuses.",
+      "description": "Start free with one building and unlimited floors. Paid plans add shop search, Wayfinder AI, team roles and analytics. Enterprise available.",
       "keywords": [
         "indoor wayfinding pricing",
         "wayfinding software cost",
