@@ -122,6 +122,65 @@
   --shadow-brand: 0 8px 24px -6px rgb(0 0 0 / 0.18);
 }
 
+/* ----------------------------------------------------------------------------
+   .on-dark — the dark palette, scoped to one element instead of the document.
+   The theme tokens live on :root, so a section that must be dark regardless of
+   the chosen theme cannot simply set an attribute. This redeclares them locally,
+   which means every component inside (buttons, badges, borders, focus rings)
+   resolves correctly without a single override.
+   Used by the home hero, where white light rays need a dark surface to exist on.
+   ------------------------------------------------------------------------- */
+.on-dark {
+  color-scheme: dark;
+  --canvas: var(--neutral-950);
+  --canvas-subtle: #111111;
+  --surface: #141414;
+  --surface-2: #1a1a1a;
+  --surface-hover: #222222;
+  --ink: var(--neutral-0);
+  --ink-muted: var(--neutral-400);
+  --ink-subtle: var(--neutral-500);
+  --ink-inverse: var(--neutral-950);
+  --line: var(--neutral-800);
+  --line-strong: #333333;
+  --brand: var(--neutral-0);
+  --brand-hover: var(--neutral-200);
+  --brand-ink: var(--neutral-1000);
+  --brand-text: var(--neutral-0);
+  --brand-subtle: #1a1a1a;
+  --brand-border: #333333;
+  --danger: var(--red-400);
+  --danger-ink: #1a0d0d;
+  --danger-text: var(--red-300);
+  --danger-subtle: #271515;
+  --danger-border: #45211f;
+  --success: var(--green-500);
+  --success-ink: #04140b;
+  --success-text: var(--green-300);
+  --success-subtle: #10211a;
+  --success-border: #1d3c2c;
+  --warning: var(--amber-500);
+  --warning-ink: #1a1204;
+  --warning-text: var(--amber-300);
+  --warning-subtle: #241d0e;
+  --warning-border: #423416;
+  --info: var(--blue-500);
+  --info-ink: #05101f;
+  --info-text: var(--blue-300);
+  --info-subtle: #131c2b;
+  --info-border: #23344f;
+  --ring: var(--neutral-0);
+  --scrim: rgb(0 0 0 / 0.7);
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.5), 0 1px 2px -1px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.55), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 12px 28px -6px rgb(0 0 0 / 0.6), 0 4px 8px -4px rgb(0 0 0 / 0.45);
+  --shadow-xl: 0 24px 48px -12px rgb(0 0 0 / 0.7);
+  --shadow-brand: 0 8px 24px -6px rgb(255 255 255 / 0.10);
+  background-color: var(--canvas);
+  color: var(--ink);
+}
+
 /* ============================================================================
    Dark theme — inverted monochrome: white actions on near-black surfaces.
    ========================================================================= */

@@ -50,8 +50,6 @@ const Scan = () => {
       />
 
       <section className="relative min-h-screen overflow-hidden bg-canvas pb-16 pt-28 sm:pt-32">
-        {/* Floor-plan grid backdrop, matching the home hero. */}
-        <div className="bg-grid pointer-events-none absolute inset-0" aria-hidden="true" />
         {/* Soft brand glow behind the scanner. */}
         <div
           aria-hidden="true"

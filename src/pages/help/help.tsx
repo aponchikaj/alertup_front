@@ -15,11 +15,7 @@ const Help = () => {
   return (
     <div ref={rootRef}>
       {/* ================= HERO ================= */}
-      <section className="relative overflow-hidden bg-canvas">
-        <div
-          className="bg-grid pointer-events-none absolute inset-0"
-          aria-hidden="true"
-        />
+      <section className="relative overflow-hidden bg-canvas-subtle">
         <Container className="relative flex flex-col items-center gap-4 pb-14 pt-28 text-center sm:pt-32 lg:pb-16 lg:pt-36">
           <span
             data-hero

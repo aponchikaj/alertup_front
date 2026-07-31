@@ -6,6 +6,7 @@ import Reviews from "../components/reviews";
 import { ContactAPI } from "../apis/contact";
 import { getMe } from "../apis/me";
 import Seo from "../seo/Seo";
+import LightRays from "../components/ui/lightRays";
 // FAQ and HOW_TO drive the visible sections further down the page; the JSON-LD
 // builders read the same data so the markup can never drift from the copy.
 import { FAQ, HOW_TO } from "../seo/seo.config";
@@ -183,14 +184,27 @@ const Home = () => {
           as visible content further down this page. */}
       <Seo jsonLd={[faqJsonLd(), howToJsonLd()]} />
 
-      {/* ================= HERO ================= */}
-      <section className="relative overflow-hidden bg-canvas">
-        {/* Floor-plan grid backdrop, fading toward the fold. */}
-        <div className="bg-grid pointer-events-none absolute inset-0" aria-hidden="true" />
-        {/* Soft brand glow behind the scanner column. */}
+      {/* ================= HERO =================
+          Dark in both themes, via the .on-dark token scope: the light rays are
+          white, so they need a dark surface to exist on at all. Scoping the
+          palette rather than overriding colours means every component inside
+          — badge, buttons, the scanner card — follows without special cases. */}
+      <section className="on-dark relative overflow-hidden">
+        <LightRays
+          raysOrigin="top-center"
+          raysColor="#ffffff"
+          raysSpeed={0.9}
+          lightSpread={0.6}
+          rayLength={2.4}
+          followMouse
+          mouseInfluence={0.08}
+          saturation={0}
+          fadeDistance={1.1}
+        />
+        {/* Floor-plan grid, very faint, under the rays. */}
         <div
+          className="bg-grid pointer-events-none absolute inset-0 opacity-30"
           aria-hidden="true"
-          className="pointer-events-none absolute -top-32 right-[-10%] h-[28rem] w-[28rem] rounded-full bg-brand/15 blur-3xl"
         />
 
         <Container

@@ -10,8 +10,6 @@ const PageNotFound = () => {
   return (
     <div ref={rootRef}>
       <section className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-canvas px-4 pb-16 pt-28 sm:pt-32">
-        {/* Floor-plan grid backdrop, echoing the home hero. */}
-        <div className="bg-grid pointer-events-none absolute inset-0" aria-hidden="true" />
         <div
           aria-hidden="true"
           className="pointer-events-none absolute left-1/2 top-1/3 h-[24rem] w-[24rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand/10 blur-3xl"
