@@ -119,7 +119,8 @@ const Register = () => {
                 Create account
               </h1>
               <p className="text-sm text-ink-muted">
-                Set up your building's QR evacuation routes in minutes.
+                Put your building on the map — directions for visitors, and a way
+                out if they ever need one.
               </p>
             </div>
 
