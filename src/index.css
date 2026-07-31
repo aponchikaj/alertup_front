@@ -198,6 +198,47 @@
   }
 }
 
+/* ----------------------------------------------------------------------------
+   Map route animations.
+   These are CSS rather than anime.js on purpose: route geometry always arrives
+   with a fetch, and usePageAnimations only scans the DOM once on mount. CSS
+   also respects the reduced-motion kill-switch in the base layer for free —
+   which the safety-critical scan route page depends on.
+   ------------------------------------------------------------------------- */
+@keyframes route-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes route-march {
+  from {
+    stroke-dashoffset: 40;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.route-path-draw {
+  /* pathLength-independent draw-on: the dash array is expressed in the
+     path's own length via pathLength normalization below. */
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  animation: route-draw 0.9s var(--ease-out-quint) both;
+}
+
+.route-path-march {
+  animation: route-march 1.6s linear infinite;
+}
+
+.map-user-pulse {
+  animation: var(--animate-pulse-ring);
+}
+
 /* ============================================================================
    Base
    ========================================================================= */

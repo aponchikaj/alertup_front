@@ -179,6 +179,28 @@ export const en = {
     building: "Building",
     scanned: "Scanned",
   },
+
+  ai: {
+    title: "Wayfinder AI",
+    subtitle: "Ask about shops, exits and directions",
+    open: "Ask Wayfinder AI",
+    close: "Close assistant",
+    inputPlaceholder: "Ask where something is…",
+    send: "Send",
+    stop: "Stop",
+    thinking: "Thinking…",
+    unavailableTitle: "Wayfinder AI is unavailable",
+    unavailableBody: "Use the destination search to find your way instead.",
+    unavailableCta: "Open search",
+    retry: "Try again",
+    chips: {
+      nearestExit: "Nearest exit",
+      nearestRestroom: "Nearest restroom",
+      whereIs: "Where is…",
+      foodCourt: "Food court",
+    },
+    disclaimer: "AI answers can be imperfect. In an emergency, follow the on-screen route.",
+  },
 };
 
 export type Messages = typeof en;

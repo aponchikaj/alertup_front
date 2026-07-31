@@ -178,4 +178,26 @@ export const ka: Messages = {
     building: "შენობა",
     scanned: "დასკანერდა",
   },
+
+  ai: {
+    title: "Wayfinder AI",
+    subtitle: "იკითხე მაღაზიების, გასასვლელების და მიმართულებების შესახებ",
+    open: "ჰკითხე Wayfinder AI-ს",
+    close: "ასისტენტის დახურვა",
+    inputPlaceholder: "იკითხე, სად არის რამე…",
+    send: "გაგზავნა",
+    stop: "შეჩერება",
+    thinking: "ფიქრობს…",
+    unavailableTitle: "Wayfinder AI მიუწვდომელია",
+    unavailableBody: "გზის საპოვნელად გამოიყენე დანიშნულების ძიება.",
+    unavailableCta: "ძიების გახსნა",
+    retry: "თავიდან ცდა",
+    chips: {
+      nearestExit: "უახლოესი გასასვლელი",
+      nearestRestroom: "უახლოესი საპირფარეშო",
+      whereIs: "სად არის…",
+      foodCourt: "კვების კუთხე",
+    },
+    disclaimer: "AI-ის პასუხები შეიძლება უზუსტო იყოს. საგანგებო სიტუაციაში მიჰყევი ეკრანზე გამოსახულ მარშრუტს.",
+  },
 };
