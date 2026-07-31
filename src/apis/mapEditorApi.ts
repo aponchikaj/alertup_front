@@ -15,6 +15,7 @@
    ========================================================================= */
 
 import { ApiError, del, get, post, put, request } from './http';
+import { parseDrawing, type FloorDrawing } from '../components/map/drawing';
 import type {
   FloorRecord,
   MapEdge,
@@ -35,6 +36,8 @@ export interface RawFloor {
   mapImageUrl: string | null;
   qrCodeUrl: string | null;
   svgContent: string | null;
+  /** Hand-drawn plan; arrives as an untyped JSON column. */
+  drawing: unknown;
   width: number | string | null;
   height: number | string | null;
   scalePixelsPerMeter: number | string | null;
@@ -89,6 +92,8 @@ export interface EditorFloor extends FloorRecord {
   buildingId: string;
   qrCodeUrl: string | null;
   scanCount: number;
+  /** Always a usable drawing (possibly empty) — never the raw column. */
+  drawing: FloorDrawing;
 }
 
 export interface EditorNode extends MapNode {
@@ -175,6 +180,8 @@ export const toEditorFloor = (row: RawFloor): EditorFloor => ({
   mapImageUrl: nullableStr(row.mapImageUrl),
   qrCodeUrl: nullableStr(row.qrCodeUrl),
   svgContent: nullableStr(row.svgContent),
+  // Parsed at the boundary so no component ever handles the raw column.
+  drawing: parseDrawing(row.drawing),
   width: nullableNum(row.width),
   height: nullableNum(row.height),
   scalePixelsPerMeter: nullableNum(row.scalePixelsPerMeter),
@@ -269,10 +276,15 @@ export interface FloorInput {
   floorNumber?: number | string;
   name?: string;
   scalePixelsPerMeter?: number | string | null;
+  /** Canvas size in map units — set when a floor is drawn rather than uploaded. */
+  width?: number | string | null;
+  height?: number | string | null;
   /** Floor plan image (raster or svg). Sent as the `map` file field. */
   map?: File | null;
   /** Inline SVG markup — PATCH only. */
   svgContent?: string | null;
+  /** Hand-drawn plan. `null` clears it; omit to leave it untouched. */
+  drawing?: FloorDrawing | null;
 }
 
 const floorFormData = (input: FloorInput): FormData => {
@@ -282,7 +294,15 @@ const floorFormData = (input: FloorInput): FormData => {
   appendIfSet(form, 'floorNumber', input.floorNumber);
   appendIfSet(form, 'name', input.name);
   appendIfSet(form, 'scalePixelsPerMeter', input.scalePixelsPerMeter);
+  appendIfSet(form, 'width', input.width);
+  appendIfSet(form, 'height', input.height);
   appendIfSet(form, 'svgContent', input.svgContent);
+  // Sent as JSON text: multipart has no nested-object encoding, and the server
+  // parses this field back with JSON.parse. `null` is meaningful (clear it), so
+  // it goes through the raw append rather than appendIfSet.
+  if (input.drawing !== undefined) {
+    form.append('drawing', input.drawing === null ? '' : JSON.stringify(input.drawing));
+  }
   if (input.map) form.append('map', input.map);
   return form;
 };
@@ -315,6 +335,22 @@ export const updateFloor = async (
 
 export const deleteFloor = async (floorId: string): Promise<void> => {
   await del<Envelope<unknown>>(`/api/map-editor/floors/${encodeURIComponent(floorId)}`);
+};
+
+/** Store a shop logo and get back the URL to write into the shape. */
+export const uploadShopLogo = async (
+  buildingId: string,
+  file: File,
+): Promise<string> => {
+  const form = new FormData();
+  form.append('logo', file);
+  const data = unwrap(
+    await post<Envelope<{ url: string }>>(
+      `/api/map-editor/buildings/${encodeURIComponent(buildingId)}/logos`,
+      form,
+    ),
+  );
+  return data.url;
 };
 
 /* --- nodes --------------------------------------------------------------- */

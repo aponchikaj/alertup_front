@@ -2,6 +2,8 @@ import { useCallback, useMemo, useState } from "react";
 import { MapCanvas } from "../map/MapCanvas";
 import { useMapCamera } from "../map/useMapCamera";
 import { FloorImageLayer } from "../map/layers/FloorImageLayer";
+import { DrawingLayer } from "../map/layers/DrawingLayer";
+import { parseDrawing, isDrawingEmpty } from "../map/drawing";
 import { RouteLayer } from "../map/layers/RouteLayer";
 import { NodeLayer } from "../map/layers/NodeLayer";
 import { UserDotLayer } from "../map/layers/UserDotLayer";
@@ -158,6 +160,13 @@ export const WayfindingPanel = ({
 
   const displayedFloor = displayedSegment?.floor ?? null;
 
+  // Re-parsed per floor change rather than per render: the drawing arrives as
+  // untyped JSON on the route response and can hold hundreds of shapes.
+  const displayedDrawing = useMemo(() => {
+    const parsed = parseDrawing(displayedFloor?.drawing);
+    return isDrawingEmpty(parsed) ? null : parsed;
+  }, [displayedFloor?.drawing]);
+
   const displayedNodes = useMemo<MapNode[]>(
     () =>
       (displayedSegment?.nodes ?? []).map((node) => ({
@@ -242,7 +251,11 @@ export const WayfindingPanel = ({
                 width: displayedFloor?.width ?? 1000,
                 height: displayedFloor?.height ?? 800,
               }}
+              // A drawn floor supplies its own plan; the "no map" notice would
+              // sit underneath it saying otherwise.
+              placeholderLabel={displayedDrawing ? null : undefined}
             />
+            <DrawingLayer drawing={displayedDrawing} scale={camera.scale} />
             <RouteLayer
               segment={displayedSegment}
               tone={route.mode === "EVACUATION" ? "danger" : "brand"}

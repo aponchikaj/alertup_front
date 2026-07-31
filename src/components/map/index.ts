@@ -31,12 +31,60 @@ export {
   NODE_THEME,
   NODE_GLYPH_PATHS,
   TRANSIT_GLYPH_PATHS,
+  DRAWING_ICON_PATHS,
+  DRAWING_ICON_COLORS,
+  DRAWING_DEFAULTS,
   ROUTE_TONES,
   CURRENT_LOCATION_COLOR,
 } from './mapTheme';
 export type { NodeGlyph, NodeTheme, RouteTone } from './mapTheme';
 
+export {
+  DRAWING_VERSION,
+  EMPTY_DRAWING,
+  ICON_KINDS,
+  ICON_NODE_TYPE,
+  TRANSIT_ICONS,
+  DEFAULT_PIXELS_PER_METER,
+  GRID_STEP,
+  GRID_MAJOR_EVERY,
+  MIN_ROOM_METERS,
+  MAX_ROOM_METERS,
+  canvasSizeForMeters,
+  clampToSpace,
+  eraseHitTest,
+  hitTest,
+  pointSegmentDistance,
+  isBoxShape,
+  isDrawingEmpty,
+  newShapeId,
+  parseDrawing,
+  RESIZE_HANDLES,
+  rectContains,
+  rectFromPoints,
+  shapeBounds,
+  shapeCenter,
+  snap,
+  snapPoint,
+  translateShape,
+} from './drawing';
+export type {
+  BoxShape,
+  DrawingShape,
+  FloorDrawing,
+  IconKind,
+  IconShape,
+  Rect,
+  ResizeHandle,
+  RoomShape,
+  ShapeKind,
+  ShopShape,
+  TextShape,
+  WallShape,
+} from './drawing';
+
 export { FloorImageLayer } from './layers/FloorImageLayer';
+export { DrawingLayer } from './layers/DrawingLayer';
 export { EdgeLayer } from './layers/EdgeLayer';
 export { NodeLayer } from './layers/NodeLayer';
 export { RouteLayer } from './layers/RouteLayer';

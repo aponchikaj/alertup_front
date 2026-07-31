@@ -1,26 +1,50 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { generateQRCode, downloadQRCodeAsFile, type QRCodeRequest } from '../apis/qrApi';
 import { buildScanUrl, type Node } from '../apis/nodesApi';
-import { escapeHtml } from '../lib/escapeHtml';
 import { sanitizeSvg } from '../lib/sanitizeSvg';
+import { cn } from '../lib/cn';
+import {
+  buildPrintDocument,
+  clampCopies,
+  openPrintWindow,
+  CARD_SIZE_MM,
+  SHEET_CAPACITY,
+  type PrintLayout,
+} from '../lib/qrPrint';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
-import { Alert } from './ui/feedback';
-import { TextField } from './ui/field';
+import { Alert, Skeleton } from './ui/feedback';
 import {
   CheckIcon,
   CloseIcon,
   DownloadIcon,
   FileTextIcon,
+  LayersIcon,
   PrinterIcon,
   SmartphoneIcon,
 } from './ui/icons';
+import { useI18n } from '../i18n/LanguageProvider';
+
+/* ============================================================================
+   QR code dialog — preview, then print.
+   ----------------------------------------------------------------------------
+   The printed artefact is the actual product here: a code on a wall is how
+   every visitor enters the system, and during an evacuation it may be the only
+   thing within reach. So the preview is rendered at true physical scale — what
+   you see is the size it comes out of the printer, because "looked fine on
+   screen, unscannable on the wall" is the failure that matters.
+
+   Layout geometry lives in lib/qrPrint.ts; this file is the chrome around it.
+   ========================================================================= */
 
 // Printed QR codes must keep resolving no matter where the app is served from,
 // so the production origin is pinned here rather than taken from
 // window.location — a code generated on localhost would otherwise be useless
 // once it is on a wall.
 const PUBLIC_ORIGIN = 'https://www.alertup.world';
+
+/** Screen pixels per millimetre at the CSS reference of 96dpi. */
+const PX_PER_MM = 96 / 25.4;
 
 interface SimpleQRCodeDisplayProps {
   node: Node;
@@ -29,18 +53,40 @@ interface SimpleQRCodeDisplayProps {
   onClose: () => void;
 }
 
-const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQRCodeDisplayProps) => {
-  const [loading, setLoading] = useState(false);
-  const [qrData, setQrData] = useState<any>(null);
+interface QrResult {
+  svgContent?: string | null;
+  url?: string;
+  filename?: string | null;
+}
+
+const LAYOUTS: { value: PrintLayout; labelKey: string; hintKey: string; Icon: typeof FileTextIcon }[] = [
+  { value: 'card', labelKey: 'qr.layoutCard', hintKey: 'qr.layoutCardHint', Icon: SmartphoneIcon },
+  { value: 'poster', labelKey: 'qr.layoutPoster', hintKey: 'qr.layoutPosterHint', Icon: FileTextIcon },
+  { value: 'sheet', labelKey: 'qr.layoutSheet', hintKey: 'qr.layoutSheetHint', Icon: LayersIcon },
+];
+
+const SimpleQRCodeDisplay = ({
+  node,
+  buildingName,
+  floorName,
+  onClose,
+}: SimpleQRCodeDisplayProps) => {
+  const { t } = useI18n();
+  const [loading, setLoading] = useState(true);
+  const [qrData, setQrData] = useState<QrResult | null>(null);
   const [error, setError] = useState('');
-  const [printSize, setPrintSize] = useState<'poster' | 'card'>('poster');
+  const [layout, setLayout] = useState<PrintLayout>('card');
+  const [copies, setCopies] = useState(SHEET_CAPACITY);
   const [copied, setCopied] = useState(false);
 
-  const generateQR = async () => {
-    try {
-      setLoading(true);
-      setError('');
+  const scanUrl = buildScanUrl(node.buildingId, node.floorNumber, node._id, PUBLIC_ORIGIN);
+  const locationLabel = node.label || t(`qr.node${node.type === 'exit' ? 'Exit' : 'Point'}`);
+  const floorLabel = t('wayfinding.floor', { number: floorName || node.floorNumber || 1 });
 
+  const generate = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
       const request: QRCodeRequest = {
         nodeId: node._id,
         buildingId: node.buildingId,
@@ -50,277 +96,84 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
           // Literal hex, deliberately: a QR code has to stay maximum-contrast
           // black-on-white to scan reliably off a wall in poor light. This is a
           // functional requirement, not a style choice, so it does not follow
-          // the theme tokens. The surrounding text is monochrome ink.
+          // the theme tokens.
           primaryColor: '#000000',
           backgroundColor: '#FFFFFF',
-          title: buildingName || 'AlertUp',
-          titleColor: '#111111',
-          subtitle: node ? `${node.label || node.type} - Floor ${floorName || '1'}` : `Floor ${floorName || '1'}`,
-          subtitleColor: '#353535',
-          size: 'medium'
-        }
+          size: 'medium',
+        },
       };
-
       const response = await generateQRCode(request);
-
       if (response.success && response.data) {
-        setQrData(response.data);
+        setQrData(response.data as QrResult);
       } else {
-        setError(response.message || 'Failed to generate QR code');
+        setError(response.message || t('qr.generateFailed'));
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to generate QR code');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('qr.generateFailed'));
     } finally {
       setLoading(false);
     }
-  };
+  }, [node._id, node.buildingId, node.floorNumber, t]);
+
+  // Generated on open rather than behind a button: there is exactly one thing
+  // to do in this dialog, and making the user ask for it first is a step that
+  // buys nothing.
+  useEffect(() => {
+    void generate();
+  }, [generate]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
 
   const handlePrint = () => {
-    if (!qrData?.svgContent) return;
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      setError('Failed to open print window');
+    if (!qrData?.svgContent) {
+      setError(t('qr.printNeedsSvg'));
       return;
     }
-
-    const isPoster = printSize === 'poster';
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>AlertUp QR code</title>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <style>
-            body {
-              margin: 0;
-              padding: 20px;
-              font-family: Arial, sans-serif;
-              background: #f5f5f5;
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              min-height: 100vh;
-            }
-            .qr-container {
-              width: min(90%, 500px);
-              max-width: 500px;
-              background: white;
-              padding: 40px;
-              border-radius: 12px;
-              box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-              text-align: center;
-              margin: 0 auto;
-            }
-            .qr-header {
-              margin-bottom: 30px;
-            }
-            /* The print window has no access to the app's design tokens, so the
-               monochrome palette is spelled out literally here. */
-            .qr-title {
-              font-size: clamp(20px, 5vw, 32px);
-              font-weight: bold;
-              margin-bottom: 12px;
-              color: #111111;
-            }
-            .qr-subtitle {
-              font-size: clamp(14px, 3.5vw, 20px);
-              margin-bottom: 25px;
-              color: #353535;
-            }
-            .qr-image {
-              margin: 30px 0;
-            }
-            .qr-image svg {
-              width: clamp(120px, 25vw, 300px);
-              height: clamp(120px, 25vw, 300px);
-              max-width: 100%;
-            }
-            .qr-footer {
-              margin-top: 30px;
-              padding-top: 25px;
-              border-top: 1px solid #eee;
-              font-size: 14px;
-              color: #666;
-            }
-            .qr-info {
-              margin: 20px 0;
-              padding: 15px;
-              background: #f8f9fa;
-              border-radius: 8px;
-              font-size: clamp(12px, 2.5vw, 16px);
-              color: #333;
-              line-height: 1.6;
-            }
-            .qr-size-indicator {
-              position: absolute;
-              top: 10px;
-              right: 10px;
-              font-size: 10px;
-              color: #999;
-              background: white;
-              padding: 2px 6px;
-              border-radius: 4px;
-              border: 1px solid #ddd;
-            }
-
-            @media (max-width: 640px) {
-              body {
-                padding: 10px;
-                font-size: 14px;
-              }
-              .qr-container {
-                width: 100%;
-                max-width: 350px;
-                padding: 20px;
-              }
-              .qr-title {
-                font-size: 24px !important;
-                margin-bottom: 8px !important;
-              }
-              .qr-subtitle {
-                font-size: 16px !important;
-                margin-bottom: 15px !important;
-              }
-              .qr-image {
-                margin: 15px 0 !important;
-              }
-              .qr-image svg {
-                width: 180px !important;
-                height: 180px !important;
-              }
-              .qr-footer {
-                margin-top: 15px !important;
-                padding-top: 15px !important;
-                font-size: 12px !important;
-              }
-              .qr-info {
-                margin: 10px 0 !important;
-                padding: 10px !important;
-                font-size: 12px !important;
-              }
-              .qr-size-indicator {
-                font-size: 8px !important;
-                padding: 1px 4px !important;
-              }
-            }
-
-            @media (min-width: 641px) and (max-width: 1024px) {
-              body {
-                padding: 15px;
-              }
-              .qr-container {
-                width: 90%;
-                max-width: 450px;
-              }
-              .qr-image svg {
-                width: 220px !important;
-                height: 220px !important;
-              }
-            }
-
-            @media print {
-              body {
-                background: white;
-                padding: 5mm;
-                font-size: 12pt;
-              }
-              .qr-container {
-                box-shadow: none;
-                margin: 0;
-                width: 100%;
-                max-width: none;
-                page-break-inside: avoid;
-              }
-              .qr-image svg {
-                width: 25mm !important;
-                height: 25mm !important;
-              }
-              .qr-title {
-                font-size: 16pt !important;
-              }
-              .qr-subtitle {
-                font-size: 12pt !important;
-              }
-              .qr-info {
-                font-size: 10pt !important;
-              }
-              .qr-footer {
-                font-size: 9pt !important;
-              }
-              .qr-size-indicator {
-                display: block;
-                font-size: 8pt;
-              }
-              @page {
-                margin: 10mm;
-                size: auto;
-              }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="qr-container">
-            <div class="qr-size-indicator">${isPoster ? 'POSTER' : 'CARD'}</div>
-            <div class="qr-header">
-              <div class="qr-title">${escapeHtml(buildingName || 'AlertUp')}</div>
-              <div class="qr-subtitle">${escapeHtml(node.label || node.type)} - Floor ${escapeHtml(floorName || '1')}</div>
-            </div>
-
-            <div class="qr-image">
-              ${sanitizeSvg(qrData.svgContent)}
-            </div>
-
-            <div class="qr-info">
-              <strong>Node Type:</strong> ${escapeHtml(node.type)}<br>
-              <strong>Position:</strong> (${Number(node.x)}, ${Number(node.y)})<br>
-              <strong>Scan for directions — and the way out</strong><br>
-              <strong>Building:</strong> ${escapeHtml(buildingName || 'N/A')}
-            </div>
-
-            <div class="qr-footer">
-              www.alertup.world
-            </div>
-          </div>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.focus();
-
-    // Printing is driven by the new window's own load/afterprint events.
-    // Calling print() and close() synchronously after document.write raced the
-    // layout on browsers that render asynchronously, producing blank or
-    // truncated printouts and sometimes dismissing the dialog outright.
-    const startPrint = () => {
-      printWindow.print();
-    };
-
-    if (printWindow.document.readyState === 'complete') {
-      startPrint();
-    } else {
-      printWindow.addEventListener('load', startPrint, { once: true });
-    }
-
-    printWindow.addEventListener('afterprint', () => printWindow.close(), { once: true });
+    const html = buildPrintDocument(
+      {
+        svgContent: qrData.svgContent,
+        scanUrl,
+        buildingName: buildingName || 'AlertUp',
+        locationLabel,
+        floorLabel,
+      },
+      {
+        layout,
+        copies,
+        strings: {
+          scanPrompt: t('qr.scanPrompt'),
+          scanHint: t('qr.scanHint'),
+          orVisit: t('qr.orVisit'),
+          documentTitle: `${buildingName || 'AlertUp'} — ${locationLabel}`,
+        },
+      },
+    );
+    if (!openPrintWindow(html)) setError(t('qr.popupBlocked'));
   };
 
   const handleDownload = () => {
     if (!qrData?.filename) return;
-
     try {
-      const nodeName = node.label || `${node.type}-node`;
-      downloadQRCodeAsFile(qrData.filename, nodeName);
-    } catch (err: any) {
-      setError(err.message || 'Failed to download QR code');
+      downloadQRCodeAsFile(qrData.filename, node.label || `${node.type}-node`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('qr.downloadFailed'));
     }
   };
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(buildScanUrl(node.buildingId, node.floorNumber, node._id, PUBLIC_ORIGIN));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(scanUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError(t('qr.copyFailed'));
+    }
   };
 
   return (
@@ -330,139 +183,212 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
       aria-modal="true"
       aria-labelledby="qr-display-title"
     >
-      <Card className="max-h-[90vh] w-full max-w-md overflow-y-auto animate-scale-in">
-        <div className="p-4 sm:p-6">
-          {/* Header */}
-          <div className="mb-4 flex items-center justify-between sm:mb-6">
-            <h2 id="qr-display-title" className="text-lg font-semibold text-ink sm:text-xl">
-              QR Code
-            </h2>
-            <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
+      <Card className="max-h-[92vh] w-full max-w-3xl overflow-y-auto animate-scale-in">
+        <div className="flex flex-col gap-5 p-5 sm:p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h2 id="qr-display-title" className="text-lg font-semibold text-ink sm:text-xl">
+                {t('qr.title')}
+              </h2>
+              <p className="truncate text-sm text-ink-muted">
+                {locationLabel} · {floorLabel}
+              </p>
+            </div>
+            <Button variant="ghost" size="icon" onClick={onClose} aria-label={t('common.cancel')}>
               <CloseIcon size={20} />
             </Button>
           </div>
 
-          {/* Node Info */}
-          <div className="mb-4 rounded-xl border border-line bg-surface-2 p-3 sm:mb-6 sm:p-4">
-            <div className="text-xs text-ink-muted sm:text-sm">
-              <div className="mb-1 font-semibold text-ink">
-                {node.label || `${node.type} node`}
+          {error && <Alert tone="danger">{error}</Alert>}
+
+          <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_16rem]">
+            {/* Preview at true physical scale. */}
+            <div className="flex flex-col gap-3">
+              <div className="flex items-baseline justify-between">
+                <span className="text-sm font-medium text-ink">{t('qr.preview')}</span>
+                <span className="text-xs text-ink-subtle">{t('qr.actualSize')}</span>
               </div>
-              <div>Type: {node.type}</div>
-              <div>Position: ({node.x}, {node.y})</div>
-              <div>Floor: {floorName || '1'}</div>
+
+              <div className="flex min-h-56 items-center justify-center overflow-auto rounded-xl border border-line bg-surface-2 p-4">
+                {loading ? (
+                  <Skeleton className="h-44 w-72" />
+                ) : qrData ? (
+                  <PrintPreview
+                    layout={layout}
+                    svgContent={qrData.svgContent}
+                    fallbackUrl={qrData.url}
+                    buildingName={buildingName || 'AlertUp'}
+                    locationLabel={locationLabel}
+                    floorLabel={floorLabel}
+                    scanUrl={scanUrl}
+                    scanPrompt={t('qr.scanPrompt')}
+                  />
+                ) : null}
+              </div>
             </div>
-          </div>
 
-          {/* Generate Button */}
-          {!qrData && (
-            <Button
-              fullWidth
-              size="lg"
-              className="mb-3 sm:mb-4"
-              onClick={generateQR}
-              loading={loading}
-              loadingLabel="Generating..."
-            >
-              Generate QR Code
-            </Button>
-          )}
+            {/* Controls */}
+            <div className="flex flex-col gap-4">
+              <fieldset className="flex flex-col gap-2">
+                <legend className="mb-1 text-sm font-medium text-ink">
+                  {t('qr.printFormat')}
+                </legend>
+                {LAYOUTS.map(({ value, labelKey, hintKey, Icon }) => {
+                  const active = layout === value;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => setLayout(value)}
+                      className={cn(
+                        'flex items-start gap-3 rounded-xl border p-3 text-left',
+                        'transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                        active
+                          ? 'border-line-strong bg-surface-2'
+                          : 'border-line hover:bg-surface-hover',
+                      )}
+                    >
+                      <Icon size={18} className={active ? 'text-ink' : 'text-ink-muted'} />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-medium text-ink">
+                          {t(labelKey)}
+                        </span>
+                        <span className="block text-xs text-ink-subtle">{t(hintKey)}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </fieldset>
 
-          {/* Error Display */}
-          {error && (
-            <Alert tone="danger" className="mb-3 sm:mb-4">
-              {error}
-            </Alert>
-          )}
+              {layout === 'sheet' && (
+                <label className="flex flex-col gap-1.5 text-sm">
+                  <span className="font-medium text-ink">{t('qr.copies')}</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={SHEET_CAPACITY}
+                    value={copies}
+                    onChange={(e) => setCopies(clampCopies(Number(e.target.value)))}
+                    className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-ink"
+                  />
+                  <span className="text-xs text-ink-subtle">
+                    {t('qr.copiesHint', { max: SHEET_CAPACITY })}
+                  </span>
+                </label>
+              )}
 
-          {/* QR Code Display */}
-          {qrData && (
-            <div className="flex flex-col gap-3 sm:gap-4">
-              {/* Size Selection */}
-              <div
-                role="group"
-                aria-label="Print size"
-                className="flex gap-2 rounded-xl border border-line bg-surface-2 p-2"
-              >
-                <Button
-                  variant={printSize === 'poster' ? 'primary' : 'secondary'}
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => setPrintSize('poster')}
-                  aria-pressed={printSize === 'poster'}
-                >
-                  <FileTextIcon size={16} />
-                  Poster
+              <div className="flex flex-col gap-2 border-t border-line pt-4">
+                <Button onClick={handlePrint} disabled={!qrData?.svgContent}>
+                  <PrinterIcon size={18} />
+                  {t('qr.print')}
                 </Button>
-                <Button
-                  variant={printSize === 'card' ? 'primary' : 'secondary'}
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => setPrintSize('card')}
-                  aria-pressed={printSize === 'card'}
-                >
-                  <SmartphoneIcon size={16} />
-                  Card
+                <Button variant="secondary" onClick={handleDownload} disabled={!qrData?.filename}>
+                  <DownloadIcon size={18} />
+                  {t('qr.download')}
                 </Button>
-              </div>
-
-              {/* Emergency Route Link */}
-              <div className="flex flex-col gap-2">
-                <TextField
-                  label="Scan link"
-                  readOnly
-                  value={buildScanUrl(node.buildingId, node.floorNumber, node._id, PUBLIC_ORIGIN)}
-                  inputClassName="font-mono text-sm"
-                />
-                <Button variant="secondary" size="sm" onClick={handleCopyLink}>
+                <Button variant="ghost" size="sm" onClick={() => void handleCopyLink()}>
                   {copied ? (
                     <>
                       <CheckIcon size={16} className="text-success-text" />
-                      Copied!
+                      {t('qr.copied')}
                     </>
                   ) : (
-                    'Copy link'
+                    t('qr.copyLink')
                   )}
                 </Button>
               </div>
 
-              {/* Preview */}
-              <div className="text-center">
-                <div className="inline-block rounded-xl border border-line bg-surface p-2 shadow-sm sm:p-4">
-                  {qrData.svgContent ? (
-                    <div dangerouslySetInnerHTML={{ __html: sanitizeSvg(qrData.svgContent) }} />
-                  ) : (
-                    <img src={qrData.url} alt="QR Code" className="h-24 w-24 sm:h-32 sm:w-32" />
-                  )}
-                  <div className="mt-2 sm:mt-3">
-                    <div className="text-xs font-bold text-brand-text sm:text-sm">
-                      {buildingName || 'AlertUp'}
-                    </div>
-                    <div className="text-xs text-ink-muted">
-                      {node.label || node.type} - Floor {floorName || '1'}
-                    </div>
-                  </div>
-                  <div className="mt-1 text-xs text-ink-subtle sm:mt-2">
-                    www.alertup.world
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                <Button variant="secondary" onClick={handleDownload}>
-                  <DownloadIcon size={18} />
-                  Download
-                </Button>
-                <Button onClick={handlePrint}>
-                  <PrinterIcon size={18} />
-                  Print {printSize === 'poster' ? 'Poster' : 'Card'}
-                </Button>
-              </div>
+              <p className="break-all font-mono text-[11px] leading-relaxed text-ink-subtle">
+                {scanUrl}
+              </p>
             </div>
-          )}
+          </div>
         </div>
       </Card>
+    </div>
+  );
+};
+
+/**
+ * Preview rendered at true physical scale.
+ *
+ * Sized in millimetres converted at 96dpi, matching what the print stylesheet
+ * emits, so the card on screen is the card that comes out of the printer.
+ * The poster is shown at a third scale — A4 does not fit in a dialog — and
+ * says so, rather than quietly lying about its size.
+ */
+const PrintPreview = ({
+  layout,
+  svgContent,
+  fallbackUrl,
+  buildingName,
+  locationLabel,
+  floorLabel,
+  scanUrl,
+  scanPrompt,
+}: {
+  layout: PrintLayout;
+  svgContent?: string | null;
+  fallbackUrl?: string;
+  buildingName: string;
+  locationLabel: string;
+  floorLabel: string;
+  scanUrl: string;
+  scanPrompt: string;
+}) => {
+  const code = svgContent ? (
+    <div
+      className="h-full w-full [&>svg]:h-full [&>svg]:w-full"
+      dangerouslySetInnerHTML={{ __html: sanitizeSvg(svgContent) }}
+    />
+  ) : fallbackUrl ? (
+    <img src={fallbackUrl} alt="" className="h-full w-full" />
+  ) : null;
+
+  if (layout === 'poster') {
+    // A4 at a third scale — the only honest way to show it in a dialog.
+    const scale = 1 / 3;
+    return (
+      <div
+        style={{
+          width: 210 * PX_PER_MM * scale,
+          height: 297 * PX_PER_MM * scale,
+        }}
+        className="flex flex-col items-center gap-2 rounded-sm bg-white p-4 text-center text-black shadow-md"
+      >
+        <div className="text-[13px] font-bold leading-tight">{buildingName}</div>
+        <div className="text-[10px] font-semibold">{locationLabel}</div>
+        <div className="text-[8px] text-neutral-600">{floorLabel}</div>
+        <div className="mt-2" style={{ width: 110 * PX_PER_MM * scale, height: 110 * PX_PER_MM * scale }}>
+          {code}
+        </div>
+        <div className="mt-2 text-[9px] font-bold">{scanPrompt}</div>
+        <div className="mt-auto break-all font-mono text-[5px] text-neutral-500">{scanUrl}</div>
+      </div>
+    );
+  }
+
+  // Card, and one representative card for the sheet.
+  return (
+    <div
+      style={{ width: CARD_SIZE_MM.width * PX_PER_MM, height: CARD_SIZE_MM.height * PX_PER_MM }}
+      className="flex items-center gap-3 rounded-lg border-2 border-black bg-white p-3 text-black shadow-md"
+    >
+      <div style={{ width: 38 * PX_PER_MM, height: 38 * PX_PER_MM }} className="flex-none bg-white p-1">
+        {code}
+      </div>
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <div className="truncate text-[13px] font-bold leading-tight">{buildingName}</div>
+        <div className="truncate text-[11px] font-semibold">{locationLabel}</div>
+        <div className="truncate text-[9px] text-neutral-600">{floorLabel}</div>
+        <div className="mt-0.5 text-[10px] font-semibold">{scanPrompt}</div>
+        <div className="mt-auto flex items-center gap-1 text-[7px] font-bold uppercase tracking-wide">
+          <span className="h-1.5 w-1.5 rounded-full bg-black" />
+          AlertUp
+        </div>
+      </div>
     </div>
   );
 };

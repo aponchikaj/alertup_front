@@ -7,6 +7,8 @@
    field, so a shape change on either side is a breaking change on both.
    ========================================================================= */
 
+import type { FloorDrawing } from './drawing';
+
 export type NodeType =
   | 'NORMAL'
   | 'ENTRANCE'
@@ -45,6 +47,8 @@ export interface FloorRecord {
   name: string | null;
   mapImageUrl: string | null;
   svgContent?: string | null;
+  /** Hand-drawn plan authored in the editor; parse with parseDrawing. */
+  drawing?: FloorDrawing | null;
   width: number | null;
   height: number | null;
   scalePixelsPerMeter: number | null;
@@ -56,6 +60,8 @@ export interface FloorSummary {
   floorNumber: number;
   name: string | null;
   mapImageUrl: string | null;
+  /** Drawn plans travel with the segment so the visitor map needs no refetch. */
+  drawing?: FloorDrawing | null;
   width: number | null;
   height: number | null;
   scalePixelsPerMeter: number | null;

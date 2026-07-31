@@ -258,3 +258,148 @@ describe('editorReducer — selection', () => {
     );
   });
 });
+
+describe('editorReducer — drawing tools', () => {
+  test('each map click in draw-wall drops a vertex and emits nothing yet', () => {
+    let current = state({ tool: 'draw-wall' });
+
+    const first = editorReducer(current, { type: 'MAP_CLICKED', x: 10, y: 20 });
+    expect(first.intent).toBeUndefined();
+    expect(first.state.wallPoints).toEqual([10, 20]);
+
+    current = first.state;
+    const second = editorReducer(current, { type: 'MAP_CLICKED', x: 30, y: 40 });
+    // Still nothing committed — the run is open until FINISH_WALL.
+    expect(second.intent).toBeUndefined();
+    expect(second.state.wallPoints).toEqual([10, 20, 30, 40]);
+  });
+
+  test('FINISH_WALL commits a run of two or more points', () => {
+    const { state: next, intent } = editorReducer(
+      state({ tool: 'draw-wall', wallPoints: [0, 0, 10, 10] }),
+      { type: 'FINISH_WALL' },
+    );
+    expect(intent).toEqual({ type: 'commit-wall', points: [0, 0, 10, 10] });
+    expect(next.wallPoints).toEqual([]);
+  });
+
+  test('FINISH_WALL discards a single-point run rather than saving a dot', () => {
+    const { state: next, intent } = editorReducer(
+      state({ tool: 'draw-wall', wallPoints: [5, 5] }),
+      { type: 'FINISH_WALL' },
+    );
+    expect(intent).toBeUndefined();
+    expect(next.wallPoints).toEqual([]);
+  });
+
+  test('FINISH_WALL with nothing drawn is identity', () => {
+    const start = state({ tool: 'draw-wall' });
+    expect(editorReducer(start, { type: 'FINISH_WALL' }).state).toBe(start);
+  });
+
+  test('switching tools commits the wall in progress instead of losing it', () => {
+    const { state: next, intent } = editorReducer(
+      state({ tool: 'draw-wall', wallPoints: [0, 0, 10, 0] }),
+      { type: 'SET_TOOL', tool: 'select' },
+    );
+    expect(intent).toEqual({ type: 'commit-wall', points: [0, 0, 10, 0] });
+    expect(next.wallPoints).toEqual([]);
+    expect(next.tool).toBe('select');
+  });
+
+  test('Escape discards the wall in progress — that is how it differs from switching tools', () => {
+    const { state: next, intent } = editorReducer(
+      state({ tool: 'draw-wall', wallPoints: [0, 0, 10, 0] }),
+      { type: 'CANCEL' },
+    );
+    expect(intent).toBeUndefined();
+    expect(next.wallPoints).toEqual([]);
+  });
+
+  test('stamp-icon emits the currently selected marker at the tapped point', () => {
+    const { intent } = editorReducer(
+      state({ tool: 'stamp-icon', stampIcon: 'ESCALATOR' }),
+      { type: 'MAP_CLICKED', x: 7, y: 9 },
+    );
+    expect(intent).toEqual({ type: 'stamp-icon', icon: 'ESCALATOR', x: 7, y: 9 });
+  });
+
+  test('an unfinished wall counts as a pending gesture', () => {
+    expect(hasPendingGesture(state({ wallPoints: [0, 0] }))).toBe(true);
+    expect(hasPendingGesture(state({ wallPoints: [] }))).toBe(false);
+  });
+
+  test('selecting a shape clears the node selection, and vice versa', () => {
+    const withShape = editorReducer(state({ selectedNodeId: 'n1' }), {
+      type: 'SELECT_SHAPE',
+      shapeId: 's1',
+    }).state;
+    expect(withShape.selectedShapeId).toBe('s1');
+    // The inspector shows one subject; two highlights would be a lie.
+    expect(withShape.selectedNodeId).toBeNull();
+
+    const withNode = editorReducer(withShape, {
+      type: 'NODE_CLICKED',
+      nodeId: 'n2',
+      floorId: 'f1',
+    }).state;
+    expect(withNode.selectedShapeId).toBeNull();
+  });
+
+  test('SHAPE_REMOVED clears the selection only when it was the deleted shape', () => {
+    const selected = state({ selectedShapeId: 's1' });
+    expect(
+      editorReducer(selected, { type: 'SHAPE_REMOVED', shapeId: 's1' }).state
+        .selectedShapeId,
+    ).toBeNull();
+    expect(editorReducer(selected, { type: 'SHAPE_REMOVED', shapeId: 'other' }).state).toBe(
+      selected,
+    );
+  });
+
+  test('changing floor abandons a wall run and the shape selection', () => {
+    const next = editorReducer(
+      state({ activeFloorId: 'f1', wallPoints: [0, 0, 5, 5], selectedShapeId: 's1' }),
+      { type: 'SET_FLOOR', floorId: 'f2' },
+    ).state;
+    expect(next.wallPoints).toEqual([]);
+    expect(next.selectedShapeId).toBeNull();
+  });
+});
+
+describe('editorReducer — eraser', () => {
+  test('clicking a node with the eraser asks the page to delete it', () => {
+    const { state: next, intent } = editorReducer(state({ tool: 'erase' }), {
+      type: 'NODE_CLICKED',
+      nodeId: 'n1',
+      floorId: 'f1',
+    });
+    expect(intent).toEqual({ type: 'delete-node', nodeId: 'n1' });
+    // Nothing is left selected — the inspector must not point at a row that is
+    // on its way out.
+    expect(next.selectedNodeId).toBeNull();
+  });
+
+  test('the eraser clears a previous selection as it deletes', () => {
+    const { state: next } = editorReducer(
+      state({ tool: 'erase', selectedNodeId: 'other', selectedShapeId: 's1' }),
+      { type: 'NODE_CLICKED', nodeId: 'n1', floorId: 'f1' },
+    );
+    expect(next.selectedNodeId).toBeNull();
+    expect(next.selectedShapeId).toBeNull();
+  });
+});
+
+describe('editorReducer — erase taps', () => {
+  test('a map tap in erase mode asks the page to erase whatever is nearby', () => {
+    const { state: next, intent } = editorReducer(
+      state({ tool: 'erase', selectedNodeId: 'n1', selectedShapeId: 's1' }),
+      { type: 'MAP_CLICKED', x: 40, y: 50 },
+    );
+    expect(intent).toEqual({ type: 'erase-at', x: 40, y: 50 });
+    // Nothing stays selected: the target of the selection may be the thing
+    // about to be deleted.
+    expect(next.selectedNodeId).toBeNull();
+    expect(next.selectedShapeId).toBeNull();
+  });
+});

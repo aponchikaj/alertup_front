@@ -22,6 +22,21 @@ jest.mock('../../../components/map/mapSpace', () => {
   return { ...actual, screenToMap: jest.fn(() => ({ x: 321, y: 123 })) };
 });
 
+
+// The collab hook opens a real socket; in jsdom that means a doomed XHR poll
+// loop and open handles. A stub socket keeps the page renderable while the
+// collab paths simply stay dormant (never connected, no peers).
+jest.mock('socket.io-client', () => ({
+  io: () => ({
+    on: jest.fn(),
+    off: jest.fn(),
+    emit: jest.fn(),
+    close: jest.fn(),
+    connected: false,
+    volatile: { emit: jest.fn() },
+  }),
+}));
+
 jest.mock('../../../apis/mapEditorApi');
 jest.mock('../../../apis/building');
 
@@ -98,6 +113,38 @@ const mapSvg = () =>
 
 const tool = (name: string) => screen.getByRole('button', { name });
 
+/**
+ * Arm an editor tool.
+ *
+ * Tools live in dropdown menus rather than a flat strip, so picking one means
+ * opening the menu that holds it. Which menu that is stays an implementation
+ * detail here: try each in turn and click the item where it turns up.
+ */
+const selectTool = (name: string) => {
+  // Graph tools only exist in Nodes mode — the editor opens in Draw mode so a
+  // stray click cannot drop a routing node onto the plan. Try the current mode
+  // first, then the other one.
+  for (const attempt of [0, 1]) {
+    if (attempt === 1) {
+      fireEvent.click(screen.getByRole('radio', { name: en.mapEditor.modeNodes }));
+    }
+    const trigger = document.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]');
+    if (!trigger) break;
+    fireEvent.click(trigger);
+    // Menu items carry a <kbd> shortcut hint, so the accessible name is
+    // "Place node N" — match on the label prefix.
+    const item = screen.queryByRole('menuitemradio', {
+      name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`),
+    });
+    if (item) {
+      fireEvent.click(item);
+      return;
+    }
+    fireEvent.click(trigger); // close before switching mode
+  }
+  throw new Error(`No tool menu contains "${name}"`);
+};
+
 beforeEach(() => {
   jest.clearAllMocks();
   api.getBuildingGraph.mockResolvedValue(graph);
@@ -145,7 +192,7 @@ describe('MapEditorPage — placing nodes', () => {
     const { container } = renderPage();
     await screen.findByText('Ground floor');
 
-    fireEvent.click(tool(en.mapEditor.toolPlaceNode));
+    selectTool(en.mapEditor.toolPlaceNode);
 
     const svg = mapSvg();
     fireEvent.pointerDown(svg, { pointerId: 1, clientX: 40, clientY: 40 });
@@ -167,7 +214,7 @@ describe('MapEditorPage — placing nodes', () => {
     const { container } = renderPage();
     await screen.findByText('Ground floor');
 
-    fireEvent.click(tool(en.mapEditor.toolPlaceNode));
+    selectTool(en.mapEditor.toolPlaceNode);
 
     const marker = container.querySelector('[data-node-id="n1"]') as Element;
     fireEvent.pointerDown(marker, { pointerId: 2, clientX: 10, clientY: 10 });
@@ -178,7 +225,7 @@ describe('MapEditorPage — placing nodes', () => {
 });
 
 describe('MapEditorPage — drawing edges', () => {
-  test('clicking two nodes opens the connection form and posts the edge', async () => {
+  test('clicking two nodes creates a default connection with no modal', async () => {
     api.createEdge.mockResolvedValue({
       id: 'e1',
       sourceNodeId: 'n1',
@@ -191,37 +238,125 @@ describe('MapEditorPage — drawing edges', () => {
     const { container } = renderPage();
     await screen.findByText('Ground floor');
 
-    fireEvent.click(tool(en.mapEditor.toolDrawEdge));
+    selectTool(en.mapEditor.toolDrawEdge);
 
     fireEvent.click(container.querySelector('[data-node-id="n1"]') as Element);
-    // One endpoint picked — no dialog yet, but the cancel hint is up.
+    // One endpoint picked — the cancel hint is up, and nothing was created.
     expect(screen.getByText(en.mapEditor.cancelHint)).toBeInTheDocument();
-    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(api.createEdge).not.toHaveBeenCalled();
 
     fireEvent.click(container.querySelector('[data-node-id="n2"]') as Element);
 
-    const dialog = await screen.findByRole('dialog');
-    fireEvent.click(
-      within(dialog).getByRole('button', { name: en.mapEditor.saveEdge }),
-    );
-
+    // The edge posts immediately with defaults — the modal is gone. Three
+    // questions whose answers were almost always the defaults now live in
+    // the edge inspector instead.
     await waitFor(() => expect(api.createEdge).toHaveBeenCalledTimes(1));
-    expect(api.createEdge).toHaveBeenCalledWith(
-      expect.objectContaining({
-        sourceNodeId: 'n1',
-        targetNodeId: 'n2',
-        buildingId: 'b1',
-        transitType: 'WALKWAY',
-        accessible: true,
-      }),
+    expect(api.createEdge).toHaveBeenCalledWith({
+      sourceNodeId: 'n1',
+      targetNodeId: 'n2',
+      buildingId: 'b1',
+    });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() =>
+      expect(container.querySelector('[data-edge-id="e1"]')).toBeInTheDocument(),
     );
+  });
+
+  test('clicking an edge opens the edge inspector; delete removes it', async () => {
+    api.getBuildingGraph.mockResolvedValue({
+      ...graph,
+      edges: [
+        {
+          id: 'e9',
+          sourceNodeId: 'n1',
+          targetNodeId: 'n2',
+          buildingId: 'b1',
+          transitType: 'WALKWAY',
+          accessible: true,
+          distance: 100,
+        },
+      ],
+    });
+    api.deleteEdge.mockResolvedValue(undefined);
+
+    const { container } = renderPage();
+    await screen.findByText('Ground floor');
+
+    // The clickable element is the fat invisible hit line inside the edge group.
+    const edgeGroup = container.querySelector('[data-edge-id="e9"]') as Element;
+    const hitLine = edgeGroup.querySelector('line[stroke="transparent"]') as Element;
+    fireEvent.click(hitLine);
+
+    expect(await screen.findByTestId('edge-inspector')).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getAllByRole('button', { name: new RegExp(en.mapEditor.deleteEdge) })[0],
+    );
+    // On narrow viewports the inspector itself lives in a Sheet (also a
+    // dialog); the confirm is whichever dialog holds the confirm body text.
+    await screen.findByText(en.mapEditor.deleteEdgeConfirm);
+    const confirm = screen
+      .getAllByRole('dialog')
+      .find((d) => within(d).queryByText(en.mapEditor.deleteEdgeConfirm))!;
+    fireEvent.click(within(confirm).getByRole('button', { name: en.common.delete }));
+
+    await waitFor(() => expect(api.deleteEdge).toHaveBeenCalledWith('e9'));
+    await waitFor(() =>
+      expect(container.querySelector('[data-edge-id="e9"]')).toBeNull(),
+    );
+  });
+
+  test('placing a node auto-connects it to the nearest neighbour', async () => {
+    api.createNode.mockResolvedValue(node('new1', 'f1', 321, 123));
+    api.createEdge.mockResolvedValue({
+      id: 'e-auto',
+      sourceNodeId: 'n2',
+      targetNodeId: 'new1',
+      buildingId: 'b1',
+      transitType: 'WALKWAY',
+      accessible: true,
+    });
+
+    renderPage();
+    await screen.findByText('Ground floor');
+
+    selectTool(en.mapEditor.toolPlaceNode);
+
+    const svg = mapSvg();
+    fireEvent.pointerDown(svg, { pointerId: 1, clientX: 40, clientY: 40 });
+    fireEvent.pointerUp(svg, { pointerId: 1, clientX: 40, clientY: 40 });
+
+    // The mocked tap lands at (321, 123); n2 sits at (300, 200) — inside the
+    // auto-connect radius, so the new node arrives already wired in.
+    await waitFor(() => expect(api.createEdge).toHaveBeenCalledTimes(1));
+    expect(api.createEdge).toHaveBeenCalledWith({
+      sourceNodeId: 'n2',
+      targetNodeId: 'new1',
+      buildingId: 'b1',
+    });
+  });
+
+  test('auto-connect can be switched off', async () => {
+    api.createNode.mockResolvedValue(node('new1', 'f1', 321, 123));
+    renderPage();
+    await screen.findByText('Ground floor');
+
+    selectTool(en.mapEditor.toolPlaceNode);
+    fireEvent.click(screen.getByRole('checkbox', { name: en.mapEditor.autoConnect }));
+
+    const svg = mapSvg();
+    fireEvent.pointerDown(svg, { pointerId: 1, clientX: 40, clientY: 40 });
+    fireEvent.pointerUp(svg, { pointerId: 1, clientX: 40, clientY: 40 });
+
+    await waitFor(() => expect(api.createNode).toHaveBeenCalledTimes(1));
+    expect(api.createEdge).not.toHaveBeenCalled();
   });
 
   test('Escape abandons a half-drawn edge', async () => {
     const { container } = renderPage();
     await screen.findByText('Ground floor');
 
-    fireEvent.click(tool(en.mapEditor.toolDrawEdge));
+    selectTool(en.mapEditor.toolDrawEdge);
     fireEvent.click(container.querySelector('[data-node-id="n1"]') as Element);
     expect(screen.getByText(en.mapEditor.cancelHint)).toBeInTheDocument();
 
@@ -312,10 +447,192 @@ describe('MapEditorPage — floors panel', () => {
     fireEvent.change(screen.getByLabelText(en.mapEditor.floorName), {
       target: { value: 'Roof' },
     });
+    // A new floor is sized in metres — that is what gives it a blank canvas to
+    // draw on, and what fixes the scale routes are measured against.
+    fireEvent.change(screen.getByLabelText(en.mapEditor.widthMeters), {
+      target: { value: '20' },
+    });
+    fireEvent.change(screen.getByLabelText(en.mapEditor.heightMeters), {
+      target: { value: '16' },
+    });
     fireEvent.click(tool(en.mapEditor.addFloor));
 
     await waitFor(() => expect(api.createFloor).toHaveBeenCalledTimes(1));
-    expect(api.createFloor).toHaveBeenCalledWith('b1', expect.any(Object));
+    // 20m x 16m at the default 50 px/m is the standard 1000x800 space.
+    expect(api.createFloor).toHaveBeenCalledWith(
+      'b1',
+      expect.objectContaining({
+        width: 1000,
+        height: 800,
+        scalePixelsPerMeter: 50,
+      }),
+    );
     expect(await screen.findByText('Roof')).toBeInTheDocument();
+  });
+
+  test('a floor cannot be created without a canvas to draw on', async () => {
+    renderPage();
+    await screen.findByText('Ground floor');
+
+    fireEvent.change(screen.getByLabelText(en.mapEditor.floorNumber), {
+      target: { value: '4' },
+    });
+    // No size and no uploaded plan — there is nothing to draw on yet.
+    expect(tool(en.mapEditor.addFloor)).toBeDisabled();
+  });
+
+  test('an out-of-range room size is rejected before it is sent', async () => {
+    renderPage();
+    await screen.findByText('Ground floor');
+
+    fireEvent.change(screen.getByLabelText(en.mapEditor.floorNumber), {
+      target: { value: '5' },
+    });
+    fireEvent.change(screen.getByLabelText(en.mapEditor.widthMeters), {
+      target: { value: '99999' },
+    });
+    fireEvent.change(screen.getByLabelText(en.mapEditor.heightMeters), {
+      target: { value: '10' },
+    });
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(tool(en.mapEditor.addFloor)).toBeDisabled();
+    expect(api.createFloor).not.toHaveBeenCalled();
+  });
+});
+
+describe('MapEditorPage — drawing, undo and delete', () => {
+  /** Draw a wall via the UI: arm the tool, two taps, Enter to finish. */
+  const drawWall = async () => {
+    selectTool(en.mapEditor.toolDrawWall);
+    const svg = mapSvg();
+    fireEvent.pointerDown(svg, { pointerId: 5, clientX: 30, clientY: 30 });
+    fireEvent.pointerUp(svg, { pointerId: 5, clientX: 30, clientY: 30 });
+    fireEvent.pointerDown(svg, { pointerId: 6, clientX: 80, clientY: 80 });
+    fireEvent.pointerUp(svg, { pointerId: 6, clientX: 80, clientY: 80 });
+    fireEvent.keyDown(window, { key: 'Enter' });
+    await screen.findByTestId('drawing-layer');
+  };
+
+  test('Ctrl+Z undoes the last drawn shape; Ctrl+Shift+Z brings it back', async () => {
+    renderPage();
+    await screen.findByText('Ground floor');
+    await drawWall();
+
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true });
+    await waitFor(() =>
+      expect(screen.queryByTestId('drawing-layer')).toBeNull(),
+    );
+
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true, shiftKey: true });
+    expect(await screen.findByTestId('drawing-layer')).toBeInTheDocument();
+  });
+
+  test('Delete removes the selected shape', async () => {
+    const { container } = renderPage();
+    await screen.findByText('Ground floor');
+    await drawWall();
+
+    selectTool(en.mapEditor.toolSelect);
+    fireEvent.click(container.querySelector('[data-shape-id]') as Element);
+    fireEvent.keyDown(window, { key: 'Delete' });
+
+    await waitFor(() =>
+      expect(screen.queryByTestId('drawing-layer')).toBeNull(),
+    );
+  });
+
+  test('pressing a tool shortcut arms the tool, switching mode if needed', async () => {
+    renderPage();
+    await screen.findByText('Ground floor');
+
+    // "N" = place node, a Nodes-mode tool — the shortcut flips the mode too.
+    fireEvent.keyDown(window, { key: 'n' });
+    expect(
+      screen.getByRole('radio', { name: en.mapEditor.modeNodes }),
+    ).toHaveAttribute('aria-checked', 'true');
+  });
+});
+
+describe('MapEditorPage — eraser', () => {
+  /** Tap the map at the mocked screenToMap point (321, 123). */
+  const tapMap = () => {
+    const svg = mapSvg();
+    fireEvent.pointerDown(svg, { pointerId: 9, clientX: 50, clientY: 50 });
+    fireEvent.pointerUp(svg, { pointerId: 9, clientX: 50, clientY: 50 });
+  };
+
+  test('a tap near a node deletes it — no dead-centre click required', async () => {
+    api.getBuildingGraph.mockResolvedValue({
+      ...graph,
+      nodes: [...graph.nodes, node('near', 'f1', 325, 125)],
+    });
+    api.deleteNode.mockResolvedValue(undefined);
+
+    const { container } = renderPage();
+    await screen.findByText('Ground floor');
+
+    selectTool(en.mapEditor.toolErase);
+    tapMap();
+
+    // (321, 123) is ~4.5 units from the node at (325, 125) — well inside the
+    // eraser's radius even though the click missed the marker element.
+    await waitFor(() => expect(api.deleteNode).toHaveBeenCalledWith('near'));
+    await waitFor(() =>
+      expect(container.querySelector('[data-node-id="near"]')).toBeNull(),
+    );
+  });
+
+  test('a tap on a connection deletes it when no node is nearer', async () => {
+    api.getBuildingGraph.mockResolvedValue({
+      ...graph,
+      nodes: [node('a', 'f1', 321, 50), node('b', 'f1', 321, 200)],
+      edges: [
+        {
+          id: 'e-target',
+          sourceNodeId: 'a',
+          targetNodeId: 'b',
+          buildingId: 'b1',
+          transitType: 'WALKWAY',
+          accessible: true,
+        },
+      ],
+    });
+    api.deleteEdge.mockResolvedValue(undefined);
+
+    const { container } = renderPage();
+    await screen.findByText('Ground floor');
+
+    selectTool(en.mapEditor.toolErase);
+    tapMap();
+
+    // The tap sits ON the a—b segment but 70+ units from either endpoint:
+    // too far for the node radius, dead-on for the edge.
+    await waitFor(() => expect(api.deleteEdge).toHaveBeenCalledWith('e-target'));
+    expect(api.deleteNode).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(container.querySelector('[data-edge-id="e-target"]')).toBeNull(),
+    );
+  });
+
+  test('a tap near a drawn shape deletes it', async () => {
+    // No nodes at all, so nothing outranks the shape.
+    api.getBuildingGraph.mockResolvedValue({ ...graph, nodes: [], edges: [] });
+    renderPage();
+    await screen.findByText('Ground floor');
+
+    // Draw a wall at the mocked point, then erase with a tap beside it.
+    selectTool(en.mapEditor.toolDrawWall);
+    tapMap();
+    tapMap();
+    fireEvent.keyDown(window, { key: 'Enter' });
+    await screen.findByTestId('drawing-layer');
+
+    selectTool(en.mapEditor.toolErase);
+    tapMap();
+
+    await waitFor(() =>
+      expect(screen.queryByTestId('drawing-layer')).toBeNull(),
+    );
   });
 });

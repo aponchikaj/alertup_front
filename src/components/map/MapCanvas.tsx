@@ -53,6 +53,12 @@ export interface MapCanvasProps {
   /** Disables the transform transition while a drag is in flight. */
   isDragging?: boolean;
   /**
+   * CSS cursor over the map. Overrides the default grab/grabbing pair — an
+   * editor uses it to show which tool is armed, so the pointer itself answers
+   * "what happens if I click here?".
+   */
+  cursor?: string;
+  /**
    * Click on empty map, in map coordinates. Suppressed after drags, and a
    * graceful no-op where no CTM exists (jsdom). For gesture-aware taps prefer
    * useMapCamera's onTap.
@@ -74,6 +80,7 @@ export const MapCanvas = ({
   svgRef,
   interactive = false,
   isDragging = false,
+  cursor,
   onMapClick,
   onContainerResize,
   children,
@@ -169,7 +176,11 @@ export const MapCanvas = ({
         aria-label={ariaLabel}
         className="absolute inset-0 h-full w-full"
         style={{
-          cursor: interactive ? (isDragging ? 'grabbing' : 'grab') : undefined,
+          // Dragging always wins: whatever tool is armed, a pan in flight
+          // should read as a pan.
+          cursor: isDragging
+            ? 'grabbing'
+            : (cursor ?? (interactive ? 'grab' : undefined)),
         }}
         viewBox={`0 0 ${space.width} ${space.height}`}
         preserveAspectRatio="xMidYMid meet"

@@ -17,6 +17,13 @@ export interface EdgeLayerProps {
   showAccessibility?: boolean;
   /** Tooltip for inaccessible edges. Localize via this prop. */
   inaccessibleLabel?: string;
+  /** Editor only: highlighted edge. */
+  selectedEdgeId?: string | null;
+  /**
+   * Editor only: makes edges clickable. A 14-unit invisible hit line backs
+   * each visible one — a 2px stroke is an impossible click target.
+   */
+  onEdgeClick?: (edge: MapEdge) => void;
 }
 
 const isTransit = (t: TransitType): t is Exclude<TransitType, 'WALKWAY'> =>
@@ -30,6 +37,8 @@ export const EdgeLayer = ({
   nodesById,
   showAccessibility = true,
   inaccessibleLabel = 'Not wheelchair accessible',
+  selectedEdgeId = null,
+  onEdgeClick,
 }: EdgeLayerProps) => (
   <g data-testid="edge-layer">
     {edges.map((edge) => {
@@ -42,6 +51,7 @@ export const EdgeLayer = ({
       const transitType = isTransit(edge.transitType) ? edge.transitType : null;
       const transit = transitType !== null;
       const flagged = showAccessibility && !edge.accessible;
+      const selected = edge.id === selectedEdgeId;
       const midX = (source.x + target.x) / 2;
       const midY = (source.y + target.y) / 2;
 
@@ -52,16 +62,29 @@ export const EdgeLayer = ({
             y1={source.y}
             x2={target.x}
             y2={target.y}
-            stroke="var(--line-strong)"
-            strokeWidth={transit ? 2.5 : 2}
+            stroke={selected ? 'var(--brand)' : 'var(--line-strong)'}
+            strokeWidth={selected ? 3.5 : transit ? 2.5 : 2}
             strokeLinecap="round"
             // Three visually distinct treatments: solid walkway, long-dash
             // transit, dot-dash inaccessible.
             strokeDasharray={flagged ? '2 6' : transit ? '7 5' : undefined}
-            opacity={0.9}
+            opacity={selected ? 1 : 0.9}
           >
             {flagged ? <title>{inaccessibleLabel}</title> : null}
           </line>
+          {onEdgeClick && (
+            <line
+              x1={source.x}
+              y1={source.y}
+              x2={target.x}
+              y2={target.y}
+              stroke="transparent"
+              strokeWidth={14}
+              strokeLinecap="round"
+              style={{ cursor: 'pointer' }}
+              onClick={() => onEdgeClick(edge)}
+            />
+          )}
           {transitType ? (
             <g
               transform={`translate(${midX - 12 * GLYPH_SCALE} ${midY - 12 * GLYPH_SCALE}) scale(${GLYPH_SCALE})`}

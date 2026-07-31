@@ -251,6 +251,70 @@ export const TrashIcon = (p: IconProps) => (
   </Icon>
 );
 
+/** Expand to fullscreen — four corners pointing out. */
+export const MaximizeIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M8 3.5H4.5a1 1 0 0 0-1 1V8M16 3.5h3.5a1 1 0 0 1 1 1V8M8 20.5H4.5a1 1 0 0 1-1-1V16M16 20.5h3.5a1 1 0 0 0 1-1V16" />
+  </Icon>
+);
+
+/** Leave fullscreen — four corners pointing in. */
+export const MinimizeIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M3.5 8H7a1 1 0 0 0 1-1V3.5M20.5 8H17a1 1 0 0 1-1-1V3.5M3.5 16H7a1 1 0 0 1 1 1v3.5M20.5 16H17a1 1 0 0 0-1 1v3.5" />
+  </Icon>
+);
+
+/** Undo — arrow curling back left. */
+export const UndoIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 9.5h10.5a5 5 0 0 1 0 10H9" />
+    <path d="M8 5.5 4 9.5l4 4" />
+  </Icon>
+);
+
+/** Redo — arrow curling forward right. */
+export const RedoIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M20 9.5H9.5a5 5 0 0 0 0 10H15" />
+    <path d="M16 5.5l4 4-4 4" />
+  </Icon>
+);
+
+/* --- map editor drawing tools -------------------------------------------- */
+
+/** Draw walls — a pen nib. */
+export const PenIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    <path d="M14.5 5.5l3 3" />
+  </Icon>
+);
+
+/** Draw a room — an empty box. */
+export const SquareIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+  </Icon>
+);
+
+/** Draw a shop — a storefront with an awning. */
+export const StoreIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 9.5V19a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9.5" />
+    <path d="M3 9.5 4.7 5a1 1 0 0 1 .93-.64h12.74a1 1 0 0 1 .93.64L21 9.5" />
+    <path d="M9.5 20v-5.5h5V20" />
+  </Icon>
+);
+
+/** Stamp a marker — a pin dropping onto a surface. */
+export const StampIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 3a4 4 0 0 0-4 4c0 1.5.7 2.3 1.2 3.3.4.8.3 1.7-.2 2.2H15c-.5-.5-.6-1.4-.2-2.2C15.3 9.3 16 8.5 16 7a4 4 0 0 0-4-4Z" />
+    <path d="M5 16.5h14M6.5 20.5h11" />
+  </Icon>
+);
+
 export const DownloadIcon = (p: IconProps) => (
   <Icon {...p}>
     <path d="M12 3v12m0 0 4.5-4.5M12 15l-4.5-4.5" />
