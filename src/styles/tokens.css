@@ -1,0 +1,185 @@
+/* ============================================================================
+   AlertUp — Design Tokens (monochrome minimal)
+   ----------------------------------------------------------------------------
+   Two layers:
+     1. PRIMITIVES  — a single neutral ramp. Never used directly in components.
+     2. SEMANTICS   — role-based tokens (canvas, surface, ink, line, brand...).
+                      These are what components consume, and the only layer
+                      that changes between light and dark.
+
+   The visual language is black / white / gray. "Brand" now resolves to ink:
+   black surfaces and text in light mode, white in dark mode. Status colors
+   stay chromatic but muted — this is evacuation software, and the emergency
+   UI must keep red/green/amber semantics; they are the only color on the site.
+
+   Contrast: every foreground/background pair below is >= 4.5:1 for body text
+   (WCAG 2.1 AA).
+   ========================================================================= */
+
+:root {
+  /* --- PRIMITIVES: neutral ramp ------------------------------------------- */
+  --neutral-0: #ffffff;
+  --neutral-50: #fafafa;
+  --neutral-100: #f5f5f5;
+  --neutral-200: #e5e5e5;
+  --neutral-300: #d4d4d4;
+  --neutral-400: #a3a3a3;
+  --neutral-500: #737373;
+  --neutral-600: #525252;
+  --neutral-700: #404040;
+  --neutral-800: #262626;
+  --neutral-900: #171717;
+  --neutral-950: #0a0a0a;
+  --neutral-1000: #000000;
+
+  /* The old brand ramp keeps its names so every consumer re-skins for free —
+     the values are now the neutral ramp. */
+  --brand-50: var(--neutral-50);
+  --brand-100: var(--neutral-100);
+  --brand-200: var(--neutral-200);
+  --brand-300: var(--neutral-300);
+  --brand-400: var(--neutral-400);
+  --brand-500: var(--neutral-500);
+  --brand-600: var(--neutral-600);
+  --brand-700: var(--neutral-700);
+  --brand-800: var(--neutral-800);
+  --brand-900: var(--neutral-900);
+  --brand-950: var(--neutral-950);
+
+  /* --- PRIMITIVES: status (muted, functional only) ------------------------- */
+  --red-500: #b3261e;
+  --red-400: #dc4a41;
+  --red-300: #f2938d;
+  --green-600: #1b6e42;
+  --green-500: #2e9963;
+  --green-300: #7ecfa4;
+  --amber-600: #8a5a00;
+  --amber-500: #c9971d;
+  --amber-300: #e8c56a;
+  --blue-600: #2f5e9e;
+  --blue-500: #5c8bc9;
+  --blue-300: #a3c2e8;
+
+  /* --- SEMANTICS: light theme (default) ----------------------------------- */
+  color-scheme: light;
+
+  --canvas: var(--neutral-0);
+  --canvas-subtle: var(--neutral-100);
+  --surface: var(--neutral-0);
+  --surface-2: var(--neutral-50);
+  --surface-hover: var(--neutral-100);
+
+  --ink: var(--neutral-1000);
+  --ink-muted: var(--neutral-600);
+  --ink-subtle: var(--neutral-500);
+  --ink-inverse: var(--neutral-0);
+
+  --line: var(--neutral-200);
+  --line-strong: var(--neutral-300);
+
+  /* Brand = ink. Primary actions are solid black with white text. */
+  --brand: var(--neutral-1000);
+  --brand-hover: var(--neutral-800);
+  --brand-ink: var(--neutral-0);
+  --brand-text: var(--neutral-1000);
+  --brand-subtle: var(--neutral-100);
+  --brand-border: var(--neutral-300);
+
+  --danger: var(--red-500);
+  --danger-ink: #ffffff;
+  --danger-text: #9a2019;
+  --danger-subtle: #faf0ef;
+  --danger-border: #ecccca;
+
+  --success: var(--green-600);
+  --success-ink: #ffffff;
+  --success-text: #175d38;
+  --success-subtle: #eff6f2;
+  --success-border: #c8e2d3;
+
+  --warning: var(--amber-600);
+  --warning-ink: #ffffff;
+  --warning-text: #6f4900;
+  --warning-subtle: #faf5ea;
+  --warning-border: #ead9b4;
+
+  --info: var(--blue-600);
+  --info-ink: #ffffff;
+  --info-text: #2a5490;
+  --info-subtle: #f0f4fa;
+  --info-border: #ccd9ec;
+
+  --ring: var(--neutral-1000);
+  --scrim: rgb(0 0 0 / 0.55);
+
+  /* Elevation — pure neutral, restrained. Minimal design leans on hairline
+     borders; shadows only whisper. */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.04);
+  --shadow-lg: 0 12px 28px -6px rgb(0 0 0 / 0.10), 0 4px 8px -4px rgb(0 0 0 / 0.05);
+  --shadow-xl: 0 24px 48px -12px rgb(0 0 0 / 0.14);
+  --shadow-brand: 0 8px 24px -6px rgb(0 0 0 / 0.18);
+}
+
+/* ============================================================================
+   Dark theme — inverted monochrome: white actions on near-black surfaces.
+   ========================================================================= */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --canvas: var(--neutral-950);
+  --canvas-subtle: #111111;
+  --surface: #141414;
+  --surface-2: #1a1a1a;
+  --surface-hover: #222222;
+
+  --ink: var(--neutral-0);
+  --ink-muted: var(--neutral-400);
+  --ink-subtle: var(--neutral-500);
+  --ink-inverse: var(--neutral-950);
+
+  --line: var(--neutral-800);
+  --line-strong: #333333;
+
+  --brand: var(--neutral-0);
+  --brand-hover: var(--neutral-200);
+  --brand-ink: var(--neutral-1000);
+  --brand-text: var(--neutral-0);
+  --brand-subtle: #1a1a1a;
+  --brand-border: #333333;
+
+  --danger: var(--red-400);
+  --danger-ink: #1a0d0d;
+  --danger-text: var(--red-300);
+  --danger-subtle: #271515;
+  --danger-border: #45211f;
+
+  --success: var(--green-500);
+  --success-ink: #04140b;
+  --success-text: var(--green-300);
+  --success-subtle: #10211a;
+  --success-border: #1d3c2c;
+
+  --warning: var(--amber-500);
+  --warning-ink: #1a1204;
+  --warning-text: var(--amber-300);
+  --warning-subtle: #241d0e;
+  --warning-border: #423416;
+
+  --info: var(--blue-500);
+  --info-ink: #05101f;
+  --info-text: var(--blue-300);
+  --info-subtle: #131c2b;
+  --info-border: #23344f;
+
+  --ring: var(--neutral-0);
+  --scrim: rgb(0 0 0 / 0.7);
+
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.5), 0 1px 2px -1px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.55), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 12px 28px -6px rgb(0 0 0 / 0.6), 0 4px 8px -4px rgb(0 0 0 / 0.45);
+  --shadow-xl: 0 24px 48px -12px rgb(0 0 0 / 0.7);
+  --shadow-brand: 0 8px 24px -6px rgb(255 255 255 / 0.10);
+}

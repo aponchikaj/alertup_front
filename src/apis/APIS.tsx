@@ -1,6 +1,13 @@
-// Use Vite env `VITE_API_URL` when available (set in production), otherwise fallback to known backend.
-// const envApi = typeof import.meta !== 'undefined' ? (import.meta.env.VITE_API_URL as string | undefined) : undefined;
-export const MAIN_API_URL: string ='https://alertup-backend.onrender.com/api/';
+import { API_URL } from "./http";
+
+// Endpoint paths. The origin comes from VITE_API_URL (see http.ts), so the
+// backend URL is configured in one place instead of being hardcoded here and
+// separately re-derived in half a dozen other modules.
+//
+// Local dev:  VITE_API_URL=http://localhost:3001
+// Production: VITE_API_URL=https://alertup-backend.onrender.com
+export const MAIN_API_URL: string = `${API_URL}/`;
+
 export const APIS = {
     contact:`${MAIN_API_URL}contact`,
     me:`${MAIN_API_URL}me`,
@@ -18,11 +25,6 @@ export const APIS = {
         activate2fa:`${MAIN_API_URL}2fa/activate`,
         deactivate2fa:`${MAIN_API_URL}2fa/deactivate`,
         verify2fa:`${MAIN_API_URL}2fa/verify`
-    },
-    premium:{
-        getPremiumPlans:`${MAIN_API_URL}premium/plans`,
-        purchasePremium:`${MAIN_API_URL}premium/purchase`,
-        confirmPremium:`${MAIN_API_URL}premium/confirm`
     },
     getDashboard:`${MAIN_API_URL}dashboard`,
     buildings:{

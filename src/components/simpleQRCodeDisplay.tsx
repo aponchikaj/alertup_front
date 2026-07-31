@@ -1,6 +1,26 @@
 import { useState } from 'react';
 import { generateQRCode, downloadQRCodeAsFile, type QRCodeRequest } from '../apis/qrApi';
-import { type Node } from '../apis/nodesApi';
+import { buildScanUrl, type Node } from '../apis/nodesApi';
+import { escapeHtml } from '../lib/escapeHtml';
+import { sanitizeSvg } from '../lib/sanitizeSvg';
+import { Card } from './ui/card';
+import { Button } from './ui/button';
+import { Alert } from './ui/feedback';
+import { TextField } from './ui/field';
+import {
+  CheckIcon,
+  CloseIcon,
+  DownloadIcon,
+  FileTextIcon,
+  PrinterIcon,
+  SmartphoneIcon,
+} from './ui/icons';
+
+// Printed QR codes must keep resolving no matter where the app is served from,
+// so the production origin is pinned here rather than taken from
+// window.location — a code generated on localhost would otherwise be useless
+// once it is on a wall.
+const PUBLIC_ORIGIN = 'https://www.alertup.world';
 
 interface SimpleQRCodeDisplayProps {
   node: Node;
@@ -14,12 +34,13 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
   const [qrData, setQrData] = useState<any>(null);
   const [error, setError] = useState('');
   const [printSize, setPrintSize] = useState<'poster' | 'card'>('poster');
+  const [copied, setCopied] = useState(false);
 
   const generateQR = async () => {
     try {
       setLoading(true);
       setError('');
-      
+
       const request: QRCodeRequest = {
         nodeId: node._id,
         buildingId: node.buildingId,
@@ -37,7 +58,7 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
       };
 
       const response = await generateQRCode(request);
-      
+
       if (response.success && response.data) {
         setQrData(response.data);
       } else {
@@ -52,15 +73,15 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
 
   const handlePrint = () => {
     if (!qrData?.svgContent) return;
-    
+
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       setError('Failed to open print window');
       return;
     }
-    
+
     const isPoster = printSize === 'poster';
-    
+
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
@@ -68,9 +89,9 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
           <title>Emergency Route QR Code</title>
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
-            body { 
-              margin: 0; 
-              padding: 20px; 
+            body {
+              margin: 0;
+              padding: 20px;
               font-family: Arial, sans-serif;
               background: #f5f5f5;
               display: flex;
@@ -78,7 +99,7 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
               align-items: center;
               min-height: 100vh;
             }
-            .qr-container { 
+            .qr-container {
               width: min(90%, 500px);
               max-width: 500px;
               background: white;
@@ -91,18 +112,18 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
             .qr-header {
               margin-bottom: 30px;
             }
-            .qr-title { 
-              font-size: clamp(20px, 5vw, 32px); 
-              font-weight: bold; 
+            .qr-title {
+              font-size: clamp(20px, 5vw, 32px);
+              font-weight: bold;
               margin-bottom: 12px;
               color: #FF7B22;
             }
-            .qr-subtitle { 
-              font-size: clamp(14px, 3.5vw, 20px); 
+            .qr-subtitle {
+              font-size: clamp(14px, 3.5vw, 20px);
               margin-bottom: 25px;
               color: #353535;
             }
-            .qr-image { 
+            .qr-image {
               margin: 30px 0;
             }
             .qr-image svg {
@@ -110,11 +131,11 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
               height: clamp(120px, 25vw, 300px);
               max-width: 100%;
             }
-            .qr-footer { 
+            .qr-footer {
               margin-top: 30px;
               padding-top: 25px;
               border-top: 1px solid #eee;
-              font-size: 14px; 
+              font-size: 14px;
               color: #666;
             }
             .qr-info {
@@ -137,36 +158,36 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
               border-radius: 4px;
               border: 1px solid #ddd;
             }
-            
+
             @media (max-width: 640px) {
-              body { 
+              body {
                 padding: 10px;
                 font-size: 14px;
               }
-              .qr-container { 
+              .qr-container {
                 width: 100%;
                 max-width: 350px;
                 padding: 20px;
               }
-              .qr-title { 
-                font-size: 24px !important; 
+              .qr-title {
+                font-size: 24px !important;
                 margin-bottom: 8px !important;
               }
-              .qr-subtitle { 
-                font-size: 16px !important; 
+              .qr-subtitle {
+                font-size: 16px !important;
                 margin-bottom: 15px !important;
               }
-              .qr-image { 
+              .qr-image {
                 margin: 15px 0 !important;
               }
               .qr-image svg {
                 width: 180px !important;
                 height: 180px !important;
               }
-              .qr-footer { 
+              .qr-footer {
                 margin-top: 15px !important;
                 padding-top: 15px !important;
-                font-size: 12px !important; 
+                font-size: 12px !important;
               }
               .qr-info {
                 margin: 10px 0 !important;
@@ -178,12 +199,12 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
                 padding: 1px 4px !important;
               }
             }
-            
+
             @media (min-width: 641px) and (max-width: 1024px) {
-              body { 
+              body {
                 padding: 15px;
               }
-              .qr-container { 
+              .qr-container {
                 width: 90%;
                 max-width: 450px;
               }
@@ -192,14 +213,14 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
                 height: 220px !important;
               }
             }
-            
+
             @media print {
-              body { 
+              body {
                 background: white;
                 padding: 5mm;
                 font-size: 12pt;
               }
-              .qr-container { 
+              .qr-container {
                 box-shadow: none;
                 margin: 0;
                 width: 100%;
@@ -210,17 +231,17 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
                 width: 25mm !important;
                 height: 25mm !important;
               }
-              .qr-title { 
-                font-size: 16pt !important; 
+              .qr-title {
+                font-size: 16pt !important;
               }
-              .qr-subtitle { 
-                font-size: 12pt !important; 
+              .qr-subtitle {
+                font-size: 12pt !important;
               }
               .qr-info {
                 font-size: 10pt !important;
               }
-              .qr-footer { 
-                font-size: 9pt !important; 
+              .qr-footer {
+                font-size: 9pt !important;
               }
               .qr-size-indicator {
                 display: block;
@@ -237,21 +258,21 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
           <div class="qr-container">
             <div class="qr-size-indicator">${isPoster ? 'POSTER' : 'CARD'}</div>
             <div class="qr-header">
-              <div class="qr-title">${buildingName || 'Emergency Route'}</div>
-              <div class="qr-subtitle">${node.label || node.type} - Floor ${floorName || '1'}</div>
+              <div class="qr-title">${escapeHtml(buildingName || 'Emergency Route')}</div>
+              <div class="qr-subtitle">${escapeHtml(node.label || node.type)} - Floor ${escapeHtml(floorName || '1')}</div>
             </div>
-            
+
             <div class="qr-image">
-              ${qrData.svgContent}
+              ${sanitizeSvg(qrData.svgContent)}
             </div>
-            
+
             <div class="qr-info">
-              <strong>Node Type:</strong> ${node.type}<br>
-              <strong>Position:</strong> (${node.x}, ${node.y})<br>
+              <strong>Node Type:</strong> ${escapeHtml(node.type)}<br>
+              <strong>Position:</strong> (${Number(node.x)}, ${Number(node.y)})<br>
               <strong>Scan for Emergency Route</strong><br>
-              <strong>Building:</strong> ${buildingName || 'N/A'}
+              <strong>Building:</strong> ${escapeHtml(buildingName || 'N/A')}
             </div>
-            
+
             <div class="qr-footer">
               www.alertup.world
             </div>
@@ -261,13 +282,27 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
     `);
     printWindow.document.close();
     printWindow.focus();
-    printWindow.print();
-    printWindow.close();
+
+    // Printing is driven by the new window's own load/afterprint events.
+    // Calling print() and close() synchronously after document.write raced the
+    // layout on browsers that render asynchronously, producing blank or
+    // truncated printouts and sometimes dismissing the dialog outright.
+    const startPrint = () => {
+      printWindow.print();
+    };
+
+    if (printWindow.document.readyState === 'complete') {
+      startPrint();
+    } else {
+      printWindow.addEventListener('load', startPrint, { once: true });
+    }
+
+    printWindow.addEventListener('afterprint', () => printWindow.close(), { once: true });
   };
 
   const handleDownload = () => {
     if (!qrData?.filename) return;
-    
+
     try {
       const nodeName = node.label || `${node.type}-node`;
       downloadQRCodeAsFile(qrData.filename, nodeName);
@@ -276,25 +311,35 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
     }
   };
 
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(buildScanUrl(node.buildingId, node.floorNumber, node._id, PUBLIC_ORIGIN));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-[#353535] rounded-lg max-w-md w-full border border-white/10 max-h-[90vh] overflow-y-auto">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="qr-display-title"
+    >
+      <Card className="max-h-[90vh] w-full max-w-md overflow-y-auto animate-scale-in">
         <div className="p-4 sm:p-6">
           {/* Header */}
-          <div className="flex justify-between items-center mb-4 sm:mb-6">
-            <h2 className="text-lg sm:text-xl font-bold text-white">QR Code</h2>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-white text-xl sm:text-2xl transition-colors"
-            >
-              ×
-            </button>
+          <div className="mb-4 flex items-center justify-between sm:mb-6">
+            <h2 id="qr-display-title" className="text-lg font-semibold text-ink sm:text-xl">
+              QR Code
+            </h2>
+            <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
+              <CloseIcon size={20} />
+            </Button>
           </div>
 
           {/* Node Info */}
-          <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-white/5 rounded-lg border border-white/10">
-            <div className="text-xs sm:text-sm text-gray-300">
-              <div className="font-semibold text-white mb-1">
+          <div className="mb-4 rounded-xl border border-line bg-surface-2 p-3 sm:mb-6 sm:p-4">
+            <div className="text-xs text-ink-muted sm:text-sm">
+              <div className="mb-1 font-semibold text-ink">
                 {node.label || `${node.type} node`}
               </div>
               <div>Type: {node.type}</div>
@@ -305,98 +350,93 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
 
           {/* Generate Button */}
           {!qrData && (
-            <button
+            <Button
+              fullWidth
+              size="lg"
+              className="mb-3 sm:mb-4"
               onClick={generateQR}
-              disabled={loading}
-              className="w-full px-4 sm:px-6 py-2 sm:py-3 bg-[#FF7B22] text-white rounded-lg font-medium hover:bg-[#FF7B22]/80 disabled:opacity-50 disabled:cursor-not-allowed mb-3 sm:mb-4 transition-colors text-sm sm:text-base"
+              loading={loading}
+              loadingLabel="Generating..."
             >
-              {loading ? 'Generating...' : 'Generate QR Code'}
-            </button>
+              Generate QR Code
+            </Button>
           )}
 
           {/* Error Display */}
           {error && (
-            <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-red-500/20 border border-red-500 text-red-300 rounded-lg text-xs sm:text-sm">
+            <Alert tone="danger" className="mb-3 sm:mb-4">
               {error}
-            </div>
+            </Alert>
           )}
 
           {/* QR Code Display */}
           {qrData && (
-            <div className="space-y-3 sm:space-y-4">
+            <div className="flex flex-col gap-3 sm:gap-4">
               {/* Size Selection */}
-              <div className="flex gap-2 p-3 bg-white/5 rounded-lg border border-white/10">
-                <button
+              <div
+                role="group"
+                aria-label="Print size"
+                className="flex gap-2 rounded-xl border border-line bg-surface-2 p-2"
+              >
+                <Button
+                  variant={printSize === 'poster' ? 'primary' : 'secondary'}
+                  size="sm"
+                  className="flex-1"
                   onClick={() => setPrintSize('poster')}
-                  className={`flex-1 px-2 sm:px-3 py-1 sm:py-2 rounded-lg font-medium transition-colors text-xs sm:text-sm ${
-                    printSize === 'poster'
-                      ? 'bg-[#FF7B22] text-white'
-                      : 'bg-white/10 border border-white/20 text-white hover:bg-white/20'
-                  }`}
+                  aria-pressed={printSize === 'poster'}
                 >
-                  📄 Poster
-                </button>
-                <button
+                  <FileTextIcon size={16} />
+                  Poster
+                </Button>
+                <Button
+                  variant={printSize === 'card' ? 'primary' : 'secondary'}
+                  size="sm"
+                  className="flex-1"
                   onClick={() => setPrintSize('card')}
-                  className={`flex-1 px-2 sm:px-3 py-1 sm:py-2 rounded-lg font-medium transition-colors text-xs sm:text-sm ${
-                    printSize === 'card'
-                      ? 'bg-[#FF7B22] text-white'
-                      : 'bg-white/10 border border-white/20 text-white hover:bg-white/20'
-                  }`}
+                  aria-pressed={printSize === 'card'}
                 >
-                  📱 Card
-                </button>
+                  <SmartphoneIcon size={16} />
+                  Card
+                </Button>
               </div>
 
               {/* Emergency Route Link */}
-              <div className="p-2 sm:p-3 bg-white/5 rounded-lg border border-white/10">
-                <div className="text-xs sm:text-sm text-gray-300 mb-2">Emergency Route Link:</div>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-                  <input
-                    type="text"
-                    readOnly
-                    value={`https://www.alertup.world/scan/route/qr_${node.buildingId}_${node.floorNumber}_${node._id}`}
-                    className="flex-1 px-2 sm:px-3 py-1 sm:py-2 bg-black/40 border border-white/20 rounded-lg text-white text-xs sm:text-sm font-mono"
-                  />
-                  <button
-                    onClick={(event) => {
-                      navigator.clipboard.writeText(`https://www.alertup.world/scan/route/qr_${node.buildingId}_${node.floorNumber}_${node._id}`);
-                      // Show success feedback
-                      const button = event?.target as HTMLButtonElement;
-                      if (button) {
-                        const originalText = button.textContent;
-                        button.textContent = '✓ Copied!';
-                        button.classList.add('bg-green-500');
-                        setTimeout(() => {
-                          button.textContent = originalText;
-                          button.classList.remove('bg-green-500');
-                        }, 2000);
-                      }
-                    }}
-                    className="px-2 sm:px-3 py-1 sm:py-2 bg-white/10 border border-white/20 text-white rounded-lg hover:bg-white/20 text-xs sm:text-sm transition-colors whitespace-nowrap"
-                  >
-                    📋 Copy
-                  </button>
-                </div>
+              <div className="flex flex-col gap-2">
+                <TextField
+                  label="Emergency Route Link"
+                  readOnly
+                  value={buildScanUrl(node.buildingId, node.floorNumber, node._id, PUBLIC_ORIGIN)}
+                  inputClassName="font-mono text-sm"
+                />
+                <Button variant="secondary" size="sm" onClick={handleCopyLink}>
+                  {copied ? (
+                    <>
+                      <CheckIcon size={16} className="text-success-text" />
+                      Copied!
+                    </>
+                  ) : (
+                    'Copy link'
+                  )}
+                </Button>
               </div>
 
               {/* Preview */}
               <div className="text-center">
-                <div className="inline-block p-2 sm:p-4 bg-white rounded-lg border border-white/20">
+                <div className="inline-block rounded-xl border border-line bg-surface p-2 shadow-sm sm:p-4">
                   {qrData.svgContent ? (
-                    <div dangerouslySetInnerHTML={{ __html: qrData.svgContent }} />
+                    <div dangerouslySetInnerHTML={{ __html: sanitizeSvg(qrData.svgContent) }} />
                   ) : (
-                    <img src={qrData.url} alt="QR Code" className="w-24 h-24 sm:w-32 sm:h-32" />
+                    <img src={qrData.url} alt="QR Code" className="h-24 w-24 sm:h-32 sm:w-32" />
                   )}
                   <div className="mt-2 sm:mt-3">
-                    <div className="font-bold text-xs sm:text-sm text-[#FF7B22]">
+                    <div className="text-xs font-bold text-brand-text sm:text-sm">
                       {buildingName || 'Emergency Route'}
                     </div>
-                    <div className="text-xs text-gray-400">
+                    <div className="text-xs text-ink-muted">
                       {node.label || node.type} - Floor {floorName || '1'}
                     </div>
                   </div>
-                  <div className="mt-1 sm:mt-2 text-xs text-gray-500">
+                  <div className="mt-1 text-xs text-ink-subtle sm:mt-2">
                     www.alertup.world
                   </div>
                 </div>
@@ -404,23 +444,19 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
 
               {/* Action Buttons */}
               <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                <button
-                  onClick={handleDownload}
-                  className="px-3 sm:px-4 py-2 bg-white/10 border border-white/20 text-white rounded-lg hover:bg-white/20 font-medium transition-colors text-xs sm:text-sm"
-                >
-                  📱 Download
-                </button>
-                <button
-                  onClick={handlePrint}
-                  className="px-3 sm:px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium transition-colors text-xs sm:text-sm"
-                >
-                  🖨️ Print {printSize === 'poster' ? 'Poster' : 'Card'}
-                </button>
+                <Button variant="secondary" onClick={handleDownload}>
+                  <DownloadIcon size={18} />
+                  Download
+                </Button>
+                <Button onClick={handlePrint}>
+                  <PrinterIcon size={18} />
+                  Print {printSize === 'poster' ? 'Poster' : 'Card'}
+                </Button>
               </div>
             </div>
           )}
         </div>
-      </div>
+      </Card>
     </div>
   );
 };

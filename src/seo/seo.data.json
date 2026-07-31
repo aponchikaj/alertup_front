@@ -1,0 +1,375 @@
+{
+  "site": {
+    "name": "AlertUp",
+    "legalName": "AlertUp",
+    "url": "https://alertup.world",
+    "lang": "en",
+    "locale": "en_US",
+    "themeColor": "#000000",
+    "backgroundColor": "#ffffff",
+    "titleTemplate": "%s | AlertUp",
+    "defaultTitle": "AlertUp — QR Code Evacuation Routes & Escape Maps",
+    "defaultDescription": "Scan a QR code and instantly see the safest way out of any building. AlertUp turns official escape maps into instant evacuation routes — no app install.",
+    "defaultImage": "/og-image.png",
+    "defaultImageAlt": "AlertUp — scan once, find the safest way out",
+    "founder": "Lazare Mirziashvili",
+    "foundingLocation": "Tbilisi, Georgia",
+    "email": "support@alertup.world",
+    "sameAs": [
+      "https://github.com/aponchikaj/alertup_front",
+      "https://github.com/aponchikaj/alertup_backend"
+    ],
+    "keywords": [
+      "emergency evacuation QR code",
+      "building evacuation map",
+      "escape route app",
+      "fire safety QR code",
+      "evacuation plan software",
+      "emergency exit navigation",
+      "building safety platform",
+      "digital fire escape plan"
+    ]
+  },
+
+  "routes": [
+    {
+      "path": "/",
+      "index": true,
+      "priority": 1.0,
+      "changefreq": "weekly",
+      "useDefaultTitle": true,
+      "title": "AlertUp — QR Code Evacuation Routes & Escape Maps",
+      "description": "Scan a QR code and instantly see the safest way out of any building. AlertUp turns official escape maps into instant evacuation routes — no app install.",
+      "keywords": [
+        "emergency evacuation QR code",
+        "building evacuation map",
+        "escape route app",
+        "fire safety QR code",
+        "digital fire escape plan"
+      ],
+      "content": {
+        "h1": "Scan once. Find the safest way out.",
+        "lead": "AlertUp is a building safety platform that gives anyone instant access to evacuation routes through QR codes. Building owners upload their official escape and evacuation maps, generate a QR code for every floor and location, and print them around the building. When someone scans, they immediately see the safest path to an exit.",
+        "bullets": [
+          "Emergency instructions — clear, step-by-step safety guidance tailored to the building and the type of emergency.",
+          "Escape route maps — simple visual evacuation maps showing exits and safe paths inside the building.",
+          "QR code access — no app needed; scan a code and instantly get emergency safety information."
+        ],
+        "links": [
+          { "href": "/scan", "text": "Scan a QR code" },
+          { "href": "/register", "text": "Create a free account" },
+          { "href": "/contact", "text": "Contact the AlertUp team" }
+        ]
+      }
+    },
+    {
+      "path": "/scan",
+      "index": true,
+      "priority": 0.9,
+      "changefreq": "monthly",
+      "title": "Scan a QR Code to Find Your Nearest Safe Exit",
+      "description": "Point your camera at an AlertUp QR code to open your building's evacuation route in seconds. Works in any mobile browser — nothing to download.",
+      "keywords": [
+        "scan evacuation QR code",
+        "emergency exit scanner",
+        "QR code safety scanner",
+        "find nearest fire exit"
+      ],
+      "content": {
+        "h1": "Scan an AlertUp QR code",
+        "lead": "Open the scanner, point your camera at any AlertUp QR code posted in a building, and you will be taken straight to that floor's evacuation route. The scanner runs in your browser — there is no app to install and no account required.",
+        "bullets": [
+          "Works on any modern phone browser, online in seconds.",
+          "Only AlertUp codes are accepted — other QR codes are rejected.",
+          "Shows the floor map and the shortest safe path to the nearest exit."
+        ],
+        "links": [
+          { "href": "/", "text": "How AlertUp works" },
+          { "href": "/register", "text": "Add your own building" }
+        ]
+      }
+    },
+    {
+      "path": "/contact",
+      "index": true,
+      "priority": 0.6,
+      "changefreq": "yearly",
+      "title": "Contact AlertUp — Building Safety Support",
+      "description": "Questions about evacuation maps, QR codes, or getting AlertUp into your building? Send the team a message and we will get back to you.",
+      "keywords": [
+        "AlertUp support",
+        "building safety contact",
+        "evacuation software support"
+      ],
+      "content": {
+        "h1": "Contact AlertUp",
+        "lead": "Reach the AlertUp team about installing evacuation QR codes in your building, questions about escape maps, partnerships, or reporting a problem with a code you scanned.",
+        "bullets": [
+          "Support for building owners and facility managers.",
+          "Help with uploading floor maps and generating QR codes.",
+          "Report an incorrect or damaged QR code."
+        ],
+        "links": [
+          { "href": "/", "text": "Back to the homepage" },
+          { "href": "/scan", "text": "Scan a QR code" }
+        ]
+      }
+    },
+    {
+      "path": "/register",
+      "index": true,
+      "priority": 0.8,
+      "changefreq": "monthly",
+      "title": "Create a Free AlertUp Account for Your Building",
+      "description": "Sign up free to add your building, upload official escape maps and generate printable QR codes that show visitors the safest way out in an emergency.",
+      "keywords": [
+        "free evacuation plan software",
+        "create building safety account",
+        "generate evacuation QR codes"
+      ],
+      "content": {
+        "h1": "Create your free AlertUp account",
+        "lead": "Register to add a building, set its floors, upload the official evacuation maps and generate a printable QR code for every location. Visitors scan the code and immediately see how to get out.",
+        "bullets": [
+          "Free to create — add your first building in minutes.",
+          "Upload official escape and evacuation maps per floor.",
+          "Generate and print a unique QR code for each location.",
+          "Track scans and emergency analytics for your building."
+        ],
+        "links": [
+          { "href": "/login", "text": "Already have an account? Log in" },
+          { "href": "/", "text": "See how AlertUp works" }
+        ]
+      }
+    },
+    {
+      "path": "/login",
+      "index": false,
+      "title": "Log in to AlertUp",
+      "description": "Log in to manage your buildings, evacuation maps and QR codes on AlertUp."
+    },
+    {
+      "path": "/reset",
+      "index": false,
+      "title": "Reset your AlertUp password",
+      "description": "Reset the password for your AlertUp account."
+    },
+    {
+      "path": "/dashboard",
+      "index": false,
+      "title": "Dashboard",
+      "description": "Your AlertUp dashboard."
+    },
+    {
+      "path": "/mybuildings",
+      "index": false,
+      "title": "My buildings",
+      "description": "Manage the buildings you own on AlertUp."
+    },
+    {
+      "path": "/new",
+      "index": false,
+      "title": "Add a new building",
+      "description": "Add a new building to AlertUp."
+    },
+    {
+      "path": "/settings",
+      "index": false,
+      "title": "Account settings",
+      "description": "Manage your AlertUp account settings and security."
+    },
+    {
+      "path": "/pricing",
+      "index": true,
+      "priority": 0.7,
+      "changefreq": "monthly",
+      "title": "Pricing — Free for Your First Building",
+      "description": "Start free with one building, unlimited floors and printable QR codes. Upgrade to Premium for unlimited buildings, analytics and priority support.",
+      "keywords": [
+        "evacuation software pricing",
+        "building safety plan cost",
+        "free evacuation QR codes"
+      ],
+      "content": {
+        "h1": "Simple pricing for safer buildings",
+        "lead": "AlertUp is free for your first building — unlimited floors, printable QR codes, emergency instructions and escape maps included. Premium adds unlimited buildings, scan and emergency analytics, full activity logs and priority support.",
+        "links": [
+          { "href": "/register", "text": "Start free" },
+          { "href": "/contact", "text": "Contact us about plans" }
+        ]
+      }
+    },
+    {
+      "path": "/help",
+      "index": true,
+      "priority": 0.6,
+      "changefreq": "monthly",
+      "title": "Help Center — Scanning Codes & Managing Buildings",
+      "description": "How to scan AlertUp QR codes, add your building, upload evacuation maps, generate codes and keep them up to date.",
+      "keywords": [
+        "AlertUp help",
+        "how to scan evacuation QR code",
+        "upload evacuation map help"
+      ],
+      "content": {
+        "h1": "AlertUp Help Center",
+        "lead": "Answers for visitors scanning codes and for building owners managing evacuation maps, floors and QR codes.",
+        "links": [
+          { "href": "/contact", "text": "Contact support" },
+          { "href": "/scan", "text": "Scan a code" }
+        ]
+      }
+    },
+    {
+      "path": "/privacy",
+      "index": true,
+      "priority": 0.3,
+      "changefreq": "yearly",
+      "title": "Privacy Policy",
+      "description": "How AlertUp collects, uses and protects your data — accounts, building maps, QR scans and analytics.",
+      "content": {
+        "h1": "AlertUp Privacy Policy",
+        "lead": "This policy explains what data AlertUp collects when you create an account, add a building or scan a QR code, and how that data is used and protected.",
+        "links": [
+          { "href": "/terms", "text": "Terms of Service" },
+          { "href": "/cookies", "text": "Cookie Policy" }
+        ]
+      }
+    },
+    {
+      "path": "/terms",
+      "index": true,
+      "priority": 0.3,
+      "changefreq": "yearly",
+      "title": "Terms of Service",
+      "description": "The terms that govern using AlertUp — accounts, building profiles, evacuation maps and generated QR codes.",
+      "content": {
+        "h1": "AlertUp Terms of Service",
+        "lead": "These terms govern your use of AlertUp, including account responsibilities, building owner obligations for keeping evacuation maps accurate, and acceptable use of generated QR codes.",
+        "links": [
+          { "href": "/privacy", "text": "Privacy Policy" },
+          { "href": "/contact", "text": "Contact us" }
+        ]
+      }
+    },
+    {
+      "path": "/cookies",
+      "index": true,
+      "priority": 0.3,
+      "changefreq": "yearly",
+      "title": "Cookie Policy",
+      "description": "The cookies and similar technologies AlertUp uses, what they do, and how you can control them.",
+      "content": {
+        "h1": "AlertUp Cookie Policy",
+        "lead": "AlertUp uses a small number of cookies to keep you signed in and to understand how the product is used. This page lists them and explains your choices.",
+        "links": [
+          { "href": "/privacy", "text": "Privacy Policy" }
+        ]
+      }
+    },
+    {
+      "path": "/security",
+      "index": true,
+      "priority": 0.3,
+      "changefreq": "yearly",
+      "title": "Security at AlertUp",
+      "description": "How AlertUp protects building data and evacuation maps, and how to report a vulnerability.",
+      "content": {
+        "h1": "Security at AlertUp",
+        "lead": "Building safety data deserves careful protection. This page describes AlertUp's security practices and how to responsibly disclose a vulnerability.",
+        "links": [
+          { "href": "/contact", "text": "Report a security issue" }
+        ]
+      }
+    },
+    {
+      "path": "/accessibility",
+      "index": true,
+      "priority": 0.3,
+      "changefreq": "yearly",
+      "title": "Accessibility Statement",
+      "description": "AlertUp's commitment to accessible emergency information — standards we target and how to report barriers.",
+      "content": {
+        "h1": "AlertUp Accessibility Statement",
+        "lead": "Emergency information has to work for everyone. This page describes the accessibility standards AlertUp targets and how to tell us about barriers you encounter.",
+        "links": [
+          { "href": "/contact", "text": "Report an accessibility issue" }
+        ]
+      }
+    },
+    {
+      "path": "/scan/route/:qrId",
+      "index": false,
+      "follow": true,
+      "title": "Emergency evacuation route",
+      "description": "Your fastest safe route to the nearest exit, generated from this building's official evacuation map."
+    },
+    {
+      "path": "/route/:qrId",
+      "index": false,
+      "follow": true,
+      "title": "Emergency evacuation route",
+      "description": "Your fastest safe route to the nearest exit, generated from this building's official evacuation map."
+    },
+    {
+      "path": "/building/:buildingID",
+      "index": false,
+      "follow": true,
+      "title": "Building overview",
+      "description": "Floors, evacuation maps and QR codes for this building on AlertUp."
+    },
+    {
+      "path": "/404",
+      "index": false,
+      "title": "Page not found",
+      "description": "The page you are looking for does not exist or was moved."
+    }
+  ],
+
+  "faq": [
+    {
+      "question": "What is AlertUp?",
+      "answer": "AlertUp is a building safety platform that provides instant access to evacuation routes through QR codes. Building owners create a digital profile for their building, upload official escape and evacuation maps, and generate a QR code for each location. When a code is scanned, the person immediately sees the escape route to the nearest safe exit."
+    },
+    {
+      "question": "Do I need to install an app to use AlertUp?",
+      "answer": "No. AlertUp runs entirely in your phone's browser. Scanning an AlertUp QR code opens the evacuation route for that floor straight away, with nothing to download and no account required."
+    },
+    {
+      "question": "How do I add my building to AlertUp?",
+      "answer": "Create a free account, add your building and the number of floors, then upload the official evacuation map for each floor. AlertUp generates a printable QR code for every location that you can post around the building."
+    },
+    {
+      "question": "What happens when someone scans an AlertUp QR code during an emergency?",
+      "answer": "The scan opens that floor's evacuation map and highlights the safest route from the scanned location to the nearest exit, together with step-by-step emergency instructions for the type of emergency in progress."
+    },
+    {
+      "question": "Does AlertUp work without an internet connection?",
+      "answer": "Scanning a code requires an internet connection to load the building's current evacuation route, which is what lets the route reflect live emergency conditions such as a blocked exit."
+    },
+    {
+      "question": "Is AlertUp free?",
+      "answer": "Creating an account and adding your first building is free. Larger buildings and advanced analytics are available on a paid plan."
+    }
+  ],
+
+  "howTo": {
+    "name": "How to find the safest exit with AlertUp",
+    "description": "Use an AlertUp QR code to get the fastest safe route out of a building during an emergency.",
+    "totalTime": "PT1M",
+    "steps": [
+      {
+        "name": "Find the nearest AlertUp QR code",
+        "text": "AlertUp codes are printed and posted around the building — usually near doors, lifts and stairwells."
+      },
+      {
+        "name": "Scan it with your phone camera",
+        "text": "Point your camera at the code, or open alertup.world/scan and use the built-in scanner. No app installation is needed."
+      },
+      {
+        "name": "Follow the highlighted route",
+        "text": "The floor's evacuation map opens with the safest path from your location to the nearest exit highlighted, along with emergency instructions."
+      }
+    ]
+  }
+}

@@ -1,8 +1,19 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import PageHeader from '../../components/pageHeader';
-import axios from 'axios';
+import { get, ApiError } from '../../apis/http';
 import { evacuatedFunc } from '../../apis/building';
+import { usePageAnimations } from '../../lib/animations';
+import { sanitizeSvg } from '../../lib/sanitizeSvg';
+import { PageShell, PageHeader } from '../../components/ui/layout';
+import { Card } from '../../components/ui/card';
+import { Alert, Badge } from '../../components/ui/feedback';
+import { Button } from '../../components/ui/button';
+import {
+  AlertTriangleIcon,
+  ArrowLeftIcon,
+  CheckCircleIcon,
+  SpinnerIcon,
+} from '../../components/ui/icons';
 
 interface FloorNode {
   id: string;
@@ -15,10 +26,28 @@ interface FloorNode {
 
 interface EmergencyRoute {
   found: boolean;
+  message?: string | null;
   exitNodeId: string | null;
   path: string[];
   distance: number;
-  exitNode: FloorNode | null;
+  walkingDistance?: number;
+  exitNode: (FloorNode & { floor?: number }) | null;
+}
+
+interface RouteNode {
+  id: string;
+  x: number;
+  y: number;
+  type: 'path' | 'exit' | 'stairs';
+  label: string;
+  floor: number;
+}
+
+interface FloorTransition {
+  from: number;
+  to: number;
+  atStep: number;
+  nodeType: string;
 }
 
 interface FloorMap {
@@ -39,6 +68,10 @@ interface RouteData {
   nodePosition: { x: number; y: number };
   connectedNodes: FloorNode[];
   allFloorNodes: FloorNode[];
+  /** Every step of the route, including steps on other floors. */
+  routeNodes: RouteNode[];
+  floorTransitions: FloorTransition[];
+  requiresFloorChange: boolean;
   emergencyRoute: EmergencyRoute;
   floorMap: FloorMap | null;
   timestamp: string;
@@ -47,14 +80,14 @@ interface RouteData {
 
 const QRScanRoutePageFixed: React.FC = () => {
   const { qrId } = useParams<{ qrId: string }>();
-  // const navigate = useNavigate();
-  
+  const rootRef = usePageAnimations();
+
   const [routeData, setRouteData] = useState<RouteData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<FloorNode | null>(null);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
-  
+
   // Map interaction state
   const [scale, setScale] = useState(1);
   const [translateX, setTranslateX] = useState(0);
@@ -62,51 +95,45 @@ const QRScanRoutePageFixed: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
-  
+
   // Fixed dimensions for uploaded images
   const mapDimensions = { width: 1000, height: 800 };
-
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://alertup-backend.onrender.com';
 
   const fetchRouteData = useCallback(async (qrId: string) => {
     try {
       setLoading(true);
       setError(null);
-      
-      const response = await axios.get(`${API_BASE_URL}/api/qr/scan/route/${qrId}`);
-      
-      if (response.data.success) {
-        // The QR scan endpoint already returns the correct format
-        setRouteData(response.data.data);
-        console.log('✅ Route data loaded:', response.data.data);
+
+      const response = await get<{ success: boolean; message?: string; data: RouteData }>(
+        `/api/qr/scan/route/${qrId}`
+      );
+
+      if (response.success) {
+        setRouteData(response.data);
       } else {
-        setError(response.data.message || 'Failed to load route data');
+        setError(response.message || 'Failed to load route data');
       }
     } catch (err: unknown) {
       console.error('Error fetching route data:', err);
-      
-      if (err && typeof err === 'object' && 'response' in err) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const axiosError = err as any;
-        if (axiosError.response?.status === 404) {
+
+      if (err instanceof ApiError) {
+        if (err.status === 404) {
           setError('QR code not found. Please scan a valid emergency QR code.');
-        } else if (axiosError.response?.status === 400) {
+        } else if (err.status === 400) {
           setError('Invalid QR code format.');
         } else {
-          setError(axiosError.response?.data?.message || 'Failed to load route data');
+          setError(err.message || 'Failed to load route data');
         }
       } else {
-        const error = err as Error;
-        setError(error.message || 'Failed to load route data');
+        setError(err instanceof Error ? err.message : 'Failed to load route data');
       }
     } finally {
       setLoading(false);
     }
-  }, [API_BASE_URL]);
+  }, []);
 
   useEffect(() => {
-    document.title = 'Emergency Route - AlertUp';
-    
+
     if (qrId) {
       fetchRouteData(qrId);
     }
@@ -122,27 +149,69 @@ const QRScanRoutePageFixed: React.FC = () => {
     setHoveredNode(nodeId);
   }, []);
 
-  // Pan and zoom handlers
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    const newScale = Math.min(Math.max(scale * delta, 0.5), 3);
-    setScale(newScale);
-  }, [scale]);
+  // Wheel zoom is bound natively with { passive: false }. React registers wheel
+  // listeners passively, so preventDefault() inside onWheel was ignored — the
+  // page scrolled underneath the map and the console filled with warnings.
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element) return;
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    setIsDragging(true);
-    setDragStart({ x: e.clientX - translateX, y: e.clientY - translateY });
-  }, [translateX, translateY]);
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      setScale((current) => Math.min(Math.max(current * delta, 0.5), 3));
+    };
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    element.addEventListener('wheel', onWheel, { passive: false });
+    return () => element.removeEventListener('wheel', onWheel);
+  }, []);
+
+  // Pointer events rather than mouse events, so panning works under a finger.
+  // This page is reached by scanning a printed QR code, so it is opened on a
+  // phone almost every time — with mouse-only handlers the escape route simply
+  // could not be dragged into view.
+  const activePointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinchStart = useRef<{ distance: number; scale: number } | null>(null);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+
+    if (activePointers.current.size === 1) {
+      setIsDragging(true);
+      setDragStart({ x: e.clientX - translateX, y: e.clientY - translateY });
+    } else if (activePointers.current.size === 2) {
+      // Second finger down starts a pinch; panning stops so the two gestures
+      // do not fight each other.
+      setIsDragging(false);
+      const [a, b] = Array.from(activePointers.current.values());
+      pinchStart.current = { distance: Math.hypot(a.x - b.x, a.y - b.y), scale };
+    }
+  }, [translateX, translateY, scale]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!activePointers.current.has(e.pointerId)) return;
+    activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (activePointers.current.size >= 2 && pinchStart.current) {
+      const [a, b] = Array.from(activePointers.current.values());
+      const distance = Math.hypot(a.x - b.x, a.y - b.y);
+      if (pinchStart.current.distance > 0) {
+        const next = pinchStart.current.scale * (distance / pinchStart.current.distance);
+        setScale(Math.min(Math.max(next, 0.5), 3));
+      }
+      return;
+    }
+
     if (!isDragging) return;
     setTranslateX(e.clientX - dragStart.x);
     setTranslateY(e.clientY - dragStart.y);
   }, [isDragging, dragStart]);
 
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    activePointers.current.delete(e.pointerId);
+    if (activePointers.current.size < 2) pinchStart.current = null;
+    if (activePointers.current.size === 0) setIsDragging(false);
   }, []);
 
   const handleGoBack = () => {
@@ -150,8 +219,24 @@ const QRScanRoutePageFixed: React.FC = () => {
   };
 
   const handleEvacuated = async() => {
-    const res = await evacuatedFunc(routeData?.buildingId)
-    if(!res || res.Success==false) window.location.href = '/'
+    // Guarded: posting an undefined buildingId silently dropped the report, and
+    // evacuation counts are what the building owner watches during an incident.
+    if (!routeData?.buildingId) {
+      setError('Could not record your evacuation — building is unknown.');
+      return;
+    }
+
+    try {
+      const res = await evacuatedFunc(routeData.buildingId)
+      if (!res || res.Success === false) {
+        setError(res?.Message || "Couldn't record your evacuation. Please try again.");
+        return;
+      }
+    } catch {
+      setError("Couldn't record your evacuation. Please try again.");
+      return;
+    }
+
     window.location.href = '/';
   };
 
@@ -161,499 +246,484 @@ const QRScanRoutePageFixed: React.FC = () => {
 
   if (loading) {
     return (
-      <main className="w-full h-screen p-2 flex flex-col bg-[#353535]">
-        <section className="h-[10vh] w-full" />
-        <section className="h-auto w-full flex items-center justify-center">
-          <PageHeader title="Loading Route" backIcon={true} />
-        </section>
-        <main className="w-full h-[70vh] md:h-full flex flex-col items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF7B22] mx-auto mb-4"></div>
-          <p className="text-white text-lg">Loading emergency route...</p>
-        </main>
-      </main>
+      <PageShell width="wide">
+        <PageHeader title="Loading Route" />
+        <div
+          role="status"
+          className="flex min-h-[50vh] flex-col items-center justify-center gap-4 pt-8"
+        >
+          <SpinnerIcon size={48} className="text-brand-text" />
+          <p className="text-lg font-medium text-ink-muted">Loading emergency route...</p>
+        </div>
+      </PageShell>
     );
   }
 
   if (error) {
     return (
-      <main className="w-full h-screen p-2 flex flex-col bg-[#353535]">
-        <section className="h-[10vh] w-full" />
-        <section className="h-auto w-full flex items-center justify-center">
-          <PageHeader title="Error" backIcon={true} />
-        </section>
-        <main className="w-full h-[70vh] md:h-full flex flex-col items-center justify-center">
-          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
-            <span className="text-2xl">⚠️</span>
-          </div>
-          <h2 className="text-xl font-bold text-white mb-2">Error</h2>
-          <p className="text-gray-300">{error}</p>
-          <div className="flex gap-4 mt-4">
-            <button
+      <PageShell width="wide">
+        <PageHeader title="Error" />
+        <div className="mx-auto flex w-full max-w-xl flex-col gap-6 pt-10">
+          <Alert tone="danger">
+            <p className="text-base">{error}</p>
+          </Alert>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Button
+              variant="secondary"
+              size="lg"
+              fullWidth
               onClick={handleGoBack}
-              className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
               aria-label="Go back to previous page"
             >
+              <ArrowLeftIcon size={18} />
               Back
-            </button>
-            <button
+            </Button>
+            <Button
+              size="lg"
+              fullWidth
               onClick={handleGoHome}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
               aria-label="Go to home page"
             >
               Home
-            </button>
+            </Button>
           </div>
-        </main>
-      </main>
+        </div>
+      </PageShell>
     );
   }
 
   if (!routeData) {
     return (
-      <main className="w-full h-screen p-2 flex flex-col bg-[#353535]">
-        <section className="h-[10vh] w-full" />
-        <section className="h-auto w-full flex items-center justify-center">
-          <PageHeader title="Route Not Found" backIcon={true} />
-        </section>
-        <main className="w-full h-[70vh] md:h-full flex flex-col items-center justify-center">
-          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
-            <span className="text-2xl">⚠️</span>
-          </div>
-          <h2 className="text-xl font-bold text-white mb-2">Route Not Found</h2>
-          <p className="text-gray-300">No route data found for QR code: {qrId}</p>
-          <div className="flex gap-4 mt-4">
-            <button
+      <PageShell width="wide">
+        <PageHeader title="Route Not Found" />
+        <div className="mx-auto flex w-full max-w-xl flex-col gap-6 pt-10">
+          <Alert tone="danger">
+            <p className="text-base">No route data found for QR code: {qrId}</p>
+          </Alert>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Button
+              variant="secondary"
+              size="lg"
+              fullWidth
               onClick={handleGoBack}
-              className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
               aria-label="Go back to previous page"
             >
+              <ArrowLeftIcon size={18} />
               Back
-            </button>
-            <button
+            </Button>
+            <Button
+              size="lg"
+              fullWidth
               onClick={handleGoHome}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
               aria-label="Go to home page"
             >
               Home
-            </button>
+            </Button>
           </div>
-        </main>
-      </main>
+        </div>
+      </PageShell>
     );
   }
 
   return (
-    <main className="w-full h-auto p-2 flex flex-col bg-[#353535]">
-      {/* Spacer for header */}
-      <section className="h-[10vh] w-full" />
+    <div ref={rootRef}>
+      <PageShell width="wide">
+        {/* Header — the only animated element; route content below renders
+            instantly, nothing safety-critical waits on an animation. */}
+        <div data-hero>
+          <PageHeader
+            title="Emergency Route"
+            description={`${routeData.buildingName} • Floor ${routeData.floorNumber} • Scanned ${routeData.scanCount} times`}
+            actions={
+              <Badge tone="danger" className="px-3 py-1.5 text-sm">
+                <AlertTriangleIcon size={16} />
+                Emergency Exit Route
+              </Badge>
+            }
+          />
+        </div>
 
-      {/* Page Header */}
-      <section className="h-auto w-full flex items-center justify-center">
-        <PageHeader title="Emergency Route" backIcon={true} />
-      </section>
+        {/* Error Display */}
+        {error && (
+          <Alert tone="danger" className="mt-6">
+            {error}
+          </Alert>
+        )}
 
-      {/* Main Content */}
-      <main className="w-full h-auto md:h-full flex-1 px-4 pb-8">
-        <div className="max-w-7xl mx-auto">
-          {/* Building Info Card */}
-          <div className="mb-6 p-6 bg-white/5 rounded-lg border border-white/10">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-[#FF7B22] mb-2">
-                  {routeData.buildingName}
+        {/* Main Grid Layout */}
+        <div className="grid grid-cols-1 gap-6 pt-8 lg:grid-cols-3">
+          {/* Map Display */}
+          <div className="lg:col-span-2">
+            <Card className="p-6">
+              <div className="mb-4">
+                <h2 className="text-xl font-semibold text-ink">
+                  Emergency Route Map
                 </h2>
-                <p className="text-gray-300">
-                  Floor {routeData.floorNumber} • Scanned {routeData.scanCount} times
+                <p className="mt-1 text-base text-ink-muted">
+                  Follow the orange path to the nearest emergency exit
                 </p>
               </div>
-              <div className="mt-4 md:mt-0 flex items-center gap-2">
-                <span className="text-2xl">🚨</span>
-                <span className="text-lg font-semibold text-white">Emergency Exit Route</span>
-              </div>
-            </div>
-          </div>
 
-          {/* Error Display */}
-          {error && (
-            <div className="mb-6 p-4 bg-red-500/20 border border-red-500 rounded-lg text-red-300">
-              {error}
-            </div>
-          )}
-
-          {/* Main Grid Layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Map Display */}
-            <div className="lg:col-span-2">
-              <div className="p-6 bg-white/5 rounded-lg border border-white/10">
-                <div className="mb-4">
-                  <h3 className="text-xl font-bold text-white mb-2">
-                    Emergency Route Map
-                  </h3>
-                  <p className="text-gray-300 text-sm">
-                    Follow the orange path to the nearest emergency exit
-                  </p>
-                </div>
-
-                {/* Map Container */}
-                <div
-                  ref={containerRef}
-                  className="relative bg-gray-900 rounded-lg overflow-hidden border border-white/20"
-                  style={{ width: '100%', height: '500px' }}
-                  onWheel={handleWheel}
-                  onMouseDown={handleMouseDown}
-                  onMouseMove={handleMouseMove}
-                  onMouseUp={handleMouseUp}
-                  onMouseLeave={handleMouseUp}
+              {/* Map Container */}
+              <div
+                ref={containerRef}
+                className="relative overflow-hidden rounded-xl border border-line-strong bg-surface-2"
+                // touchAction none so the browser hands us the gesture instead
+                // of scrolling the page while the user drags the map.
+                style={{ width: '100%', height: '500px', touchAction: 'none' }}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerUp}
+                onPointerLeave={handlePointerUp}
+              >
+                {/* Combined SVG Layer - Map + Overlays */}
+                <svg
+                  className="absolute inset-0"
+                  style={{
+                    width: '100%',
+                    height: '500px',
+                    cursor: isDragging ? 'grabbing' : 'grab'
+                  }}
+                  viewBox={`0 0 ${mapDimensions.width} ${mapDimensions.height}`}
+                  preserveAspectRatio="xMidYMid meet"
                 >
-                  {/* Combined SVG Layer - Map + Overlays */}
-                  <svg
-                    className="absolute inset-0"
-                    style={{ 
-                      width: '100%', 
-                      height: '500px',
-                      cursor: isDragging ? 'grabbing' : 'grab'
+                  <g
+                    style={{
+                      transform: `translate(${translateX}px, ${translateY}px) scale(${scale})`,
+                      transformOrigin: 'center',
+                      transition: isDragging ? 'none' : 'transform 0.1s ease-out'
                     }}
-                    viewBox={`0 0 ${mapDimensions.width} ${mapDimensions.height}`}
-                    preserveAspectRatio="xMidYMid meet"
                   >
-                    <g
-                      style={{
-                        transform: `translate(${translateX}px, ${translateY}px) scale(${scale})`,
-                        transformOrigin: 'center',
-                        transition: isDragging ? 'none' : 'transform 0.1s ease-out'
+                  {/* Floor Map Background */}
+                  {routeData.floorMap?.imageUrl ? (
+                    <image
+                      href={routeData.floorMap.imageUrl}
+                      x="0"
+                      y="0"
+                      width={mapDimensions.width}
+                      height={mapDimensions.height}
+                      preserveAspectRatio="xMidYMid meet"
+                      onError={() => {
+                        console.log('❌ Failed to load image:', routeData.floorMap?.imageUrl);
                       }}
-                    >
-                    {/* Floor Map Background */}
-                    {routeData.floorMap?.imageUrl ? (
-                      <image
-                        href={routeData.floorMap.imageUrl}
+                      onLoad={() => {
+                        console.log('✅ Image loaded successfully:', routeData.floorMap?.imageUrl);
+                      }}
+                    />
+                  ) : routeData.floorMap?.svgContent ? (
+                    // Sanitized: this markup is uploaded by the building owner
+                    // and rendered for every anonymous visitor who scans the QR
+                    // code, so it cannot be trusted as-is.
+                    <g
+                      dangerouslySetInnerHTML={{ __html: sanitizeSvg(routeData.floorMap.svgContent) }}
+                    />
+                  ) : (
+                    <g>
+                      {/* Theme-aware background */}
+                      <rect
                         x="0"
                         y="0"
                         width={mapDimensions.width}
                         height={mapDimensions.height}
-                        preserveAspectRatio="xMidYMid meet"
-                        onError={() => {
-                          console.log('❌ Failed to load image:', routeData.floorMap?.imageUrl);
-                        }}
-                        onLoad={() => {
-                          console.log('✅ Image loaded successfully:', routeData.floorMap?.imageUrl);
-                        }}
+                        fill="var(--surface-2)"
                       />
-                    ) : routeData.floorMap?.svgContent ? (
-                      <g
-                        dangerouslySetInnerHTML={{ __html: routeData.floorMap.svgContent }}
+                      {/* Grid pattern for better visualization */}
+                      <defs>
+                        <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
+                          <path d="M 50 0 L 0 0 0 50" fill="none" stroke="var(--line)" strokeWidth="1"/>
+                        </pattern>
+                      </defs>
+                      <rect
+                        x="0"
+                        y="0"
+                        width={mapDimensions.width}
+                        height={mapDimensions.height}
+                        fill="url(#grid)"
                       />
-                    ) : (
-                      <g>
-                        {/* Dark background */}
-                        <rect
-                          x="0"
-                          y="0"
-                          width={mapDimensions.width}
-                          height={mapDimensions.height}
-                          fill="#1a1a1a"
+                      {/* Center text */}
+                      <text
+                        x={mapDimensions.width / 2}
+                        y={mapDimensions.height / 2 + 30}
+                        textAnchor="middle"
+                        fill="var(--ink-muted)"
+                        fontSize="18"
+                      >
+                        No Floor Map Available
+                      </text>
+                    </g>
+                  )}
+
+                  {/* Emergency Route Path.
+                      Only the portion of the route on the floor being viewed
+                      is drawn — a multi-floor route would otherwise render as
+                      a meaningless line jumping between two floor plans. */}
+                  {routeData.emergencyRoute.found && routeData.routeNodes?.length > 0 && (() => {
+                    const currentFloor = Number(routeData.floorNumber);
+                    const pathNodes = routeData.routeNodes.filter(
+                      (node) => Number(node.floor) === currentFloor
+                    );
+
+                    if (pathNodes.length < 2) return null;
+
+                    const pathData = pathNodes
+                      .map((node, index) => `${index === 0 ? 'M' : 'L'} ${node.x} ${node.y}`)
+                      .join(' ');
+
+                    return (
+                      <path
+                        d={pathData}
+                        stroke="var(--brand)"
+                        strokeWidth="5"
+                        fill="none"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        opacity={0.9}
+                      />
+                    );
+                  })()}
+
+                  {/* Nodes Layer */}
+                  {routeData.allFloorNodes.map((node) => {
+                    const isCurrentNode = node.id === routeData.nodeId;
+                    const isExitNode = node.id === routeData.emergencyRoute.exitNodeId;
+                    const isPathNode = routeData.emergencyRoute.path.includes(node.id);
+                    const isSelected = selectedNode?.id === node.id;
+                    const isHovered = hoveredNode === node.id;
+
+                    return (
+                      <g key={node.id}>
+                        {/* Node circle */}
+                        <circle
+                          cx={node.x}
+                          cy={node.y}
+                          r={isSelected ? 30 : isHovered ? 25 :20}
+                          fill={
+                            isCurrentNode ? 'var(--danger)' : // red for current
+                            isExitNode ? 'var(--success)' : // green for exit
+                            isPathNode ? 'var(--warning)' : // amber for path
+                            node.type === 'exit' ? 'var(--success)' :
+                            node.type === 'stairs' ? 'var(--info)' :
+                            'var(--ink-subtle)' // neutral for regular
+                          }
+                          stroke={isSelected ? 'var(--ink)' : 'transparent'}
+                          strokeWidth={isSelected ? 2 : 0}
+                          opacity={isPathNode ? 1 : 0.7}
+                          className="cursor-pointer transition-all"
+                          onClick={() => handleNodeClick(node)}
+                          onMouseEnter={() => handleNodeHover(node.id)}
+                          onMouseLeave={() => handleNodeHover(null)}
                         />
-                        {/* Grid pattern for better visualization */}
-                        <defs>
-                          <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
-                            <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#333" strokeWidth="1"/>
-                          </pattern>
-                        </defs>
-                        <rect
-                          x="0"
-                          y="0"
-                          width={mapDimensions.width}
-                          height={mapDimensions.height}
-                          fill="url(#grid)"
-                        />
-                        {/* Center text */}
+
+                        {/* Node label — halo keeps it readable over any map */}
                         <text
-                          x={mapDimensions.width / 2}
-                          y={mapDimensions.height / 2}
+                          x={node.x}
+                          y={node.y - 12}
                           textAnchor="middle"
-                          fill="#666"
-                          fontSize="24"
+                          fill="var(--ink)"
+                          stroke="var(--canvas)"
+                          strokeWidth={3}
+                          paintOrder="stroke"
+                          fontSize="14"
+                          fontWeight={600}
+                          className="pointer-events-none select-none"
                         >
-                          🗺️
-                        </text>
-                        <text
-                          x={mapDimensions.width / 2}
-                          y={mapDimensions.height / 2 + 30}
-                          textAnchor="middle"
-                          fill="#999"
-                          fontSize="16"
-                        >
-                          No Floor Map Available
-                        </text>
-                        <text
-                          x={mapDimensions.width / 2}
-                          y={mapDimensions.height / 2 + 30}
-                          textAnchor="middle"
-                          fill="#999"
-                          fontSize="16"
-                        >
-                          No Floor Map Available
+                          {node.label}
                         </text>
                       </g>
-                    )}
-
-                    {/* Emergency Route Path */}
-                    {routeData.emergencyRoute.found && routeData.emergencyRoute.path.length > 0 && (() => {
-                      const pathNodes = routeData.emergencyRoute.path
-                        .map(nodeId => routeData.allFloorNodes.find(n => n.id === nodeId))
-                        .filter(Boolean) as FloorNode[];
-                      
-                      if (pathNodes.length < 2) return null;
-                      
-                      const pathData = pathNodes
-                        .map((node, index) => `${index === 0 ? 'M' : 'L'} ${node.x} ${node.y}`)
-                        .join(' ');
-                      
-                      return (
-                        <path
-                          d={pathData}
-                          stroke="#FF7B22"
-                          strokeWidth="4"
-                          fill="none"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          opacity={0.8}
-                        />
-                      );
-                    })()}
-
-                    {/* Nodes Layer */}
-                    {routeData.allFloorNodes.map((node) => {
-                      const isCurrentNode = node.id === routeData.nodeId;
-                      const isExitNode = node.id === routeData.emergencyRoute.exitNodeId;
-                      const isPathNode = routeData.emergencyRoute.path.includes(node.id);
-                      const isSelected = selectedNode?.id === node.id;
-                      const isHovered = hoveredNode === node.id;
-                      
-                      return (
-                        <g key={node.id}>
-                          {/* Node circle */}
-                          <circle
-                            cx={node.x}
-                            cy={node.y}
-                            r={isSelected ? 30 : isHovered ? 25 :20}
-                            fill={
-                              isCurrentNode ? '#EF4444' : // red for current
-                              isExitNode ? '#10B981' : // green for exit
-                              isPathNode ? '#F59E0B' : // orange for path
-                              node.type === 'exit' ? '#10B981' :
-                              node.type === 'stairs' ? '#3B82F6' :
-                              '#6B7280' // gray for regular
-                            }
-                            stroke={isSelected ? '#FFFFFF' : 'transparent'}
-                            strokeWidth={isSelected ? 2 : 0}
-                            opacity={isPathNode ? 1 : 0.7}
-                            className="cursor-pointer transition-all"
-                            onClick={() => handleNodeClick(node)}
-                            onMouseEnter={() => handleNodeHover(node.id)}
-                            onMouseLeave={() => handleNodeHover(null)}
-                          />
-                          
-                          {/* Node label */}
-                          <text
-                            x={node.x}
-                            y={node.y - 12}
-                            textAnchor="middle"
-                            fill="#FFFFFF"
-                            fontSize="12"
-                            className="pointer-events-none select-none"
-                          >
-                            {node.label}
-                          </text>
-                        </g>
-                      );
-                    })}
-                    </g>
-                  </svg>
-                </div>
+                    );
+                  })}
+                  </g>
+                </svg>
               </div>
-            </div>
-
-            {/* Route Information Sidebar */}
-            <div className="lg:col-span-1 space-y-6">
-              {/* Route Status Card */}
-              <div className="p-6 bg-white/5 rounded-lg border border-white/10">
-                <h3 className="text-lg font-bold text-white mb-4">Route Information</h3>
-                
-                {routeData.emergencyRoute.found ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                      <p className="text-green-400 font-medium">✅ Route to exit found</p>
-                    </div>
-                    
-                    <div>
-                      <p className="text-sm text-gray-400">Distance</p>
-                      <p className="font-medium text-white">{routeData.emergencyRoute.distance} steps</p>
-                    </div>
-                    
-                    <div>
-                      <p className="text-sm text-gray-400">Exit Location</p>
-                      <p className="font-medium text-white">
-                        {routeData.emergencyRoute.exitNode?.label || 'Emergency Exit'}
-                      </p>
-                      <p className="text-sm text-gray-400">
-                        ({routeData.emergencyRoute.exitNode?.x}, {routeData.emergencyRoute.exitNode?.y})
-                      </p>
-                    </div>
-                    
-                    <div>
-                      <p className="text-sm text-gray-400">Your Location</p>
-                      <p className="font-medium text-white">{routeData.nodeLabel}</p>
-                      <p className="text-sm text-gray-400">
-                        ({routeData.nodePosition.x}, {routeData.nodePosition.y})
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-red-400">
-                    <p>❌ No exit route found</p>
-                    <p className="text-sm text-gray-400 mt-2">
-                      Please check with building staff for emergency instructions.
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Selected Node Information */}
-              {selectedNode && (
-                <div className="p-6 bg-white/5 rounded-lg border border-white/10">
-                  <h3 className="text-lg font-bold text-white mb-4">Node Details</h3>
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-sm text-gray-400">Label</p>
-                      <p className="font-medium text-white">{selectedNode.label}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-400">Type</p>
-                      <p className="font-medium text-white capitalize">{selectedNode.type}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-400">Position</p>
-                      <p className="font-medium text-white">({selectedNode.x}, {selectedNode.y})</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-400">Connections</p>
-                      <p className="font-medium text-white">{selectedNode.connections.length} nodes</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setSelectedNode(null)}
-                    className="mt-4 w-full px-4 py-2 bg-gray-500/20 border border-gray-500 text-gray-300 rounded-lg hover:bg-gray-500/30 transition-colors"
-                    aria-label="Clear selected node"
-                  >
-                    Clear selection
-                  </button>
-                </div>
-              )}
-
-              {/* Emergency Instructions Card */}
-              <div className="p-6 bg-red-500/10 border border-red-500/30 rounded-lg">
-                <div className="flex items-center mb-4">
-                  <span className="text-2xl mr-3">🚨</span>
-                  <div>
-                    <h3 className="text-lg font-bold text-red-400">Emergency Instructions</h3>
-                    <p className="text-red-300 text-sm">
-                      Follow the highlighted route to the nearest emergency exit.
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="space-y-2 text-sm text-red-300">
-                  <p>• Stay calm and move quickly</p>
-                  <p>• Follow the orange path on the map</p>
-                  <p>• Do not use elevators during fire</p>
-                  <p>• Help others if you can do so safely</p>
-                  <p>• Call emergency services if needed</p>
-                </div>
-              </div>
-
-              {/* Building Details Card */}
-              <div className="p-6 bg-white/5 rounded-lg border border-white/10">
-                <h3 className="text-lg font-bold text-white mb-4">Building Details</h3>
-                
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-sm text-gray-400">Building</p>
-                    <p className="font-medium text-white">{routeData.buildingName}</p>
-                  </div>
-                  
-                  <div>
-                    <p className="text-sm text-gray-400">Floor</p>
-                    <p className="font-medium text-white">Floor {routeData.floorNumber}</p>
-                  </div>
-                  
-                  {/* <div>
-                    <p className="text-sm text-gray-400">QR Code ID</p>
-                    <p className="font-medium text-xs text-gray-300">{qrId}</p>
-                  </div> */}
-                  
-                  <div>
-                    <p className="text-sm text-gray-400">Last Updated</p>
-                    <p className="font-medium text-xs text-gray-300">
-                      {new Date(routeData.timestamp).toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="space-y-3">
-                <button
-                  onClick={handleGoBack}
-                  className="w-full px-4 py-3 bg-gray-500/20 border border-gray-500 text-gray-300 rounded-lg hover:bg-gray-500/30 transition-colors"
-                  aria-label="Go back to previous page"
-                >
-                  ← Back
-                </button>
-                <button
-                  onClick={handleEvacuated}
-                  className="w-full px-4 py-3 bg-[#FF7B22] text-white font-semibold rounded-lg hover:bg-[#FF7B22]/80 transition-colors"
-                  aria-label="Go to home page"
-                >
-                  Evacuated
-                </button>
-                {
-                  
-                }
-              </div>
-            </div>
+            </Card>
           </div>
 
-          {/* Legend */}
-          <div className="mt-8 p-4 bg-white/5 rounded-lg border border-white/10">
-            <h3 className="text-lg font-bold text-white mb-4">Node Types</h3>
-            <div className="flex flex-wrap gap-6 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                <span className="text-gray-300">Your Location</span>
+          {/* Route Information Sidebar */}
+          <div className="flex flex-col gap-6 lg:col-span-1">
+            {/* Route Status Card */}
+            <Card className="p-6">
+              <h2 className="mb-4 text-lg font-semibold text-ink">Route Information</h2>
+
+              {routeData.emergencyRoute.found ? (
+                <div className="flex flex-col gap-4">
+                  <Alert tone="success">
+                    <p className="text-base font-semibold">Route to exit found</p>
+                  </Alert>
+
+                  {/* A route that leaves this floor is the single most
+                      important thing to communicate — the drawn line stops at
+                      the stairs, so without this the map looks truncated. */}
+                  {routeData.requiresFloorChange && routeData.floorTransitions?.length > 0 && (
+                    <Alert tone="info" title="This route changes floors">
+                      {routeData.floorTransitions.map((t, i) => (
+                        <p key={i} className="text-base">
+                          Take the {t.nodeType === 'stairs' ? 'stairs' : 'connection'} from floor {t.from} to floor {t.to}
+                        </p>
+                      ))}
+                      <p className="mt-1 text-sm">
+                        The orange path shows your current floor only.
+                      </p>
+                    </Alert>
+                  )}
+
+                  <div>
+                    <p className="text-sm text-ink-subtle">Distance</p>
+                    <p className="text-xl font-semibold text-ink">{routeData.emergencyRoute.distance} steps</p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-ink-subtle">Exit Location</p>
+                    <p className="text-xl font-semibold text-ink">
+                      {routeData.emergencyRoute.exitNode?.label || 'Emergency Exit'}
+                    </p>
+                    <p className="text-sm text-ink-subtle">
+                      ({routeData.emergencyRoute.exitNode?.x}, {routeData.emergencyRoute.exitNode?.y})
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-ink-subtle">Your Location</p>
+                    <p className="text-xl font-semibold text-ink">{routeData.nodeLabel}</p>
+                    <p className="text-sm text-ink-subtle">
+                      ({routeData.nodePosition.x}, {routeData.nodePosition.y})
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <Alert tone="danger" title="No exit route found">
+                  <p className="text-sm">
+                    Please check with building staff for emergency instructions.
+                  </p>
+                </Alert>
+              )}
+            </Card>
+
+            {/* Selected Node Information */}
+            {selectedNode && (
+              <Card className="p-6">
+                <h2 className="mb-4 text-lg font-semibold text-ink">Node Details</h2>
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <p className="text-sm text-ink-subtle">Label</p>
+                    <p className="font-medium text-ink">{selectedNode.label}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-ink-subtle">Type</p>
+                    <p className="font-medium capitalize text-ink">{selectedNode.type}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-ink-subtle">Position</p>
+                    <p className="font-medium text-ink">({selectedNode.x}, {selectedNode.y})</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-ink-subtle">Connections</p>
+                    <p className="font-medium text-ink">{selectedNode.connections.length} nodes</p>
+                  </div>
+                </div>
+                <Button
+                  variant="secondary"
+                  fullWidth
+                  className="mt-4"
+                  onClick={() => setSelectedNode(null)}
+                  aria-label="Clear selected node"
+                >
+                  Clear selection
+                </Button>
+              </Card>
+            )}
+
+            {/* Emergency Instructions Card */}
+            <Alert tone="danger" title="Emergency Instructions">
+              <p className="text-sm">
+                Follow the highlighted route to the nearest emergency exit.
+              </p>
+              <ul className="mt-3 flex list-disc flex-col gap-2 pl-5 text-[0.9375rem] font-medium">
+                <li>Stay calm and move quickly</li>
+                <li>Follow the orange path on the map</li>
+                <li>Do not use elevators during fire</li>
+                <li>Help others if you can do so safely</li>
+                <li>Call emergency services if needed</li>
+              </ul>
+            </Alert>
+
+            {/* Building Details Card */}
+            <Card className="p-6">
+              <h2 className="mb-4 text-lg font-semibold text-ink">Building Details</h2>
+
+              <div className="flex flex-col gap-3">
+                <div>
+                  <p className="text-sm text-ink-subtle">Building</p>
+                  <p className="font-medium text-ink">{routeData.buildingName}</p>
+                </div>
+
+                <div>
+                  <p className="text-sm text-ink-subtle">Floor</p>
+                  <p className="font-medium text-ink">Floor {routeData.floorNumber}</p>
+                </div>
+
+                <div>
+                  <p className="text-sm text-ink-subtle">Last Updated</p>
+                  <p className="text-sm font-medium text-ink-muted">
+                    {new Date(routeData.timestamp).toLocaleString()}
+                  </p>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                <span className="text-gray-300">Emergency Exit</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                <span className="text-gray-300">Stairs/Elevator</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                <span className="text-gray-300">Path Point</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-1 bg-[#FF7B22]"></div>
-                <span className="text-gray-300">Emergency Route</span>
-              </div>
+            </Card>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col gap-3">
+              <Button
+                variant="secondary"
+                size="lg"
+                fullWidth
+                onClick={handleGoBack}
+                aria-label="Go back to previous page"
+              >
+                <ArrowLeftIcon size={18} />
+                Back
+              </Button>
+              <Button
+                size="lg"
+                fullWidth
+                onClick={handleEvacuated}
+                aria-label="Go to home page"
+              >
+                <CheckCircleIcon size={18} />
+                Evacuated
+              </Button>
             </div>
           </div>
         </div>
-      </main>
-    </main>
+
+        {/* Legend */}
+        <Card className="mt-8 p-6">
+          <h2 className="mb-4 text-lg font-semibold text-ink">Node Types</h2>
+          <div className="flex flex-wrap gap-x-6 gap-y-3 text-sm text-ink-muted">
+            <div className="flex items-center gap-2">
+              <span aria-hidden="true" className="h-3 w-3 rounded-full bg-danger" />
+              Your Location
+            </div>
+            <div className="flex items-center gap-2">
+              <span aria-hidden="true" className="h-3 w-3 rounded-full bg-success" />
+              Emergency Exit
+            </div>
+            <div className="flex items-center gap-2">
+              <span aria-hidden="true" className="h-3 w-3 rounded-full bg-info" />
+              Stairs/Elevator
+            </div>
+            <div className="flex items-center gap-2">
+              <span aria-hidden="true" className="h-3 w-3 rounded-full bg-warning" />
+              Path Point
+            </div>
+            <div className="flex items-center gap-2">
+              <span aria-hidden="true" className="h-1 w-8 rounded-full bg-brand" />
+              Emergency Route
+            </div>
+          </div>
+        </Card>
+      </PageShell>
+    </div>
   );
 };
 

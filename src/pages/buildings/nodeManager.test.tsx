@@ -1,11 +1,21 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { BrowserRouter } from 'react-router-dom';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import NodeManager from './nodeManager';
 import * as nodesApi from '../../apis/nodesApi';
 import * as buildingApi from '../../apis/building';
 import * as routeApi from '../../apis/routeApi';
 import { type Node } from '../../apis/nodesApi';
+
+// jsdom does not implement ResizeObserver, but the page's reveal animations
+// (animejs onScroll) construct one when the component mounts.
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  globalThis.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof globalThis.ResizeObserver;
+}
 
 // Mock the APIs
 jest.mock('../../apis/nodesApi');
@@ -49,7 +59,7 @@ const mockNodes: Node[] = [
     y: 400,
     type: 'path' as const,
     connections: ['node1'],
-    label: 'Path Point',
+    label: 'Corridor Point',
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-01T00:00:00Z'
   }
@@ -62,11 +72,18 @@ const mockSvgContent = `
   </svg>
 `;
 
-const renderWithRouter = (component: React.ReactElement) => {
+// NodeManager reads `buildingId` from the route. Rendering it under a bare
+// BrowserRouter left useParams() empty, so the component redirected to
+// /mybuildings before loading anything and every assertion failed. The route
+// has to be declared for the param to exist.
+const renderWithRouter = (component: React.ReactElement, buildingId = 'building1') => {
   return render(
-    <BrowserRouter>
-      {component}
-    </BrowserRouter>
+    <MemoryRouter initialEntries={[`/building/${buildingId}/nodes`]}>
+      <Routes>
+        <Route path="/building/:buildingId/nodes" element={component} />
+        <Route path="*" element={<div>redirected</div>} />
+      </Routes>
+    </MemoryRouter>
   );
 };
 
@@ -75,8 +92,10 @@ describe('NodeManager - Complete Functionality', () => {
     jest.clearAllMocks();
     
     // Setup default API mocks
+    // Capital `Success` — that is what /api/building/my actually returns.
+    // The mock previously used lowercase `success`, which no backend route emits.
     mockBuildingApi.getMyBuildings.mockResolvedValue({
-      success: true,
+      Success: true,
       Message: [mockBuilding]
     });
     
@@ -95,65 +114,67 @@ describe('NodeManager - Complete Functionality', () => {
   });
 
   describe('Node Connection Functionality', () => {
+    // Connecting happens by clicking nodes on the map, not in the list, and the
+    // map only renders once the floor actually has a map image. The previous
+    // version of these tests clicked the node names in the sidebar, which have
+    // no click handler at all.
+    const withFloorMap = () => {
+      mockBuildingApi.getMyBuildings.mockResolvedValue({
+        Success: true,
+        Message: [
+          {
+            ...mockBuilding,
+            maps: [
+              { floor: '1', map: 'https://example.com/floor1.png', qrCode: 'test-qr-1', scanned: 0 },
+              { floor: '2', map: null, qrCode: 'test-qr-2', scanned: 0 },
+            ],
+          },
+        ],
+      });
+    };
+
+    const clickTwoNodes = async () => {
+      const nodeEls = await screen.findAllByTestId('node');
+      expect(nodeEls.length).toBeGreaterThanOrEqual(2);
+      fireEvent.mouseDown(nodeEls[0]);
+      fireEvent.mouseDown(nodeEls[1]);
+    };
+
     it('should connect nodes when in connecting mode', async () => {
+      withFloorMap();
       mockNodesApi.connectNodes.mockResolvedValue({
         success: true,
         message: 'Nodes connected successfully',
-        data: {
-          connection: {
-            buildingId: 'building1',
-            node1Id: 'node1',
-            node2Id: 'node2'
-          }
-        }
       });
 
       renderWithRouter(<NodeManager />);
-      
-      // Wait for component to load
+
       await waitFor(() => {
         expect(screen.getByText('Test Building')).toBeInTheDocument();
       });
 
-      // Enable connecting mode
-      const connectButton = screen.getByText('Connect Nodes');
-      await userEvent.click(connectButton);
+      await userEvent.click(screen.getByText('Connect Nodes'));
+      expect(screen.getByText('Connecting Mode ON')).toBeInTheDocument();
 
-      // Click first node
-      const node1 = screen.getByText('Main Exit');
-      await userEvent.click(node1);
+      await clickTwoNodes();
 
-      // Click second node
-      const node2 = screen.getByText('Path Point');
-      await userEvent.click(node2);
-
-      // Verify connectNodes was called with correct parameters
-      expect(mockNodesApi.connectNodes).toHaveBeenCalledWith(
-        'building1',
-        'node1',
-        'node2'
-      );
+      await waitFor(() => {
+        expect(mockNodesApi.connectNodes).toHaveBeenCalledWith('building1', 'node1', 'node2');
+      });
     });
 
     it('should handle connection errors', async () => {
-      mockNodesApi.connectNodes.mockRejectedValue(
-        new Error('Connection failed')
-      );
+      withFloorMap();
+      mockNodesApi.connectNodes.mockRejectedValue(new Error('Connection failed'));
 
       renderWithRouter(<NodeManager />);
-      
+
       await waitFor(() => {
         expect(screen.getByText('Test Building')).toBeInTheDocument();
       });
 
-      const connectButton = screen.getByText('Connect Nodes');
-      await userEvent.click(connectButton);
-
-      const node1 = screen.getByText('Main Exit');
-      await userEvent.click(node1);
-
-      const node2 = screen.getByText('Path Point');
-      await userEvent.click(node2);
+      await userEvent.click(screen.getByText('Connect Nodes'));
+      await clickTwoNodes();
 
       await waitFor(() => {
         expect(screen.getByText(/Connection failed/)).toBeInTheDocument();
@@ -234,15 +255,30 @@ describe('NodeManager - Complete Functionality', () => {
 
   describe('Map Display', () => {
     it('should display floor map when available', async () => {
+      // The default fixture has map: null, which renders the upload prompt
+      // rather than a map. Give this floor an actual map image.
+      mockBuildingApi.getMyBuildings.mockResolvedValue({
+        Success: true,
+        Message: [
+          {
+            ...mockBuilding,
+            maps: [
+              { floor: '1', map: 'https://example.com/floor1.png', qrCode: 'test-qr-1', scanned: 0 },
+              { floor: '2', map: null, qrCode: 'test-qr-2', scanned: 0 },
+            ],
+          },
+        ],
+      });
+
       renderWithRouter(<NodeManager />);
-      
+
       await waitFor(() => {
         expect(screen.getByText('Test Building')).toBeInTheDocument();
       });
 
-      // Check if InteractiveMap is rendered
-      const interactiveMap = document.querySelector('div.relative.bg-gray-100');
-      expect(interactiveMap).toBeInTheDocument();
+      await waitFor(() => {
+        expect(document.querySelector('div.relative.bg-surface-2')).toBeInTheDocument();
+      });
     });
 
     it('should show empty state when no map is available', async () => {
@@ -256,9 +292,10 @@ describe('NodeManager - Complete Functionality', () => {
         expect(screen.getByText('Test Building')).toBeInTheDocument();
       });
 
-      // Should still show the map container but with empty state
-      const interactiveMap = document.querySelector('div.relative.bg-gray-100');
-      expect(interactiveMap).toBeInTheDocument();
+      // With no map for this floor the component shows the upload prompt
+      // instead of the map canvas.
+      expect(await screen.findByText('No floor map uploaded')).toBeInTheDocument();
+      expect(screen.getByText('Upload Floor Map')).toBeInTheDocument();
     });
   });
 
@@ -272,11 +309,11 @@ describe('NodeManager - Complete Functionality', () => {
 
       // Check if nodes are displayed
       expect(screen.getByText('Main Exit')).toBeInTheDocument();
-      expect(screen.getByText('Path Point')).toBeInTheDocument();
-      expect(screen.getByText('Type: exit')).toBeInTheDocument();
-      expect(screen.getByText('Type: path')).toBeInTheDocument();
-      expect(screen.getByText('Location: (100, 200)')).toBeInTheDocument();
-      expect(screen.getByText('Location: (300, 400)')).toBeInTheDocument();
+      expect(screen.getByText('Corridor Point')).toBeInTheDocument();
+      // The component renders type and position together in one element:
+      // "Type: exit | Position: (100, 200)"
+      expect(screen.getByText(/Type: exit \| Position: \(100, 200\)/)).toBeInTheDocument();
+      expect(screen.getByText(/Type: path \| Position: \(300, 400\)/)).toBeInTheDocument();
     });
 
     it('should show no nodes message when floor is empty', async () => {
@@ -320,7 +357,7 @@ describe('NodeManager - Complete Functionality', () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText(/Failed to load data/)).toBeInTheDocument();
+        expect(screen.getByText(/Failed to load nodes/)).toBeInTheDocument();
       });
     });
   });
@@ -333,8 +370,9 @@ describe('NodeManager - Complete Functionality', () => {
         expect(screen.getByText('Test Building')).toBeInTheDocument();
       });
 
-      expect(screen.getByText('Floor 1')).toBeInTheDocument();
-      expect(screen.getByText('Floor 2')).toBeInTheDocument();
+      const floorSelect = screen.getByRole('combobox');
+      expect(within(floorSelect).getByRole('option', { name: '1' })).toBeInTheDocument();
+      expect(within(floorSelect).getByRole('option', { name: '2' })).toBeInTheDocument();
     });
 
     it('should show action buttons', async () => {

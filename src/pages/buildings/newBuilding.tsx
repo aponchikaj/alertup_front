@@ -2,6 +2,18 @@ import { useEffect, useState } from "react";
 import { createNewBuilding } from "../../apis/building";
 import { useNavigate } from "react-router-dom";
 import { getMe } from "../../apis/me";
+import { usePageAnimations } from "../../lib/animations";
+import { PageHeader, PageShell } from "../../components/ui/layout";
+import { Button, ButtonLink } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
+import { Alert } from "../../components/ui/feedback";
+import { Field, TextField } from "../../components/ui/field";
+import {
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  MailIcon,
+  PlusIcon,
+} from "../../components/ui/icons";
 
 interface BuildingSchema {
   buildingName: string;
@@ -11,12 +23,14 @@ interface BuildingSchema {
 }
 
 const NewBuilding = () => {
+  const rootRef = usePageAnimations();
   const navigate = useNavigate();
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
-  // const [isUserVerified,setIsUserVerified] = useState(null)
+  /** null = still checking; false = logged in but email not verified. */
+  const [verified, setVerified] = useState<boolean | null>(null);
 
   const [buildingData, setBuildingData] = useState<BuildingSchema>({
     buildingName: "",
@@ -25,18 +39,23 @@ const NewBuilding = () => {
     maps: [],
   });
 
-  const checkVerification = async()=>{
-    const res = await getMe()
-    console.log(res)
-    if(!res || res.Success==false) navigate('/login')
-    if(res.Message.verified == false) navigate('/settings')
-  }
+  const checkVerification = async () => {
+    const res = await getMe();
+    if (!res || res.Success == false) {
+      navigate("/login");
+      return;
+    }
+    // Unverified accounts see an explanation instead of being silently
+    // bounced to /settings — that redirect read as a broken "New" button.
+    // Requires an explicit true. `!== false` treated a missing field — which is
+    // what a string error Message yields — as verified.
+    setVerified(res.Message?.verified === true);
+  };
 
   /* ----------------------------------
      PAGE SETUP - NO PREMIUM RESTRICTIONS
   ----------------------------------- */
   useEffect(() => {
-    document.title = "New - Alertup";
     checkVerification()
     // No premium checks - unlimited access for all users
   }, []);
@@ -98,7 +117,7 @@ const NewBuilding = () => {
         if (file) formData.append("maps", file); // append each map file
         });
 
-        const res = await createNewBuilding(formData); // axios must send FormData
+        const res = await createNewBuilding(formData); // FormData: the browser sets the multipart boundary
         if (!res || res.Success === false) {
         setServerError(res?.Message || "Something went wrong.");
         setLoading(false);
@@ -118,13 +137,15 @@ const NewBuilding = () => {
   ----------------------------------- */
   const renderFloorInputs = () => {
     return Array.from({ length: buildingData.floors }).map((_, i) => (
-      <div key={i} className="mb-4">
-        <label className="text-white block mb-1">
-          Floor {i + 1} Name
-        </label>
-        <input
-          type="text"
-          className="w-full px-4 py-2 rounded-lg bg-black/40 text-white outline-none"
+      <fieldset
+        key={i}
+        className="flex flex-col gap-4 rounded-xl border border-line bg-surface-2 p-4"
+      >
+        <legend className="px-1.5 text-sm font-semibold text-ink">
+          Floor {i + 1}
+        </legend>
+        <TextField
+          label={`Floor ${i + 1} name`}
           value={buildingData.floorNames[i] || ""}
           onChange={(e) => {
             const names = [...buildingData.floorNames];
@@ -134,20 +155,24 @@ const NewBuilding = () => {
           required
         />
 
-        <label className="text-white block mb-1 mt-2">
-          Floor {i + 1} Map
-        </label>
-        <input
-          type="file"
-          accept="image/*"
-          onChange={(e) => {
-            if (e.target.files?.[0]) {
-              handleFileChange(i, e.target.files[0]);
-            }
-          }}
-          required
-        />
-      </div>
+        <Field label={`Floor ${i + 1} map`} required hint="Image of the escape route map for this floor.">
+          {({ id, describedBy }) => (
+            <input
+              id={id}
+              type="file"
+              accept="image/*"
+              aria-describedby={describedBy}
+              onChange={(e) => {
+                if (e.target.files?.[0]) {
+                  handleFileChange(i, e.target.files[0]);
+                }
+              }}
+              required
+              className="w-full cursor-pointer rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink-muted transition-colors file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-brand-subtle file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-text hover:border-line-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            />
+          )}
+        </Field>
+      </fieldset>
     ));
   };
 
@@ -155,96 +180,123 @@ const NewBuilding = () => {
      RENDER
   ----------------------------------- */
   return (
-    <main className="w-full min-h-screen flex items-center justify-center bg-[#353535] p-4">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-md bg-white/5 backdrop-blur-lg rounded-2xl p-6 md:p-8 shadow-xl border border-white/10"
-      >
-        <h1 className="text-2xl font-bold text-white text-center mb-2">
-          Create Building
-        </h1>
+    <div ref={rootRef}>
+      <PageShell>
+        <div data-hero>
+          <PageHeader
+            title="Create building"
+            description="Name your building, then upload an escape map for every floor — unlimited floors available."
+          />
+        </div>
 
-        <p className="text-sm text-white/60 text-center mb-4">
-          Unlimited floors available
-        </p>
-
-        {serverError && (
-          <p className="text-red-500 text-center mb-4">{serverError}</p>
+        {/* Unverified accounts get an explanation and a path forward instead
+            of a silent redirect. */}
+        {verified === false && (
+          <div className="pt-8" data-reveal>
+            <Card className="mx-auto w-full max-w-xl p-6 text-center sm:p-8">
+              <span className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-warning-subtle text-warning-text">
+                <MailIcon size={26} />
+              </span>
+              <h2 className="text-xl font-semibold text-ink">
+                Verify your email first
+              </h2>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-ink-muted">
+                Adding a building publishes safety information other people
+                rely on, so we ask you to confirm your email address before
+                creating one. It takes under a minute in Settings.
+              </p>
+              <div className="mt-6 flex justify-center">
+                <ButtonLink to="/settings">Go to verification</ButtonLink>
+              </div>
+            </Card>
+          </div>
         )}
 
-        {/* STEP 1 */}
-        {step === 1 && (
-          <>
-            <label className="text-white block mb-1">Building Name</label>
-            <input
-              type="text"
-              className="w-full px-4 py-2 rounded-lg bg-black/40 text-white outline-none mb-3"
-              value={buildingData.buildingName}
-              onChange={(e) =>
-                setBuildingData({
-                  ...buildingData,
-                  buildingName: e.target.value,
-                })
-              }
-              required
-            />
+        {verified !== false && (
+        <div className="pt-8" data-reveal>
+          <Card className="mx-auto w-full max-w-xl p-6 sm:p-8">
+            <p className="mb-5 text-xs font-semibold uppercase tracking-[0.14em] text-brand-text">
+              Step {step} of 2
+            </p>
 
-            <label className="text-white block mb-1">Number of Floors</label>
-            <input
-              type="number"
-              min={1}
-              className="w-full px-4 py-2 rounded-lg bg-black/40 text-white outline-none mb-3"
-              value={buildingData.floors}
-              onChange={(e) => {
-                const value = Number(e.target.value);
-                setBuildingData({
-                  ...buildingData,
-                  floors: Math.max(1, value),
-                });
-              }}
-              required
-            />
+            {serverError && (
+              <Alert tone="danger" className="mb-5">
+                {serverError}
+              </Alert>
+            )}
 
-            <button
-              type="button"
-              onClick={goNext}
-              className="w-full py-2 mt-4 rounded-lg bg-[#FF7B22] text-white font-semibold hover:scale-105 transition"
-            >
-              Next
-            </button>
-          </>
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+              {/* STEP 1 */}
+              {step === 1 && (
+                <>
+                  <TextField
+                    label="Building name"
+                    value={buildingData.buildingName}
+                    onChange={(e) =>
+                      setBuildingData({
+                        ...buildingData,
+                        buildingName: e.target.value,
+                      })
+                    }
+                    required
+                  />
+
+                  <TextField
+                    label="Number of floors"
+                    type="number"
+                    min={1}
+                    value={buildingData.floors}
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+                      setBuildingData({
+                        ...buildingData,
+                        floors: Math.max(1, value),
+                      });
+                    }}
+                    required
+                  />
+
+                  <Button type="button" onClick={goNext} fullWidth className="mt-2">
+                    Next
+                    <ArrowRightIcon size={18} />
+                  </Button>
+                </>
+              )}
+
+              {/* STEP 2 */}
+              {step === 2 && (
+                <>
+                  {renderFloorInputs()}
+
+                  <div className="mt-2 flex gap-3">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={goBack}
+                      fullWidth
+                    >
+                      <ArrowLeftIcon size={18} />
+                      Back
+                    </Button>
+
+                    <Button
+                      type="submit"
+                      fullWidth
+                      loading={loading}
+                      loadingLabel="Creating…"
+                    >
+                      <PlusIcon size={18} />
+                      Create
+                    </Button>
+                  </div>
+                </>
+              )}
+            </form>
+          </Card>
+        </div>
         )}
-
-        {/* STEP 2 */}
-        {step === 2 && (
-          <>
-            {renderFloorInputs()}
-
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={goBack}
-                className="w-1/2 py-2 rounded-lg bg-white/20 text-white hover:scale-105 transition"
-              >
-                Back
-              </button>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className={`w-1/2 py-2 rounded-lg bg-[#FF7B22] text-white font-semibold ${
-                  loading
-                    ? "opacity-50 cursor-not-allowed"
-                    : "hover:scale-105 transition"
-                }`}
-              >
-                {loading ? "Creating..." : "Create"}
-              </button>
-            </div>
-          </>
-        )}
-      </form>
-    </main>
+      </PageShell>
+    </div>
   );
 };
 

@@ -2,9 +2,22 @@
 /* eslint-disable react-hooks/rules-of-hooks */
 /* eslint-disable @typescript-eslint/no-unused-expressions */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Link, useParams } from "react-router-dom"
 import { GET_BUILDING_ANALYTICS } from "../../apis/administration"
+import { usePageAnimations } from "../../lib/animations"
+import { PageHeader, PageShell } from "../../components/ui/layout"
+import { Button } from "../../components/ui/button"
+import { Card } from "../../components/ui/card"
+import { Alert, EmptyState, Skeleton } from "../../components/ui/feedback"
+import { TextField } from "../../components/ui/field"
+import {
+    AlertTriangleIcon,
+    ChartIcon,
+    ChevronRightIcon,
+    ClockIcon,
+    RefreshIcon,
+} from "../../components/ui/icons"
 
 interface EMERGENCY_SCHEMA {
     _id:string;
@@ -20,6 +33,7 @@ interface EMERGENCY_SCHEMA {
 export default function AnalyticsPage(){
 
     const {buildingId} = useParams()
+    const rootRef = usePageAnimations()
 
     const [loading,setLoading] = useState(true)
     const [serverError,setServerError] = useState("")
@@ -28,132 +42,186 @@ export default function AnalyticsPage(){
 
     const [dateFrom, setDateFrom] = useState<string>("")
     const [dateTo, setDateTo] = useState<string>("")
-    
-    const getAnalytics=async()=>{
+
+    // Only the newest request may write state. Two overlapping fetches used to
+    // resolve in arbitrary order, so a slower request carrying the previous
+    // filters could land last and overwrite the correctly filtered results.
+    const requestSeq = useRef(0)
+
+    const getAnalytics = useCallback(async () => {
+        const seq = ++requestSeq.current
         setLoading(true)
         setServerError("")
         try{
-            const res = await GET_BUILDING_ANALYTICS(buildingId,{
+            const res = await GET_BUILDING_ANALYTICS(buildingId!,{
                 dateFrom: dateFrom || undefined,
                 dateTo: dateTo || undefined})
-            // console.log(res)
+            if (seq !== requestSeq.current) return
             if(!res) {setServerError("Something went wrong."); return}
             if(res.Success==false) {setServerError(res.Message);return}
-            
+
             SET_EMERGENCIES(res.Message)
         }catch{
+            if (seq !== requestSeq.current) return
             setServerError("Something went wrong.")
         }finally{
-            setLoading(false)
+            if (seq === requestSeq.current) setLoading(false)
         }
-    }
+    }, [buildingId, dateFrom, dateTo])
 
     useEffect(() => {
         if (!buildingId) return
         getAnalytics()
-    }, [dateFrom, dateTo])
+    }, [buildingId, getAnalytics])
 
     if(loading==true){
         return(
-            <main className="w-full h-screen flex items-center justify-center bg-[#353535]">
-                <h1 className="text-white text-2xl font-medium">Loading...</h1>
-            </main>
+            <PageShell width="wide">
+                <PageHeader
+                    title="Analytics"
+                    description="Emergency history for this building."
+                />
+                <p className="sr-only" role="status">Loading analytics…</p>
+                <div className="pt-8">
+                    <Card className="flex flex-col gap-4 p-6 sm:flex-row">
+                        <Skeleton className="h-11 w-full" />
+                        <Skeleton className="h-11 w-full" />
+                    </Card>
+                </div>
+                <div className="grid grid-cols-1 gap-5 pt-6 sm:grid-cols-2 lg:grid-cols-3">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                        <Card key={i} className="flex flex-col gap-3 p-6">
+                            <Skeleton className="h-6 w-1/2" />
+                            <Skeleton className="h-4 w-2/3" />
+                            <Skeleton className="h-4 w-1/3" />
+                        </Card>
+                    ))}
+                </div>
+            </PageShell>
         )
     }
 
     if(loading==false && serverError !== ""){
         return(
-            <main className="w-full h-screen flex flex-col gap-2 items-center justify-center bg-[#353535]">
-                <h1 className="text-red-500 text-2xl font-bold ">{serverError}</h1>
-                <button onClick={getAnalytics} className="bg-[#FF7B22] hover:bg-[#FF7B22]/80 text-white rounded-[5px] p-[5px] ease-in-out duration-200 cursor-pointer">Retry</button>
-            </main>
+            <PageShell width="wide">
+                <PageHeader
+                    title="Analytics"
+                    description="Emergency history for this building."
+                />
+                <div className="flex flex-col items-start gap-4 pt-8">
+                    <Alert tone="danger" className="w-full">{serverError}</Alert>
+                    <Button variant="secondary" onClick={getAnalytics}>
+                        <RefreshIcon size={18} />
+                        Retry
+                    </Button>
+                </div>
+            </PageShell>
         )
     }
 
     if(loading == false && serverError == ""){
         return(
-            <main className="w-full min-h-screen h-auto flex flex-col bg-[#353535]">
-                <div className="w-full h-[10dvh]" />
-                <header className="w-full h-auto p-[10px] flex items-center text-center justify-center">
-                    <h1 className="text-white text-2xl font-medium md:text-3xl">Analytics</h1>
-                </header>
-                {
-                    EMERGENCIES.length===0 && (
-                        <section className="w-full h-full p-[10px] flex flex-col gap-2 items-center justify-center text-center">
-                            <p className="text-white/60 text-center">
-                                No emergencies found for this period.
-                            </p>
-                            <button onClick={()=>{setDateFrom("");setDateTo("");getAnalytics()}} className="text-lg ease-in-out duration-100 hover:bg-[#FF7B22]/80 cursor-pointer text-white bg-[#FF7B22] p-[5px] rounded-[10px]">Retry</button>
-                        </section>
-                    )
-                }
+            <div ref={rootRef}>
+                <PageShell width="wide">
+                    <div data-hero>
+                        <PageHeader
+                            title="Analytics"
+                            description="Every recorded emergency for this building. Pick one to see its full breakdown."
+                        />
+                    </div>
 
-                {
-                    EMERGENCIES && (<>
-                        <section className="w-full flex justify-center p-4">
-                            <div className="w-full max-w-xl bg-[#111] border border-[#FF7B22]/40 rounded-2xl p-5 shadow-lg">
-                                
-                                <h2 className="text-white text-lg font-light text-center mb-4">
-                                    Filter by Date
-                                </h2>
-
-                                <div className="flex flex-col md:flex-row gap-4">
-                                
-                                {/* From */}
-                                <div className="flex flex-col w-full">
-                                    <label className="text-sm text-white/70 mb-1">
-                                    From
-                                    </label>
-                                    <input
-                                    type="date"
-                                    className="
-                                        w-full bg-transparent text-white 
-                                        border border-[#FF7B22]/50 
-                                        rounded-xl px-3 py-2
-                                        focus:outline-none focus:border-[#FF7B22]
-                                        focus:ring-2 focus:ring-[#FF7B22]/40
-                                        transition
-                                    "
-                                    onChange={(e)=>{setDateFrom(e.target.value);getAnalytics()}}
-                                    value={dateFrom}
-                                    />
-                                </div>
-
-                                {/* To */}
-                                <div className="flex flex-col w-full">
-                                    <label className="text-sm text-white/70 mb-1">
-                                    To
-                                    </label>
-                                    <input
-                                    type="date"
-                                    className="
-                                        w-full bg-transparent text-white 
-                                        border border-[#FF7B22]/50 
-                                        rounded-xl px-3 py-2
-                                        focus:outline-none focus:border-[#FF7B22]
-                                        focus:ring-2 focus:ring-[#FF7B22]/40
-                                        transition
-                                    "
-                                    onChange={(e)=>{setDateTo(e.target.value);getAnalytics()}}
-                                    value={dateTo}
-                                    />
-                                </div>
-
-                                </div>
+                    {
+                        EMERGENCIES && (<>
+                            <div className="pt-8" data-hero>
+                                <Card className="p-6">
+                                    <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-ink">
+                                        <ClockIcon size={18} className="text-brand-text" />
+                                        Filter by date
+                                    </h2>
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        <TextField
+                                            label="From"
+                                            type="date"
+                                            value={dateFrom}
+                                            // The effect above refetches when
+                                            // the filter changes; calling
+                                            // getAnalytics() here as well fired
+                                            // a second request built from the
+                                            // pre-update state.
+                                            onChange={(e)=>setDateFrom(e.target.value)}
+                                        />
+                                        <TextField
+                                            label="To"
+                                            type="date"
+                                            value={dateTo}
+                                            onChange={(e)=>setDateTo(e.target.value)}
+                                        />
+                                    </div>
+                                </Card>
                             </div>
-                        </section>
-                        <section className="w-full h-full p-[10px] gap-2 flex flex-wrap items-center justify-center">
-                            {EMERGENCIES.map((e,i)=>(
-                                <Link to={'/building/'+e.buildingID+'/'+e._id+'/analytics'} key={i} className="w-auto p-[10px] border border-[#FF7B22] flex items-center justify-center text-center bg-[#FF7B22]/50 rounded-[10px] flex-col">
-                                    <h1 className="text-white font-medium ">Emergency</h1>
-                                    <p className="text-sm text-white font-thin">{new Date(e.startedAt).toLocaleDateString()}</p>
-                                    <p className="text-sm text-white font-thin">{new Date(e.startedAt).toLocaleTimeString()}</p>
-                                </Link>
-                            ))}
-                        </section>
-                    </>)
-                }
-            </main>
+
+                            {
+                                EMERGENCIES.length===0 && (
+                                    <div className="pt-6">
+                                        <EmptyState
+                                            icon={<ChartIcon size={24} />}
+                                            title="No emergencies found"
+                                            description="No emergencies were recorded for this period."
+                                            action={
+                                                <Button
+                                                    variant="secondary"
+                                                    onClick={()=>{setDateFrom("");setDateTo("");getAnalytics()}}
+                                                >
+                                                    <RefreshIcon size={18} />
+                                                    Retry
+                                                </Button>
+                                            }
+                                        />
+                                    </div>
+                                )
+                            }
+
+                            <ul
+                                data-reveal-group
+                                className="grid list-none grid-cols-1 gap-5 pt-6 sm:grid-cols-2 lg:grid-cols-3"
+                            >
+                                {EMERGENCIES.map((e,i)=>(
+                                    <li key={i} data-reveal-item className="h-full">
+                                        <Card interactive className="h-full">
+                                            <Link
+                                                to={'/building/'+e.buildingID+'/'+e._id+'/analytics'}
+                                                className="group flex h-full flex-col gap-3 rounded-2xl p-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                                            >
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-danger-subtle text-danger-text">
+                                                        <AlertTriangleIcon size={22} />
+                                                    </span>
+                                                    <ChevronRightIcon
+                                                        size={18}
+                                                        className="text-ink-subtle transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-brand-text"
+                                                    />
+                                                </div>
+                                                <h3 className="text-lg font-semibold text-ink group-hover:text-brand-text">
+                                                    Emergency
+                                                </h3>
+                                                <div className="flex flex-col gap-1 text-sm text-ink-muted">
+                                                    <span className="flex items-center gap-2">
+                                                        <ClockIcon size={15} className="text-ink-subtle" />
+                                                        {new Date(e.startedAt).toLocaleDateString()}
+                                                    </span>
+                                                    <span className="pl-[23px]">
+                                                        {new Date(e.startedAt).toLocaleTimeString()}
+                                                    </span>
+                                                </div>
+                                            </Link>
+                                        </Card>
+                                    </li>
+                                ))}
+                            </ul>
+                        </>)
+                    }
+                </PageShell>
+            </div>
         )
     }
 }

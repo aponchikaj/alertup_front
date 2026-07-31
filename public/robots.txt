@@ -1,0 +1,25 @@
+# AlertUp — https://alertup.world
+#
+# This file is a dev-time placeholder. The real one is generated into dist/ on
+# every build by scripts/generate-seo.mjs — edit src/seo/seo.data.json instead.
+#
+# Private pages (/login, /dashboard, /settings, …) are NOT disallowed here on
+# purpose. Each is prerendered with a noindex tag, and a URL blocked in
+# robots.txt can never be fetched, so a crawler would never see that tag.
+
+User-agent: *
+Allow: /
+Disallow: /building/
+Disallow: /route/
+Disallow: /scan/route/
+
+User-agent: AhrefsBot
+Crawl-delay: 10
+
+User-agent: SemrushBot
+Crawl-delay: 10
+
+User-agent: MJ12bot
+Disallow: /
+
+Sitemap: https://alertup.world/sitemap.xml

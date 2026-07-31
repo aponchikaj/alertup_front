@@ -1,58 +1,55 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import axios from "axios"
 import { APIS } from "./APIS"
+import { get, post, errorMessage, type ApiResponse } from "./http"
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const GETBUILDINGLOGS = async(data:any)=>{
-    try{
-        const res = (await axios.get(APIS.administration.getBuildingLogs+'/'+data,{withCredentials:true})).data;
-        if(!res) return {Success:false,Message:"Something went wrong."};
+export const GETBUILDINGLOGS = async (buildingId: string) => {
+    try {
+        const res = await get<ApiResponse>(`${APIS.administration.getBuildingLogs}/${buildingId}`);
+        if (!res) return { Success: false, Message: "Something went wrong." };
         return res;
-    }catch{
-        return {Success:false,Message:"Something went wrong."}
+    } catch (err) {
+        return { Success: false, Message: errorMessage(err) };
     }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const CLEARBUILDINGLOGS = async(data:any)=>{
-    try{
-        const res = (await axios.post(APIS.administration.clearBuildingLogs+'/'+data,{},{withCredentials:true})).data;
-        if(!res) return {Success:false,Message:"Something went wrong."};
+export const CLEARBUILDINGLOGS = async (buildingId: string) => {
+    try {
+        const res = await post<ApiResponse>(`${APIS.administration.clearBuildingLogs}/${buildingId}`, {});
+        if (!res) return { Success: false, Message: "Something went wrong." };
         return res;
-    }catch{
-        return {Success:false,Message:"Something went wrong."}
+    } catch (err) {
+        return { Success: false, Message: errorMessage(err) };
     }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const EMERGENCY_MODE_FUNCTION = async(data:any)=>{
-    try{
-        const res = (await axios.post(APIS.administration.emergencyMode,{buildingID:data},{withCredentials:true})).data;
-        if(!res) return {Success:false,Message:"Something went wrong."};
+export const EMERGENCY_MODE_FUNCTION = async (buildingID: string) => {
+    try {
+        const res = await post<ApiResponse>(APIS.administration.emergencyMode, { buildingID });
+        if (!res) return { Success: false, Message: "Something went wrong." };
         return res;
-    }catch{
-        return {Success:false,Message:"Something went wrong."}
+    } catch (err) {
+        return { Success: false, Message: errorMessage(err) };
     }
 }
 
-export const GET_BUILDING_ANALYTICS=async(data:any,filters:any)=>{
-    try{
-        const res = (await axios.get(APIS.administration.getBuildingAnalytics+data,{params:filters,withCredentials:true})).data
-        if(!res) return {Success:false,Message:"Something went wrong."}
+export const GET_BUILDING_ANALYTICS = async (
+    buildingID: string,
+    filters?: Record<string, string | number | undefined | null>,
+) => {
+    try {
+        const res = await get<ApiResponse>(APIS.administration.getBuildingAnalytics + buildingID, { params: filters });
+        if (!res) return { Success: false, Message: "Something went wrong." };
         return res;
-    }catch{
-        return {Success:false,Message:"Something went wrong."}
+    } catch (err) {
+        return { Success: false, Message: errorMessage(err) };
     }
 }
 
-export const GET_EMERGENCY_DATA = async(data:any)=>{
-    // console.log(APIS.administration.getEmergencyAnalytics+data.buildingID+'/'+data.emergencyID)
-    try{
-        const res= (await axios.get(APIS.administration.getEmergencyAnalytics+data.buildingID+'/'+data.emergencyID,{withCredentials:true})).data
-        // console.log(res)
-        if(!res) return {Success:false,Message:"Something went wrong."}
+export const GET_EMERGENCY_DATA = async (data: { buildingID: string; emergencyID: string }) => {
+    try {
+        const res = await get<ApiResponse>(`${APIS.administration.getEmergencyAnalytics}${data.buildingID}/${data.emergencyID}`);
+        if (!res) return { Success: false, Message: "Something went wrong." };
         return res;
-    }catch{
-        return {Success:false,Message:"Something went wrong."}
+    } catch (err) {
+        return { Success: false, Message: errorMessage(err) };
     }
 }

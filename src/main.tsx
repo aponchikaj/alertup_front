@@ -3,31 +3,21 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { BrowserRouter } from 'react-router-dom'
-import axios from 'axios'
+import { ThemeProvider } from './theme/ThemeProvider'
+import { LanguageProvider } from './i18n/LanguageProvider'
 
-// Configure axios interceptor for Safari/iOS token fallback
-axios.interceptors.request.use(
-  (config) => {
-    // Get token from localStorage (Safari/iOS fallback)
-    const token = localStorage.getItem('userToken');
-    
-    // If token exists and request needs credentials, add it as Authorization header
-    if (token && config.withCredentials !== false) {
-      config.headers = config.headers || {};
-      config.headers['Authorization'] = `Bearer ${token}`;
-    }
-    
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+// The Safari/iOS Bearer-token fallback that used to live here as an axios
+// request interceptor now lives in src/apis/http.ts, so every request made
+// through the shared fetch client gets it without a global side effect.
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
+    <ThemeProvider>
+      <LanguageProvider>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </LanguageProvider>
+    </ThemeProvider>
   </StrictMode>
 )

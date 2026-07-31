@@ -1,6 +1,4 @@
-import axios from 'axios';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://alertup-backend.onrender.com';
+import { API_BASE_URL, post, put } from './http';
 
 export interface UploadResponse {
   success: boolean;
@@ -18,28 +16,23 @@ export interface UploadResponse {
 export interface FloorMapUpdateResponse {
   Success: boolean;
   Message: string;
-  floorData?: any;
+  Data?: {
+    floorNumber: number;
+    mapUrl: string;
+    width: number;
+    height: number;
+  };
 }
 
 /**
- * Upload SVG file for building floor map
+ * Upload SVG file for building floor map.
+ * FormData is passed straight through so the browser sets the multipart
+ * boundary itself.
  */
 export const uploadSVG = async (file: File): Promise<UploadResponse> => {
-  try {
-    const formData = new FormData();
-    formData.append('svg', file);
-
-    const response = await axios.post(`${API_BASE_URL}/api/upload/svg`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-
-    return response.data;
-  } catch (error: any) {
-    console.error('Error uploading SVG:', error);
-    throw new Error(error.response?.data?.message || 'Failed to upload SVG');
-  }
+  const formData = new FormData();
+  formData.append('svg', file);
+  return post<UploadResponse>('/api/upload/svg', formData);
 };
 
 /**
@@ -55,49 +48,23 @@ export const updateFloorMap = async (
     height: number;
   }
 ): Promise<FloorMapUpdateResponse> => {
-  try {
-    const response = await axios.put(
-      `${API_BASE_URL}/api/building/${buildingId}/floor/${floorNumber}/map`,
-      svgData,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        withCredentials: true,
-      }
-    );
-
-    return response.data;
-  } catch (error: any) {
-    console.error('Error updating floor map:', error);
-    throw new Error(error.response?.data?.Message || 'Failed to update floor map');
-  }
+  return put<FloorMapUpdateResponse>(`/api/building/${buildingId}/floor/${floorNumber}/map`, svgData);
 };
 
 /**
  * Convert image to SVG (basic conversion)
  */
 export const convertToSVG = async (file: File): Promise<UploadResponse> => {
-  try {
-    const formData = new FormData();
-    formData.append('image', file);
-
-    const response = await axios.post(`${API_BASE_URL}/api/upload/convert`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-
-    return response.data;
-  } catch (error: any) {
-    console.error('Error converting to SVG:', error);
-    throw new Error(error.response?.data?.message || 'Failed to convert to SVG');
-  }
+  const formData = new FormData();
+  formData.append('image', file);
+  return post<UploadResponse>('/api/upload/convert', formData);
 };
 
 /**
  * Get uploaded SVG file URL
  */
 export const getSVGUrl = (filename: string): string => {
-  return `${API_BASE_URL}/api/upload/svg/${filename}`;
+  // Absolute: this is used as an image source, so it must point at the backend
+  // origin rather than the frontend's.
+  return `${API_BASE_URL}/api/upload/svg/${encodeURIComponent(filename)}`;
 };

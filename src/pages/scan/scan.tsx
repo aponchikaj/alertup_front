@@ -1,26 +1,34 @@
-import { useEffect, useState } from 'react';
-import PageHeader from '../../components/pageHeader';
-import Scanner from '../../components/scanner';
-import {Link} from 'react-router-dom'
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import Scanner from "../../components/scanner";
+import Seo from "../../seo/Seo";
+import { breadcrumbJsonLd } from "../../seo/structuredData";
+import { usePageAnimations } from "../../lib/animations";
+import { resolveQrTarget } from "../../lib/qrTarget";
+import { Container } from "../../components/ui/layout";
+import { Card } from "../../components/ui/card";
+import { Badge } from "../../components/ui/feedback";
+import { ButtonLink } from "../../components/ui/button";
+import { ArrowLeftIcon, QrCodeIcon } from "../../components/ui/icons";
 
 const Scan = () => {
+  const rootRef = usePageAnimations();
   const [qrCodeMessage, setQrCodeMessage] = useState("");
 
-  useEffect(() => {
-    document.title = 'Scan QR Code - AlertUp';
-  }, []);
 
   const GetQR = (data: string) => {
     if (!data) return;
 
-    if (!data.includes("alertup")) {
+    // Validated against an allowlist of AlertUp hostnames. A substring check
+    // for "alertup" would happily accept https://evil.example.com/#alertup.
+    const target = resolveQrTarget(data);
+    if (!target) {
       setQrCodeMessage("Other QR codes can't be used.");
       return;
     }
 
     try {
-      // Navigate to the scanned QR code URL
-      window.location.href = data;
+      window.location.href = target;
       setQrCodeMessage(""); // Clear any previous message
     } catch (err) {
       console.error("Failed to open QR link:", err);
@@ -29,48 +37,91 @@ const Scan = () => {
   };
 
   return (
-    <main className="w-full h-screen p-2 flex flex-col bg-[#353535]">
-      {/* Spacer for header */}
-      <section className="h-[10vh] w-full" />
+    <div ref={rootRef}>
+      <Seo
+        jsonLd={[
+          breadcrumbJsonLd([
+            { name: "Home", path: "/" },
+            { name: "Scan a QR code", path: "/scan" },
+          ]),
+        ]}
+      />
 
-      {/* Page Header */}
-      <section className="h-auto w-full flex items-center justify-center">
-        <PageHeader title="Scan" backIcon={true} />
+      <section className="relative min-h-screen overflow-hidden bg-canvas pb-16 pt-28 sm:pt-32">
+        {/* Floor-plan grid backdrop, matching the home hero. */}
+        <div className="bg-grid pointer-events-none absolute inset-0" aria-hidden="true" />
+        {/* Soft brand glow behind the scanner. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-32 left-1/2 h-[28rem] w-[28rem] -translate-x-1/2 rounded-full bg-brand/15 blur-3xl"
+        />
+
+        <Container className="relative flex flex-col items-center gap-8">
+          <div data-hero className="self-start">
+            <ButtonLink to="/" variant="ghost" size="sm">
+              <ArrowLeftIcon size={16} />
+              Back home
+            </ButtonLink>
+          </div>
+
+          <div data-hero className="flex flex-col items-center gap-4 text-center">
+            <Badge tone="brand" className="px-3 py-1.5 text-[0.8125rem]">
+              <QrCodeIcon size={15} />
+              No app needed
+            </Badge>
+            <h1 className="text-4xl font-semibold tracking-tight text-ink sm:text-5xl">
+              Scan a QR code
+            </h1>
+            <p className="max-w-md text-base leading-relaxed text-ink-muted">
+              Point your camera at an AlertUp code to open the building's
+              escape route instantly.
+            </p>
+          </div>
+
+          <div data-hero className="w-full max-w-md">
+            <Card className="flex flex-col items-center p-6 sm:p-8">
+              {/* Scanner Component */}
+              <div className="flex flex-col items-center justify-center md:hidden">
+                <Scanner
+                  w={250}
+                  h={250}
+                  brandMark
+                  onScan={(d) => GetQR(d)}
+                />
+              </div>
+
+              <div className="hidden flex-col items-center justify-center md:flex">
+                <Scanner
+                  w={300}
+                  h={300}
+                  brandMark
+                  onScan={(d) => GetQR(d)}
+                />
+              </div>
+
+              {/* Message Display */}
+              <div className="mt-5 flex w-full flex-col items-center gap-1 border-t border-line pt-5 text-center">
+                {qrCodeMessage === "" ? (
+                  <p className="text-sm text-ink-subtle">
+                    Own a building?{" "}
+                    <Link
+                      to="/new"
+                      className="rounded-sm font-semibold text-brand-text underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                    >
+                      Create a QR route
+                    </Link>
+                  </p>
+                ) : (
+                  <p role="alert" className="text-sm font-medium text-danger-text">
+                    {qrCodeMessage}
+                  </p>
+                )}
+              </div>
+            </Card>
+          </div>
+        </Container>
       </section>
-
-      {/* Main Content - Camera Scanner */}
-      <main className="w-full h-[70vh] md:h-full flex flex-col items-center justify-center">
-        <div className="w-full max-w-md mx-auto p-6 flex flex-col items-center justify-center">
-          {/* Scanner Component */}
-          <div className="flex flex-col md:hidden items-center justify-center">
-            <Scanner
-              w={250}
-              h={250}
-              foxIcon
-              onScan={(d) => GetQR(d)}
-            />
-          </div>
-
-          <div className="hidden md:flex flex-col items-center justify-center hover:translate-y-[-5px] ease-in-out duration-200">
-            <Scanner
-              w={300}
-              h={300}
-              foxIcon
-              onScan={(d) => GetQR(d)}
-            />
-          </div>
-
-          {/* Message Display */}
-          <section className="flex flex-col items-center text-center mt-4">
-            {qrCodeMessage === "" ? (
-              <p className="text-sm text-white">Or create <Link to={'/new'}><span className="text-[#FF7B22] hover:text-[#FF7B22]/60 ease-in-out duration-200 hover:scale-105">New</span></Link> </p>
-            ) : (
-              <p className="text-sm text-red-500">{qrCodeMessage}</p>
-            )}
-          </section>
-        </div>
-      </main>
-    </main>
+    </div>
   );
 };
 

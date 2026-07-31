@@ -1,12 +1,40 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { LoginUser,Login2faUser } from "../../apis/auth";
+import { LoginUser, Login2faUser } from "../../apis/auth";
+import { usePageAnimations } from "../../lib/animations";
+import { PageShell } from "../../components/ui/layout";
+import { Card } from "../../components/ui/card";
+import { Button } from "../../components/ui/button";
+import { Alert } from "../../components/ui/feedback";
+import { TextField, PasswordField } from "../../components/ui/field";
+import { LogoMark } from "../../components/ui/logo";
+
+/** Cross-links shown under both the credentials and the 2FA screens. */
+const AuthFooterLinks = () => (
+  <div className="mt-6 flex flex-col gap-2 border-t border-line pt-5 text-center text-sm text-ink-muted">
+    <p>
+      Don't have an account?{" "}
+      <Link
+        to="/register"
+        className="rounded-sm font-semibold text-brand-text underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      >
+        Register
+      </Link>
+    </p>
+    <p>
+      Forgot password?{" "}
+      <Link
+        to="/reset"
+        className="rounded-sm font-semibold text-brand-text underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      >
+        Reset
+      </Link>
+    </p>
+  </div>
+);
 
 const Login = () => {
-  useEffect(() => {
-    document.title = "Log in - AlertUp";
-  }, []);
-
+  const rootRef = usePageAnimations();
   const navigate = useNavigate();
 
   const [loginData, setLoginData] = useState({
@@ -16,8 +44,8 @@ const Login = () => {
   const [serverError, setServerError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const [twoFaScreen,setTwoFaScreen] = useState(false)
-  const [twoFaCode,setTwoFaCode] = useState("")
+  const [twoFaScreen, setTwoFaScreen] = useState(false);
+  const [twoFaCode, setTwoFaCode] = useState("");
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -35,8 +63,8 @@ const Login = () => {
         return;
       }
 
-      if(res.Message== "2fa"){
-        setTwoFaScreen(true)
+      if (res.Message == "2fa") {
+        setTwoFaScreen(true);
         return;
       }
 
@@ -57,153 +85,139 @@ const Login = () => {
     }
   };
 
-  const handle2faSubmit =async()=>{
+  const handle2faSubmit = async () => {
     setLoading(true);
     setServerError("");
-    try{
-      const res = await Login2faUser({email:loginData.user,verificationCode:twoFaCode})
-      if(!res) {setServerError("Something went wrong.");setLoading(false);return;}
-      if(res.Success==false){setServerError(res.Message);setLoading(false);return;}
+    try {
+      const res = await Login2faUser({
+        email: loginData.user,
+        verificationCode: twoFaCode,
+      });
+      if (!res) {
+        setServerError("Something went wrong.");
+        setLoading(false);
+        return;
+      }
+      if (res.Success == false) {
+        setServerError(res.Message);
+        setLoading(false);
+        return;
+      }
 
       if (res.token) localStorage.setItem("userToken", res.token);
 
       navigate("/", { replace: true });
-    }catch{
-      console.error("Something went wrong.")
-      setServerError("Something went wrong.")
-    }finally{setLoading(false)}
-  }
+    } catch {
+      console.error("Something went wrong.");
+      setServerError("Something went wrong.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-[#353535] px-4">
-      { 
-        twoFaScreen == true &&
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handle2faSubmit()
-          }}
-          className="w-full max-w-md bg-white/5 backdrop-blur-lg rounded-2xl p-6 md:p-8 shadow-xl border border-white/10"
-        >
-          <h1 className="text-2xl font-bold text-white text-center mb-6">
-            Verification Code
-          </h1>
+    <div ref={rootRef}>
+      <PageShell className="flex flex-col justify-center">
+        <div className="mx-auto w-full max-w-md">
+          <Card data-hero className="p-6 sm:p-8">
+            <div className="mb-7 flex flex-col items-center gap-3 text-center">
+              <LogoMark size={44} />
+              <h1 className="text-2xl font-semibold text-ink sm:text-3xl">
+                {twoFaScreen ? "Verification code" : "Welcome back"}
+              </h1>
+              <p className="text-sm text-ink-muted">
+                {twoFaScreen
+                  ? "Enter the code from your authenticator to finish signing in."
+                  : "Log in to manage your buildings and QR routes."}
+              </p>
+            </div>
 
-          {serverError && (
-            <p className="mt-2 mb-4 text-center text-red-500">{serverError}</p>
-          )}
+            {serverError && (
+              <Alert tone="danger" className="mb-5">
+                {serverError}
+              </Alert>
+            )}
 
-          {/* Username/Email for Individual / Company Name */}
-          <input
-            type="number"
-            placeholder="Code"
-            className="w-full mb-3 px-4 py-2 rounded-lg bg-black/40 text-white outline-none border border-white/10 focus:border-[#FF7B22]"
-            value={twoFaCode}
-            onChange={(e) =>
-              setTwoFaCode(e.target.value)
-            }
-            required
-            typeof="number"
-          />
+            {twoFaScreen == true && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handle2faSubmit();
+                }}
+                className="flex flex-col gap-4"
+              >
+                {/* Username/Email for Individual / Company Name */}
+                <TextField
+                  label="Verification code"
+                  type="number"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder="Code"
+                  value={twoFaCode}
+                  onChange={(e) => setTwoFaCode(e.target.value)}
+                  required
+                />
 
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2 rounded-lg bg-[#FF7B22] disabled:opacity-50 disabled:cursor-not-allowed transition text-white font-semibold"
-          >
-            {loading ? "Loading..." : "Login"}
-          </button>
+                <Button
+                  type="submit"
+                  size="lg"
+                  fullWidth
+                  loading={loading}
+                  loadingLabel="Logging in…"
+                >
+                  Login
+                </Button>
+              </form>
+            )}
 
-          <p className="text-sm text-gray-400 text-center mt-4">
-            Don't have an account?{" "}
-            <Link
-              to="/register"
-              className="text-[#FF7B22] cursor-pointer hover:underline"
-            >
-              Register
-            </Link>
-          </p>
-          <p className="text-sm text-gray-400 text-center mt-2">
-            Forgot password?{" "}
-            <Link
-              to="/reset"
-              className="text-[#FF7B22] cursor-pointer hover:underline"
-            >
-              Reset
-            </Link>
-          </p>
-        </form>
-      }
-      { twoFaScreen == false &&
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSubmit();
-          }}
-          className="w-full max-w-md bg-white/5 backdrop-blur-lg rounded-2xl p-6 md:p-8 shadow-xl border border-white/10"
-        >
-          <h1 className="text-2xl font-bold text-white text-center mb-6">
-            Welcome Back
-          </h1>
+            {twoFaScreen == false && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSubmit();
+                }}
+                className="flex flex-col gap-4"
+              >
+                {/* Username/Email for Individual / Company Name */}
+                <TextField
+                  label="Email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  value={loginData.user}
+                  onChange={(e) =>
+                    setLoginData({ ...loginData, user: e.target.value })
+                  }
+                  required
+                />
 
-          {serverError && (
-            <p className="mt-2 mb-4 text-center text-red-500">{serverError}</p>
-          )}
+                <PasswordField
+                  label="Password"
+                  autoComplete="current-password"
+                  placeholder="Your password"
+                  value={loginData.password}
+                  onChange={(e) =>
+                    setLoginData({ ...loginData, password: e.target.value })
+                  }
+                  required
+                />
 
-          {/* Username/Email for Individual / Company Name */}
-          <input
-            type="email"
-            placeholder="Email"
-            className="w-full mb-3 px-4 py-2 rounded-lg bg-black/40 text-white outline-none border border-white/10 focus:border-[#FF7B22]"
-            value={loginData.user}
-            onChange={(e) =>
-              setLoginData({ ...loginData, user: e.target.value })
-            }
-            required
-          />
+                <Button
+                  type="submit"
+                  size="lg"
+                  fullWidth
+                  loading={loading}
+                  loadingLabel="Logging in…"
+                >
+                  Login
+                </Button>
+              </form>
+            )}
 
-          {/* Password */}
-          <input
-            type="password"
-            placeholder="Password"
-            className="w-full mb-4 px-4 py-2 rounded-lg bg-black/40 text-white outline-none border border-white/10 focus:border-[#FF7B22]"
-            value={loginData.password}
-            onChange={(e) =>
-              setLoginData({ ...loginData, password: e.target.value })
-            }
-            required
-          />
-
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2 rounded-lg bg-[#FF7B22] disabled:opacity-50 disabled:cursor-not-allowed transition text-white font-semibold"
-          >
-            {loading ? "Loading..." : "Login"}
-          </button>
-
-          <p className="text-sm text-gray-400 text-center mt-4">
-            Don't have an account?{" "}
-            <Link
-              to="/register"
-              className="text-[#FF7B22] cursor-pointer hover:underline"
-            >
-              Register
-            </Link>
-          </p>
-          <p className="text-sm text-gray-400 text-center mt-2">
-            Forgot password?{" "}
-            <Link
-              to="/reset"
-              className="text-[#FF7B22] cursor-pointer hover:underline"
-            >
-              Reset
-            </Link>
-          </p>
-        </form>
-      }
+            <AuthFooterLinks />
+          </Card>
+        </div>
+      </PageShell>
     </div>
   );
 };

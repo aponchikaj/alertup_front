@@ -1,32 +1,74 @@
 // src/guards/AuthGuard.js
 import { Navigate } from "react-router-dom";
-import { getMe } from "../apis/me";
-import { useEffect, useState } from "react";
+import { getAuthState } from "../apis/me";
+import { useCallback, useEffect, useState } from "react";
+import { PageShell } from "../components/ui/layout";
+import { Button } from "../components/ui/button";
+import { Skeleton, EmptyState } from "../components/ui/feedback";
+import { AlertTriangleIcon, RefreshIcon } from "../components/ui/icons";
+
+type Status = "loading" | "authenticated" | "unauthenticated" | "error";
 
 const AuthGuard = ({ children }: { children: any }) => {
-  const [user, setUser] = useState<boolean | null>(null); // null = loading
+  const [status, setStatus] = useState<Status>("loading");
+  const [errorText, setErrorText] = useState("");
+
+  const check = useCallback(async () => {
+    setStatus("loading");
+    const result = await getAuthState();
+    if (result.state === "error") {
+      setErrorText(result.message);
+      setStatus("error");
+      return;
+    }
+    setStatus(result.state);
+  }, []);
 
   useEffect(() => {
-    const getMyUser = async () => {
-      try {
-        const res = await getMe();
-        if (!res || res.Success === false) {
-          setUser(false);
-          return;
-        }
-        setUser(true);
-      } catch {
-        setUser(false);
-      }
-    };
+    check();
+  }, [check]);
 
-    getMyUser();
-  }, []); // run once on mount
+  if (status === "loading")
+    return (
+      <PageShell>
+        <div role="status" aria-live="polite">
+          <span className="sr-only">Checking your session…</span>
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-3">
+              <Skeleton className="h-9 w-56 max-w-full" />
+              <Skeleton className="h-4 w-80 max-w-full" />
+            </div>
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              <Skeleton className="h-40" />
+              <Skeleton className="h-40" />
+              <Skeleton className="h-40" />
+            </div>
+          </div>
+        </div>
+      </PageShell>
+    );
 
-  // while checking auth, render nothing or a loading spinner
-  if (user === null) return <div>Loading...</div>;
+  // A backend that is unreachable or faulting says nothing about whether the
+  // session is valid, so offer a retry instead of signing the user out.
+  if (status === "error") {
+    return (
+      <PageShell>
+        <EmptyState
+          icon={<AlertTriangleIcon size={24} />}
+          title="Something went wrong"
+          description={errorText || "Could not reach the server."}
+          action={
+            <Button type="button" onClick={check}>
+              <RefreshIcon size={16} />
+              Retry
+            </Button>
+          }
+        />
+      </PageShell>
+    );
+  }
 
-  if (!user) return <Navigate to="/login" replace />;
+  if (status === "unauthenticated") return <Navigate to="/login" replace />;
 
   return children;
 };

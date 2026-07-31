@@ -1,45 +1,82 @@
-// import TiktokIcon from '../assets/images/tt.png'
-// import InstagramIcon from '../assets/images/ig.png';
-import { Link } from 'react-router-dom';
-import Sponsors from './sponsors';
+import { Link } from "react-router-dom";
+import { Container } from "./ui/layout";
+import { Logo } from "./ui/logo";
+import Sponsors from "./sponsors";
 
-const Footer = ()=>{
-    return(
-        <footer className="w-full p-[10px] h-auto flex bg-black flex flex-col items-center justify-center text-center">
-            
-            <section className="text-center">
-                <h1 className="text-2xl text-white font-thin">Alert<span className="text-sm text-[#FF7B22]">up</span></h1>
-            </section>
+const LINK_GROUPS: { heading: string; links: { to: string; label: string }[] }[] = [
+  {
+    heading: "Product",
+    links: [
+      { to: "/", label: "Home" },
+      { to: "/scan", label: "Scan a code" },
+      { to: "/new", label: "Add a building" },
+      { to: "/mybuildings", label: "My buildings" },
+    ],
+  },
+  {
+    heading: "Support",
+    links: [
+      { to: "/contact", label: "Contact us" },
+      { to: "/security", label: "Security" },
+      { to: "/accessibility", label: "Accessibility" },
+    ],
+  },
+  {
+    heading: "Legal",
+    links: [
+      { to: "/privacy", label: "Privacy Policy" },
+      { to: "/terms", label: "Terms of Service" },
+      { to: "/cookies", label: "Cookie Policy" },
+    ],
+  },
+];
 
-            <section className="flex items-center justify-center ">
-                <Sponsors/>
-            </section>
+const footerLinkClass =
+  "inline-block py-1.5 text-sm text-ink-muted transition-colors hover:text-brand-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring rounded-sm";
 
-            <div className="w-1/2 mx-auto h-[1px] bg-[#FF7B22] my-[10px]" />
+const Footer = () => (
+  <footer className="border-t border-line bg-canvas-subtle">
+    <Container className="py-14">
+      <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_repeat(3,1fr)]">
+        <div className="flex flex-col gap-4">
+          <Logo size={34} />
+          <p className="max-w-xs text-sm leading-relaxed text-ink-muted">
+            AlertUp turns a printed QR code into a guided way out. Scan it and
+            the safest route to the nearest exit is already on screen.
+          </p>
+          <Sponsors />
+        </div>
 
-            <section className="flex flex-col gap-2">
-                <h1 className="text-white text-2xl">Explore</h1>
+        {LINK_GROUPS.map((group) => (
+          <nav key={group.heading} aria-label={group.heading}>
+            <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-ink">
+              {group.heading}
+            </h2>
+            <ul>
+              {group.links.map((link) => (
+                <li key={link.to}>
+                  <Link to={link.to} className={footerLinkClass}>
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        ))}
+      </div>
 
-                <ul className="flex flex-col text-center items-center justify-center text-white">
-                    <Link to={'/'}>Home</Link>
-                    <Link to={'/scan'}>Scan</Link>
-                    <Link to={'/contact'}>Contact</Link>
-                    {/* <Link to={'/premium'}>Premium</Link> */}
-                </ul>
-            </section>
-
-            {/* <section className="flex items-center justify-center gap-1 my-[10px]"> */}
-                {/* <a href=""><button><img src={TiktokIcon} alt="tiktok" className='w-[30px] cursor-pointer' /></button></a> */}
-                {/* <a href=""><button><img src={InstagramIcon} alt="instagram" className='w-[30px] cursor-pointer' /></button></a> */}
-            {/* </section> */}
-
-            <section className="text-center items-center flex flex-col justify-center text-white text-sm">
-                {/* <h1>By <a href="https://lazare-mirziashvili.vercel.app/home" className="underline hover:text-[#FF7B22] ease-in-out duration-100">Lazare</a></h1> */}
-                <p>Alertup &copy; {new Date().getFullYear()}</p>
-            </section>
-
-        </footer>
-    )
-}
+      <div className="mt-12 flex flex-col gap-4 border-t border-line pt-6 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-ink-subtle">
+          AlertUp © {new Date().getFullYear()}. Built in Tbilisi, Georgia.
+        </p>
+        <p className="max-w-md text-xs leading-relaxed text-ink-subtle">
+          AlertUp supplements — it does not replace — the fire safety equipment,
+          signage and procedures required at your location. In an emergency,
+          always follow instructions from emergency services.
+        </p>
+      </div>
+    </Container>
+  </footer>
+);
 
 export default Footer;

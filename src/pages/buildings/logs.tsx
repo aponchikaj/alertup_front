@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react'
-import REFRESH_ICON from '../../assets/images/refresh.png'
 import { useParams } from 'react-router-dom'
 import { CLEARBUILDINGLOGS, GETBUILDINGLOGS } from '../../apis/administration'
+import { usePageAnimations } from '../../lib/animations'
+import { PageHeader, PageShell } from '../../components/ui/layout'
+import { Button } from '../../components/ui/button'
+import { Card } from '../../components/ui/card'
+import { Alert, Badge, EmptyState, Skeleton } from '../../components/ui/feedback'
+import { FileTextIcon, RefreshIcon, TrashIcon } from '../../components/ui/icons'
 
 interface LOG_SCHEMA{
     logMessage:string,
@@ -13,13 +18,14 @@ interface LOG_SCHEMA{
 
 export default function Logs(){
 
+    const rootRef = usePageAnimations()
     const [LOGS,setLOGS] = useState<Array<LOG_SCHEMA>>([])
     const [serverError,setServerError] = useState("")
     const [loading,setLoading] = useState(true)
     const {buildingId} = useParams()
     const fetchLogs = async()=>{
         try{
-            const res = await GETBUILDINGLOGS(buildingId)
+            const res = await GETBUILDINGLOGS(buildingId!)
             console.log(res)
             if(!res) {
                 setServerError("Something went wrong.")
@@ -32,6 +38,11 @@ export default function Logs(){
                 return;
             }
             setLOGS(res.Message)
+            // Cleared on success. Without this, one failed poll left the error
+            // screen up permanently — during an emergency, a single network
+            // blip replaced the live log feed for good even though every
+            // subsequent poll succeeded.
+            setServerError("")
             setLoading(false)
         }catch{
             setServerError("Something went wrong.")
@@ -53,7 +64,7 @@ export default function Logs(){
     const clearLogs = async()=>{
         setLoading(true)
         try{
-            const res = await CLEARBUILDINGLOGS(buildingId)
+            const res = await CLEARBUILDINGLOGS(buildingId!)
             if(!res) {
                 setServerError("Something went wrong.")
                 setLoading(false)
@@ -74,44 +85,71 @@ export default function Logs(){
     }
 
     return(
-        <main className="w-full h-[100dvh] bg-[#353535] flex flex-col items-center justify-center items-center">
-            <section className="w-full h-[10vh]" />
-            {/* logs box */}
-            {
-                serverError == "" && loading == true && (
-                    <main className='w-full h-full p-[10px] flex items-center justify-center text-center'>
-                        <h1 className='text-white'>Loading...</h1>
-                    </main>
-                )
-            }
-            {
-                serverError !== "" && loading == false &&(
-                    <main className='w-full h-full p-[10px] flex items-center justify-center text-center'>
-                        <h1 className='text-white'>{serverError}</h1>
-                    </main>
-                )
-            }
-            {
-                loading == false && serverError == "" &&
-                <section className="w-[90%] h-[80dvh] bg-black rounded-xl border border-[#FF7B22]/50">
-                    <header className="w-full h-[4vh] flex items-center justify-around text-center border-b border-[#FF7B22]/50">
-                        <h1 className="text-white text-lg">Logs</h1>
-                        <section className='flex gap-2 items-center'>
-                            <button onClick={fetchLogs}><img src={REFRESH_ICON} alt="refresh" className='w-[20px] cursor-pointer' title='Refresh' /></button>
-                            <button className='text-white cursor-pointer' onClick={clearLogs}>Clear</button>
-                        </section>
-                    </header>
-                    <ul className='w-full h-[90%] flex flex-col overflow-y-auto gap-3 items-start justify-end'>
-                        {   
-                            LOGS &&
-                            LOGS.map((m,i)=>(
-                                <p  className={`text-white w-full  px-[10px] border-[#FF7B22]/50  font-medium `} key={i}>{m.logMessage} - {new Date(m.createdAt).toLocaleString()} - {m.logType}</p>
-                            ))
+        <div ref={rootRef}>
+            <PageShell width="wide">
+                <div data-hero>
+                    <PageHeader
+                        title="Logs"
+                        description="Live activity for this building — the feed refreshes every 10 seconds."
+                        actions={
+                            <>
+                                <Button variant="secondary" onClick={fetchLogs} title="Refresh">
+                                    <RefreshIcon size={18} />
+                                    Refresh
+                                </Button>
+                                <Button variant="danger" onClick={clearLogs}>
+                                    <TrashIcon size={16} />
+                                    Clear
+                                </Button>
+                            </>
                         }
-                    </ul>
-                </section>
-            }
+                    />
+                </div>
 
-        </main>
+                <div className="pt-8" data-reveal>
+                    {loading && serverError === "" && (
+                        <Card className="flex flex-col gap-3 p-6">
+                            <p className="sr-only" role="status">Loading logs…</p>
+                            {Array.from({ length: 6 }).map((_, i) => (
+                                <Skeleton key={i} className="h-5 w-full" />
+                            ))}
+                        </Card>
+                    )}
+
+                    {!loading && serverError !== "" && (
+                        <Alert tone="danger">{serverError}</Alert>
+                    )}
+
+                    {!loading && serverError === "" && (
+                        LOGS && LOGS.length > 0 ? (
+                            <Card className="overflow-hidden">
+                                <ul className="flex h-[65dvh] flex-col justify-end gap-0 overflow-y-auto">
+                                    {LOGS.map((m, i) => (
+                                        <li
+                                            key={i}
+                                            className="flex flex-wrap items-baseline gap-x-2 gap-y-1 border-b border-line px-5 py-3 text-sm last:border-b-0"
+                                        >
+                                            <span className="font-medium text-ink">{m.logMessage}</span>
+                                            <span className="text-ink-muted">
+                                                {new Date(m.createdAt).toLocaleString()}
+                                            </span>
+                                            <Badge tone={m.isEmergency ? "danger" : "neutral"}>
+                                                {m.logType}
+                                            </Badge>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </Card>
+                        ) : (
+                            <EmptyState
+                                icon={<FileTextIcon size={24} />}
+                                title="No logs yet"
+                                description="Activity for this building will appear here as it happens."
+                            />
+                        )
+                    )}
+                </div>
+            </PageShell>
+        </div>
     )
 }

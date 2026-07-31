@@ -1,4 +1,25 @@
 import '@testing-library/jest-dom';
+import { TextEncoder, TextDecoder } from 'util';
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+// jsdom does not provide TextEncoder/TextDecoder, but react-router v7 needs
+// them at import time. These must be installed before any component imports.
+if (typeof globalThis.TextEncoder === 'undefined') {
+  globalThis.TextEncoder = TextEncoder as any;
+}
+if (typeof globalThis.TextDecoder === 'undefined') {
+  globalThis.TextDecoder = TextDecoder as any;
+}
+
+// jsdom has no fetch. The app's http client is built on it, so tests that do
+// not explicitly mock a request get a clear failure rather than a confusing
+// "fetch is not defined".
+if (typeof globalThis.fetch === 'undefined') {
+  globalThis.fetch = jest.fn(() =>
+    Promise.reject(new Error('Unmocked fetch call in test — mock the API module you are exercising.')),
+  ) as any;
+}
 
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
@@ -16,7 +37,7 @@ Object.defineProperty(window, 'matchMedia', {
 });
 
 // Mock IntersectionObserver
-global.IntersectionObserver = class IntersectionObserver {
+globalThis.IntersectionObserver = class IntersectionObserver {
   constructor() {}
   disconnect() {}
   observe() {}
@@ -25,18 +46,3 @@ global.IntersectionObserver = class IntersectionObserver {
   }
   unobserve() {}
 } as any;
-
-// Suppress console errors during tests (optional)
-// const originalError = console.error;
-// beforeAll(() => {
-//   console.error = (...args) => {
-//     if (typeof args[0] === 'string' && args[0].includes('Warning: ReactDOM.render')) {
-//       return;
-//     }
-//     originalError.call(console, ...args);
-//   };
-// });
-
-// afterAll(() => {
-//   console.error = originalError;
-// });

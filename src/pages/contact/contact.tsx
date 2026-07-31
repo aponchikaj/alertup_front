@@ -1,11 +1,17 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ContactAPI } from "../../apis/contact";
+import Seo from "../../seo/Seo";
+import { breadcrumbJsonLd } from "../../seo/structuredData";
+import { usePageAnimations } from "../../lib/animations";
+import { PageShell } from "../../components/ui/layout";
+import { Card } from "../../components/ui/card";
+import { Alert } from "../../components/ui/feedback";
+import { Button } from "../../components/ui/button";
+import { TextField, TextAreaField } from "../../components/ui/field";
+import { MailIcon } from "../../components/ui/icons";
 
 const Contact = () => {
-
-  useEffect(() => {
-        document.title = "Contact - AlertUp";
-    }, []);
+  const rootRef = usePageAnimations();
 
   const [contactMessage, setContactMessage] = useState("");
   const [contactLoading, setContactLoading] = useState(false);
@@ -40,96 +46,90 @@ const Contact = () => {
   };
 
   return (
-    <main className="min-h-screen w-full border flex flex-col md:flex-row gap-3 items-center justify-around bg-[#353535] px-4">
-      <div className="w-full h-[10vh] md:hidden" />
-      {/* <section className="text-center flex flex-col items-center justify-center md:items-start md:text-start w-full md:w-1/2">
-        <h1 className="text-white text-2xl md:text-[30px] font-bold">About</h1>
-        <p className="text-white font-thin w-full">
-          AlertUp is a smart safety platform designed to help people stay calm, informed, and protected during emergencies.
+    <div ref={rootRef}>
+      <Seo
+        jsonLd={[
+          breadcrumbJsonLd([
+            { name: "Home", path: "/" },
+            { name: "Contact", path: "/contact" },
+          ]),
+        ]}
+      />
 
-          In critical situations like fires, earthquakes, or other building emergencies, panic and lack of information can cost lives. AlertUp solves this by providing instant access to emergency guidance through a simple QR code system. By scanning a QR code placed inside a building, users can immediately see evacuation routes, safety instructions, and real-time alerts specific to their location.
+      <PageShell width="prose">
+        <div data-hero>
+          <Card className="p-7 sm:p-10">
+            <div className="mb-7 flex flex-col items-center gap-3 text-center">
+              <span className="grid h-12 w-12 place-items-center rounded-xl bg-brand-subtle text-brand-text">
+                <MailIcon size={24} />
+              </span>
+              <h1 className="text-2xl font-semibold text-ink sm:text-3xl">
+                Contact us
+              </h1>
+              <p className="max-w-md text-sm text-ink-muted sm:text-base">
+                Questions about setting up your building? We answer every
+                message.
+              </p>
+            </div>
 
-          For building owners and administrators, AlertUp offers powerful tools to manage safety more effectively. These include activity logs, emergency mode controls, analytics, and centralized administration dashboards that help monitor and improve building safety preparedness.
+            {contactMessage !== "" && (
+              <Alert
+                tone={contactMessage === "Sent." ? "success" : "danger"}
+                className="mb-5"
+              >
+                {contactMessage === "Sent."
+                  ? "Message sent — we'll get back to you soon."
+                  : contactMessage}
+              </Alert>
+            )}
 
-          AlertUp is built with a clear mission:
-          to make emergency response faster, clearer, and accessible to everyone.
-
-          We believe safety should not depend on knowing the building layout or waiting for instructions. With AlertUp, critical information is always one scan away.
-        </p>
-      </section> */}
-      <form
-        onSubmit={SendMessage}
-        className="w-full max-w-md bg-white/5 backdrop-blur-lg rounded-2xl p-6 md:p-8 shadow-xl border border-white/10 text-white w-full md:w-1/2"
-      >
-        <h1 className="text-2xl font-bold text-center mb-6">
-          Contact Us
-        </h1>
-
-        {contactMessage !== "" && (
-          <p
-            className={`mb-4 text-center text-sm font-semibold ${
-              contactMessage === "Sent."
-                ? "text-green-400"
-                : "text-red-500"
-            }`}
-          >
-            {contactMessage}
-          </p>
-        )}
-
-        {/* Email */}
-        <input
-          type="email"
-          placeholder="Email"
-          className="w-full mb-3 px-4 py-2 rounded-lg bg-black/40 text-white outline-none border border-white/10 focus:border-[#FF7B22]"
-          value={contactData.email}
-          onChange={(e) =>
-            setContactData({ ...contactData, email: e.target.value })
-          }
-          required
-        />
-
-        {/* Reason */}
-        <input
-          type="text"
-          placeholder="Reason"
-          className="w-full mb-3 px-4 py-2 rounded-lg bg-black/40 text-white outline-none border border-white/10 focus:border-[#FF7B22]"
-          value={contactData.reason}
-          onChange={(e) =>
-            setContactData({ ...contactData, reason: e.target.value })
-          }
-          required
-        />
-
-        {/* Message */}
-        <textarea
-          placeholder="Message"
-          className="w-full mb-4 px-4 py-2 resize-none h-[180px] rounded-lg bg-black/40 text-white outline-none border border-white/10 focus:border-[#FF7B22]"
-          value={contactData.message}
-          onChange={(e) =>
-            setContactData({ ...contactData, message: e.target.value })
-          }
-          required
-        />
-
-        {/* Submit */}
-        {!contactLoading ? (
-          <button
-            type="submit"
-            className="w-full py-2 rounded-lg bg-[#FF7B22] hover:scale-105 transition text-white font-semibold"
-          >
-            Send Message
-          </button>
-        ) : (
-          <button
-            disabled
-            className="w-full py-2 rounded-lg bg-[#FF7B22]/50 cursor-not-allowed text-white font-semibold"
-          >
-            Sending...
-          </button>
-        )}
-      </form>
-    </main>
+            <form onSubmit={SendMessage} className="flex flex-col gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <TextField
+                  label="Email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  value={contactData.email}
+                  onChange={(e) =>
+                    setContactData({ ...contactData, email: e.target.value })
+                  }
+                  required
+                />
+                <TextField
+                  label="Reason"
+                  placeholder="e.g. Setting up my building"
+                  value={contactData.reason}
+                  onChange={(e) =>
+                    setContactData({ ...contactData, reason: e.target.value })
+                  }
+                  required
+                />
+              </div>
+              <TextAreaField
+                label="Message"
+                placeholder="Tell us what you need…"
+                rows={6}
+                value={contactData.message}
+                onChange={(e) =>
+                  setContactData({ ...contactData, message: e.target.value })
+                }
+                required
+              />
+              <Button
+                type="submit"
+                size="lg"
+                fullWidth
+                loading={contactLoading}
+                loadingLabel="Sending…"
+              >
+                Send message
+              </Button>
+            </form>
+          </Card>
+        </div>
+      </PageShell>
+    </div>
   );
 };
 

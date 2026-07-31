@@ -1,5 +1,15 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, type JSX } from 'react';
 import { type Node } from '../apis/nodesApi';
+import { sanitizeSvg } from '../lib/sanitizeSvg';
+import { buttonStyles } from './ui/styles';
+import {
+  MapIcon,
+  MapPinIcon,
+  RefreshIcon,
+  RouteIcon,
+  SearchIcon,
+  ZapIcon,
+} from './ui/icons';
 
 interface InteractiveMapProps {
   svgContent: string | null;
@@ -54,63 +64,113 @@ const InteractiveMap = ({
 
   // Node dragging optimization
   const [draggedNodePosition, setDraggedNodePosition] = useState<{x: number, y: number} | null>(null);
-  const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // ReturnType<typeof setTimeout> rather than NodeJS.Timeout: this is browser
+  // code and @types/node is not in this project's `types` list.
+  const updateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Reset view when SVG content changes
+  // The map's own coordinate space. Node x/y are stored in these units.
+  const SVG_WIDTH = 1000;
+  const SVG_HEIGHT = 800;
+
+  // The container is sized by CSS (w-full h-full), so its real pixel size is
+  // measured rather than assumed from the width/height props. Those props
+  // default to 800x600 and almost never matched the rendered element, which is
+  // what pushed every node marker and click away from the floor plan beneath.
+  const [containerSize, setContainerSize] = useState({ width, height });
+
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element) return;
+
+    const measure = () => {
+      const rect = element.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      // Only commit a genuine change: ResizeObserver fires on layout passes
+      // that often report identical dimensions, and re-setting the same object
+      // would re-render the whole map (and every node overlay) for nothing.
+      setContainerSize((current) =>
+        current.width === rect.width && current.height === rect.height
+          ? current
+          : { width: rect.width, height: rect.height },
+      );
+    };
+
+    measure();
+
+    // ResizeObserver is the accurate signal (the container is resized by layout
+    // changes, not just by window resizes), but it is absent in jsdom and in
+    // older browsers, so fall back to a window resize listener rather than
+    // throwing during mount.
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', measure);
+      return () => window.removeEventListener('resize', measure);
+    }
+
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  // Cancel any pending debounced node update on unmount. Without this, tearing
+  // the map down within 100ms of a drag (a floor switch, a route change) still
+  // fired onNodeUpdate, triggering an API call and a setState on a component
+  // that no longer exists.
+  useEffect(() => {
+    return () => {
+      if (updateTimeoutRef.current) clearTimeout(updateTimeoutRef.current);
+    };
+  }, []);
+
+  // Reset view when the displayed map changes.
+  // floorMapUrl is included because image-based floors have no svgContent, so
+  // switching between them used to keep the previous floor's pan offset.
   useEffect(() => {
     setScale(1);
     setTranslateX(0);
     setTranslateY(0);
-  }, [svgContent]);
+  }, [svgContent, floorMapUrl]);
+
+  /**
+   * The background SVG uses preserveAspectRatio="xMidYMid meet", which scales
+   * uniformly and centres the result, leaving letterbox bars on one axis. The
+   * overlay math has to reproduce exactly that: a single scale factor plus the
+   * centring offset. Using independent scaleX/scaleY (and no offset) skewed the
+   * overlay relative to the map on any container that was not exactly 5:4.
+   */
+  const viewport = useMemo(() => {
+    const fit = Math.min(containerSize.width / SVG_WIDTH, containerSize.height / SVG_HEIGHT);
+    return {
+      fit,
+      offsetX: (containerSize.width - SVG_WIDTH * fit) / 2,
+      offsetY: (containerSize.height - SVG_HEIGHT * fit) / 2,
+    };
+  }, [containerSize.width, containerSize.height]);
 
   // Convert screen coordinates to SVG coordinates
   const screenToSvgCoords = useCallback((screenX: number, screenY: number) => {
-    const svgWidth = 1000;
-    const svgHeight = 800;
-    
-    // Calculate the scale factor from SVG to container
-    const scaleX = width / svgWidth;
-    const scaleY = height / svgHeight;
-    
-    // Reverse the zoom and pan transforms
+    // Undo pan/zoom, then the letterbox offset, then the uniform fit scale.
     const containerX = (screenX - translateX) / scale;
     const containerY = (screenY - translateY) / scale;
-    
-    // Convert container coordinates to SVG coordinates
-    const svgX = containerX / scaleX;
-    const svgY = containerY / scaleY;
-    
-    return { 
-      x: Math.round(Math.max(0, Math.min(svgWidth, svgX))), 
-      y: Math.round(Math.max(0, Math.min(svgHeight, svgY)))
+
+    const svgX = (containerX - viewport.offsetX) / viewport.fit;
+    const svgY = (containerY - viewport.offsetY) / viewport.fit;
+
+    return {
+      x: Math.round(Math.max(0, Math.min(SVG_WIDTH, svgX))),
+      y: Math.round(Math.max(0, Math.min(SVG_HEIGHT, svgY)))
     };
-  }, [width, height, scale, translateX, translateY]);
+  }, [scale, translateX, translateY, viewport]);
 
   // Convert SVG coordinates to screen coordinates
   const svgToScreenCoords = useCallback((svgX: number, svgY: number) => {
-    const svgWidth = 1000;
-    const svgHeight = 800;
-    
-    // Calculate the scale factor from SVG to container
-    const scaleX = width / svgWidth;
-    const scaleY = height / svgHeight;
-    
-    // Convert SVG coordinates to container coordinates
-    const containerX = svgX * scaleX;
-    const containerY = svgY * scaleY;
-    
-    // Apply zoom and pan transforms
-    const screenX = containerX * scale + translateX;
-    const screenY = containerY * scale + translateY;
-    
-    return { x: screenX, y: screenY };
-  }, [width, height, scale, translateX, translateY]);
+    const containerX = svgX * viewport.fit + viewport.offsetX;
+    const containerY = svgY * viewport.fit + viewport.offsetY;
 
-  // Handle wheel zoom - DISABLED
-  const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    // Zoom is disabled
-  }, []);
+    return {
+      x: containerX * scale + translateX,
+      y: containerY * scale + translateY
+    };
+  }, [scale, translateX, translateY, viewport]);
 
   // Handle mouse down for panning
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -183,15 +243,17 @@ const InteractiveMap = ({
     if (e.shiftKey && onNodeUpdate && !createMode) {
       // Start dragging node
       setDraggedNode(node._id);
-    } else if (createMode && onCreateNode) {
-      // Create new node at this position in create mode
-      const svgCoords = screenToSvgCoords(mousePosition.x, mousePosition.y);
-      onCreateNode(svgCoords.x, svgCoords.y);
+    } else if (createMode) {
+      // Deliberately does nothing: the click bubbles to the container, whose
+      // onClick creates the node. Creating one here as well produced two nodes
+      // at nearly identical coordinates whenever the user clicked on or near an
+      // existing node in create mode — stopPropagation on mousedown does not
+      // suppress the click event that follows.
     } else {
       // Regular node click
       onNodeClick(node._id);
     }
-  }, [onNodeClick, onNodeUpdate, onCreateNode, createMode, mousePosition, screenToSvgCoords]);
+  }, [onNodeClick, onNodeUpdate, createMode]);
 
   // Handle node hover
   const handleNodeHover = useCallback((node: Node | null) => {
@@ -227,7 +289,7 @@ const InteractiveMap = ({
                 y1={fromPos.y}
                 x2={toPos.x}
                 y2={toPos.y}
-                stroke="#FF7B22"
+                stroke="var(--brand)"
                 strokeWidth="2"
                 strokeDasharray="5,5"
                 opacity="0.7"
@@ -258,12 +320,15 @@ const InteractiveMap = ({
   // }, []);
 
   return (
-    <div className="relative bg-gray-100 rounded-lg overflow-hidden border border-gray-300 w-full h-full">
+    <div className="relative bg-surface-2 rounded-2xl overflow-hidden border border-line w-full h-full">
       {/* Map Container */}
       <div
         ref={containerRef}
         className={`relative w-full h-full ${createMode ? 'cursor-crosshair' : 'cursor-move'}`}
-        onWheel={handleWheel}
+        // The onWheel handler was removed: React attaches wheel listeners
+        // passively, so its preventDefault() never took effect — it only logged
+        // a console error on every tick while the page scrolled anyway. Zoom is
+        // disabled, so there is nothing for it to do.
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -279,10 +344,11 @@ const InteractiveMap = ({
             preserveAspectRatio="xMidYMid meet"
             style={{
               transform: `translate(${translateX}px, ${translateY}px) scale(${scale})`,
-              transformOrigin: 'center',
+              transformOrigin: '0 0',
               transition: isDragging ? 'none' : 'transform 0.1s ease-out'
             }}
-            dangerouslySetInnerHTML={{ __html: svgContent }}
+            // Uploaded floor-plan markup, sanitized before injection.
+            dangerouslySetInnerHTML={{ __html: sanitizeSvg(svgContent) }}
           />
         ) : floorMapUrl ? (
           <div className="absolute inset-0 w-full h-full">
@@ -292,7 +358,7 @@ const InteractiveMap = ({
               className="w-full h-full object-contain"
               style={{
                 transform: `translate(${translateX}px, ${translateY}px) scale(${scale})`,
-                transformOrigin: 'center',
+                transformOrigin: '0 0',
                 transition: isDragging ? 'none' : 'transform 0.1s ease-out'
               }}
               onLoad={() => console.log('✅ Image loaded successfully:', floorMapUrl)}
@@ -303,13 +369,13 @@ const InteractiveMap = ({
             />
           </div>
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
-            <div className="text-center">
-              <svg className="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-              </svg>
-              <p className="text-gray-600 font-medium">No map available for this floor</p>
-              <p className="text-sm text-gray-500 mt-2">Upload an SVG or convert an image to get started</p>
+          <div className="absolute inset-0 flex items-center justify-center bg-canvas-subtle">
+            <div className="flex flex-col items-center gap-3 px-6 text-center">
+              <span className="grid h-12 w-12 place-items-center rounded-full bg-brand-subtle text-brand-text">
+                <MapIcon size={24} />
+              </span>
+              <p className="font-medium text-ink">No map available for this floor</p>
+              <p className="text-sm text-ink-muted">Upload an SVG or convert an image to get started</p>
             </div>
           </div>
         )}
@@ -343,14 +409,14 @@ const InteractiveMap = ({
               key={node._id}
               data-testid="node"
               className={`absolute w-4 h-4 rounded-full cursor-pointer transform -translate-x-1/2 -translate-y-1/2 transition-all duration-200 ${
-                node.type === 'exit' ? 'bg-green-500' :
-                node.type === 'stairs' ? 'bg-blue-500' : 'bg-yellow-500'
+                node.type === 'exit' ? 'bg-success' :
+                node.type === 'stairs' ? 'bg-info' : 'bg-warning'
               } ${
-                isSelected ? 'ring-4 ring-white ring-opacity-60 scale-150 z-20' : ''
+                isSelected ? 'ring-4 ring-brand/60 scale-150 z-20' : ''
               } ${
-                isHovered ? 'ring-2 ring-yellow-300 scale-125 z-10' : ''
+                isHovered ? 'ring-2 ring-brand/40 scale-125 z-10' : ''
               } ${
-                draggedNode === node._id ? 'cursor-grabbing ring-4 ring-blue-400 scale-125 z-30' : ''
+                draggedNode === node._id ? 'cursor-grabbing ring-4 ring-info scale-125 z-30' : ''
               }`}
               style={{
                 left: `${actualPosition.x}px`,
@@ -368,7 +434,7 @@ const InteractiveMap = ({
         {/* Create Mode Cursor Indicator */}
         {createMode && svgContent && (
           <div
-            className="absolute w-6 h-6 border-2 border-red-500 rounded-full pointer-events-none transform -translate-x-1/2 -translate-y-1/2"
+            className="absolute w-6 h-6 border-2 border-danger rounded-full pointer-events-none transform -translate-x-1/2 -translate-y-1/2"
             style={{
               left: `${mousePosition.x}px`,
               top: `${mousePosition.y}px`,
@@ -377,12 +443,12 @@ const InteractiveMap = ({
         )}
 
         {/* Coordinate Display */}
-        <div className="absolute top-4 left-4 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded pointer-events-none">
+        <div className="absolute top-4 left-4 rounded-lg border border-line bg-surface/90 px-2 py-1 text-xs text-ink-muted shadow-sm backdrop-blur-sm pointer-events-none">
           <div>Mouse: ({Math.round(mousePosition.x)}, {Math.round(mousePosition.y)})</div>
           <div>SVG: ({svgCoordinates.x}, {svgCoordinates.y})</div>
           <div>Zoom: {Math.round(scale * 100)}%</div>
           {createMode && (
-            <div className="text-yellow-300 font-bold mt-1">
+            <div className="text-brand-text font-semibold mt-1">
               Click to place node at ({svgCoordinates.x}, {svgCoordinates.y})
             </div>
           )}
@@ -391,56 +457,50 @@ const InteractiveMap = ({
 
       {/* Controls */}
       <div className="absolute top-4 right-4 flex flex-col gap-2">
-        {/* <button
-          // onClick={zoomIn}
-          className="w-10 h-10 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center justify-center transition-colors shadow-md"
-          title="Zoom In"
-        > */}
-          {/* <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-          </svg>
-        </button> */}
-        
-        {/* <button
-          onClick={zoomOut}
-          className="w-10 h-10 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center justify-center transition-colors shadow-md"
-          title="Zoom Out"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-          </svg>
-        </button> */}
-        
         <button
           onClick={resetView}
-          className="w-10 h-10 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center justify-center transition-colors shadow-md"
+          className={buttonStyles({ variant: "secondary", size: "icon-sm" })}
           title="Reset View"
+          aria-label="Reset view"
         >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
+          <RefreshIcon size={18} />
         </button>
       </div>
 
       {/* Zoom Indicator */}
-      <div className="absolute bottom-4 right-4 bg-white border border-gray-300 text-gray-700 px-3 py-1 rounded-lg text-sm shadow-md">
+      <div className="absolute bottom-4 right-4 rounded-lg border border-line bg-surface px-3 py-1 text-sm text-ink-muted shadow-sm">
         {Math.round(scale * 100)}%
       </div>
 
       {/* Instructions */}
-      <div className="absolute bottom-4 left-4 bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-xs max-w-xs shadow-md">
+      <div className="absolute bottom-4 left-4 flex max-w-xs flex-col gap-1 rounded-lg border border-line bg-surface px-3 py-2 text-xs text-ink-muted shadow-sm">
         {createMode ? (
           <>
-            <p className="font-bold text-red-600">🎯 Create Node Mode</p>
+            <p className="flex items-center gap-1.5 font-semibold text-danger-text">
+              <MapPinIcon size={13} className="shrink-0" />
+              Create Node Mode
+            </p>
             <p>Click anywhere to place a node</p>
             <p>Coordinates shown in real-time</p>
           </>
         ) : (
           <>
-            <p>🖱️ Scroll to zoom</p>
-            <p>🤚 Click & drag to pan</p>
-            <p>📍 Click nodes to select</p>
-            <p>⚡ Shift+drag nodes to move</p>
+            <p className="flex items-center gap-1.5">
+              <SearchIcon size={13} className="shrink-0 text-ink-subtle" />
+              Scroll to zoom
+            </p>
+            <p className="flex items-center gap-1.5">
+              <RouteIcon size={13} className="shrink-0 text-ink-subtle" />
+              Click &amp; drag to pan
+            </p>
+            <p className="flex items-center gap-1.5">
+              <MapPinIcon size={13} className="shrink-0 text-ink-subtle" />
+              Click nodes to select
+            </p>
+            <p className="flex items-center gap-1.5">
+              <ZapIcon size={13} className="shrink-0 text-ink-subtle" />
+              Shift+drag nodes to move
+            </p>
           </>
         )}
       </div>

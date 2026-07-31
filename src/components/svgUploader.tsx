@@ -1,5 +1,22 @@
 import { useState } from "react";
 import { uploadSVG, convertToSVG, updateFloorMap, type UploadResponse } from "../apis/uploadApi";
+import { cn } from "../lib/cn";
+import { Alert } from "./ui/feedback";
+import { buttonStyles } from "./ui/styles";
+import {
+  CheckCircleIcon,
+  FileTextIcon,
+  ShieldCheckIcon,
+  SpinnerIcon,
+} from "./ui/icons";
+
+const SECURITY_FEATURES = [
+  "SVG file validation",
+  "File size limits (5MB max)",
+  "Content sanitization",
+  "Automatic conversion for other formats",
+  "Secure file storage",
+] as const;
 
 interface SvgUploaderProps {
   buildingId: string;
@@ -85,49 +102,42 @@ const SvgUploader = ({ buildingId, floorNumber, onSvgUploaded }: SvgUploaderProp
     if (files && files.length > 0) {
       handleFileUpload(files[0]);
     }
+    // Cleared so re-picking the same file fires onChange again. Otherwise a
+    // user whose upload failed could select the identical file and see nothing
+    // happen, because the input's value had not changed.
+    e.target.value = "";
   };
 
   return (
-    <div className="p-6 bg-white/5 rounded-lg border border-white/10">
-      <h3 className="text-xl font-bold mb-4">Upload Floor Map</h3>
-      
+    <div className="rounded-2xl border border-line bg-surface p-6 shadow-sm">
+      <h3 className="mb-4 text-lg font-semibold text-ink">Upload Floor Map</h3>
+
       <div
-        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-          dragActive 
-            ? 'border-[#FF7B22] bg-[#FF7B22]/10' 
-            : 'border-white/30 hover:border-white/50'
-        }`}
+        className={cn(
+          "rounded-2xl border-2 border-dashed p-8 text-center transition-colors",
+          dragActive
+            ? "border-brand bg-brand-subtle"
+            : "border-line bg-surface-2 hover:border-brand-border",
+        )}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
       >
-        <div className="mb-4">
-          <svg
-            className="mx-auto h-12 w-12 text-white/50"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-            />
-          </svg>
-        </div>
+        <span className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full bg-brand-subtle text-brand-text">
+          <FileTextIcon size={24} />
+        </span>
 
         {uploading ? (
-          <div className="text-[#FF7B22]">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FF7B22] mx-auto mb-2"></div>
-            <p>Uploading and processing...</p>
+          <div role="status" className="flex flex-col items-center gap-2 text-brand-text">
+            <SpinnerIcon size={28} />
+            <p className="text-sm font-medium">Uploading and processing...</p>
           </div>
         ) : (
           <div>
-            <p className="text-white/70 mb-2">
+            <p className="mb-2 text-ink-muted">
               Drag and drop your SVG file here, or click to select
             </p>
-            <p className="text-white/50 text-sm mb-4">
+            <p className="mb-4 text-sm text-ink-subtle">
               SVG files preferred. Other formats will be converted to SVG.
             </p>
             <input
@@ -139,7 +149,7 @@ const SvgUploader = ({ buildingId, floorNumber, onSvgUploaded }: SvgUploaderProp
             />
             <label
               htmlFor="svg-upload"
-              className="inline-block px-4 py-2 bg-[#FF7B22] text-white rounded-lg hover:bg-[#FF7B22]/80 cursor-pointer transition-colors"
+              className={cn(buttonStyles({ variant: "primary", size: "md" }), "cursor-pointer")}
             >
               Choose File
             </label>
@@ -147,20 +157,24 @@ const SvgUploader = ({ buildingId, floorNumber, onSvgUploaded }: SvgUploaderProp
         )}
 
         {error && (
-          <div className="mt-4 p-3 bg-red-500/20 border border-red-500 rounded-lg text-red-300 text-sm">
+          <Alert tone="danger" className="mt-4 text-left">
             {error}
-          </div>
+          </Alert>
         )}
       </div>
 
-      <div className="mt-4 p-4 bg-black/30 rounded-lg">
-        <h4 className="font-semibold mb-2 text-[#FF7B22]">Security Features:</h4>
-        <ul className="text-sm text-white/70 space-y-1">
-          <li>✅ SVG file validation</li>
-          <li>✅ File size limits (5MB max)</li>
-          <li>✅ Content sanitization</li>
-          <li>✅ Automatic conversion for other formats</li>
-          <li>✅ Secure file storage</li>
+      <div className="mt-4 rounded-xl border border-line bg-surface-2 p-4">
+        <h4 className="mb-2.5 flex items-center gap-1.5 text-sm font-semibold text-ink">
+          <ShieldCheckIcon size={16} className="shrink-0 text-brand-text" />
+          Security Features
+        </h4>
+        <ul className="space-y-1.5 text-sm text-ink-muted">
+          {SECURITY_FEATURES.map((feature) => (
+            <li key={feature} className="flex items-center gap-2">
+              <CheckCircleIcon size={15} className="shrink-0 text-success-text" />
+              {feature}
+            </li>
+          ))}
         </ul>
       </div>
     </div>

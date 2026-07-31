@@ -1,64 +1,114 @@
 import { Navigate, useParams } from "react-router-dom";
-import { getMe } from "../apis/me";
-import { useEffect, useState } from "react";
-import axios from "axios";
+import { getAuthState } from "../apis/me";
+import { getBuilding } from "../apis/building";
+import { useCallback, useEffect, useState } from "react";
+import { PageShell } from "../components/ui/layout";
+import { Button } from "../components/ui/button";
+import { Skeleton, EmptyState } from "../components/ui/feedback";
+import { AlertTriangleIcon, RefreshIcon } from "../components/ui/icons";
+
+type Status = "loading" | "owner" | "notOwner" | "unauthenticated" | "error";
 
 const BuildingOwnerGuard = ({ children }: { children: any }) => {
-  const [isOwner, setIsOwner] = useState<boolean | null>(null); // null = loading
-  const [user, setUser] = useState<any>(null);
+  const [status, setStatus] = useState<Status>("loading");
+  const [errorText, setErrorText] = useState("");
   const { buildingId } = useParams<{ buildingId: string }>();
 
-  useEffect(() => {
-    const checkOwnership = async () => {
+  const check = useCallback(
+    async (isCancelled: () => boolean) => {
+      // Reset on every run. Navigating straight from one building to another
+      // reuses this component, and leaving the previous verdict in place let
+      // the next building's page render under the old building's authorization.
+      setStatus("loading");
+
       try {
-        // First check if user is authenticated
-        const meRes = await getMe();
-        if (!meRes || meRes.Success === false) {
-          setIsOwner(false);
+        const auth = await getAuthState();
+        if (isCancelled()) return;
+
+        if (auth.state === "error") {
+          setErrorText(auth.message);
+          setStatus("error");
+          return;
+        }
+        if (auth.state === "unauthenticated") {
+          setStatus("unauthenticated");
           return;
         }
 
-        // Get user data from the correct location in response
-        const userData = meRes.user || meRes.Message?.user || meRes.Message;
-        if (!userData || !userData._id) {
-          setIsOwner(false);
-          return;
-        }
-
-        setUser(userData);
-
-        // If no buildingId provided, just check authentication
         if (!buildingId) {
-          setIsOwner(true);
+          setStatus("owner");
           return;
         }
 
-        // Check if user owns the specific building
-        const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://alertup-backend.onrender.com';
-        const buildingRes = await axios.get(`${API_BASE_URL}/api/building/id/${buildingId}`);
-        
-        if (buildingRes.data.Success && buildingRes.data.Message.owner === userData._id) {
-          setIsOwner(true);
+        const buildingRes = await getBuilding({ buildingID: buildingId });
+        if (isCancelled()) return;
+
+        if (buildingRes?.Success && buildingRes.Message?.owner === auth.user._id) {
+          setStatus("owner");
         } else {
-          setIsOwner(false);
+          setStatus("notOwner");
         }
       } catch (error) {
-        console.error('Ownership check failed:', error);
-        setIsOwner(false);
+        if (isCancelled()) return;
+        console.error("Ownership check failed:", error);
+        setStatus("error");
+        setErrorText("Could not verify access to this building.");
       }
+    },
+    [buildingId],
+  );
+
+  useEffect(() => {
+    // Guards against an earlier, slower check overwriting a newer verdict when
+    // buildingId changes mid-flight.
+    let cancelled = false;
+    check(() => cancelled);
+    return () => {
+      cancelled = true;
     };
+  }, [check]);
 
-    checkOwnership();
-  }, [buildingId]);
+  if (status === "loading")
+    return (
+      <PageShell>
+        <div role="status" aria-live="polite">
+          <span className="sr-only">Verifying access…</span>
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-3">
+              <Skeleton className="h-9 w-56 max-w-full" />
+              <Skeleton className="h-4 w-80 max-w-full" />
+            </div>
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              <Skeleton className="h-40" />
+              <Skeleton className="h-40" />
+              <Skeleton className="h-40" />
+            </div>
+          </div>
+        </div>
+      </PageShell>
+    );
 
-  // while checking ownership, render loading spinner
-  if (isOwner === null) return <div className="text-center mt-20">Loading...</div>;
+  if (status === "error") {
+    return (
+      <PageShell>
+        <EmptyState
+          icon={<AlertTriangleIcon size={24} />}
+          title="Something went wrong"
+          description={errorText || "Could not reach the server."}
+          action={
+            <Button type="button" onClick={() => check(() => false)}>
+              <RefreshIcon size={16} />
+              Retry
+            </Button>
+          }
+        />
+      </PageShell>
+    );
+  }
 
-  // if not authenticated, redirect to login
-  if (!user) return <Navigate to="/login" replace />;
+  if (status === "unauthenticated") return <Navigate to="/login" replace />;
 
-  // if not owner, redirect to dashboard
-  if (!isOwner) return <Navigate to="/dashboard" replace />;
+  if (status === "notOwner") return <Navigate to="/dashboard" replace />;
 
   return children;
 };

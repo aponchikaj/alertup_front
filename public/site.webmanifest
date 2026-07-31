@@ -1,0 +1,50 @@
+{
+  "name": "AlertUp — Scan & Be Safe",
+  "short_name": "AlertUp",
+  "description": "Scan a QR code and instantly see the safest way out of any building. Evacuation routes, escape maps and emergency instructions — no app install required.",
+  "start_url": "/?utm_source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["safety", "utilities", "navigation"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Scan a QR code",
+      "short_name": "Scan",
+      "description": "Open the scanner and find the nearest safe exit",
+      "url": "/scan?utm_source=pwa-shortcut",
+      "icons": [{ "src": "/icon-512.png", "sizes": "512x512" }]
+    },
+    {
+      "name": "My buildings",
+      "short_name": "Buildings",
+      "description": "Manage your buildings, floors and QR codes",
+      "url": "/mybuildings?utm_source=pwa-shortcut",
+      "icons": [{ "src": "/icon-512.png", "sizes": "512x512" }]
+    }
+  ]
+}

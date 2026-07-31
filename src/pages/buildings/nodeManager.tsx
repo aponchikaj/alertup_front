@@ -1,15 +1,31 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import PageHeader from "../../components/pageHeader";
 import { getNodesByBuilding, createNode, deleteNode, updateNode, connectNodes, type Node, type CreateNodeRequest } from "../../apis/nodesApi";
 import { getMyBuildings } from "../../apis/building";
 import SvgUploader from "../../components/svgUploader";
 import InteractiveMap from "../../components/interactiveMapImproved";
 import SimpleQRCodeDisplay from "../../components/simpleQRCodeDisplay";
+import { usePageAnimations } from "../../lib/animations";
+import { PageHeader, PageShell } from "../../components/ui/layout";
+import { Button } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
+import { Alert, EmptyState } from "../../components/ui/feedback";
+import { Field, TextField } from "../../components/ui/field";
+import { inputStyles } from "../../components/ui/styles";
+import {
+  BuildingIcon,
+  MapIcon,
+  MapPinIcon,
+  PlusIcon,
+  QrCodeIcon,
+  RouteIcon,
+  TrashIcon,
+} from "../../components/ui/icons";
 
 const NodeManager = () => {
   const { buildingId } = useParams<{ buildingId: string }>();
   const navigate = useNavigate();
+  const rootRef = usePageAnimations();
 
   const [building, setBuilding] = useState<any>(null);
   const [nodes, setNodes] = useState<Node[]>([]);
@@ -49,13 +65,13 @@ const NodeManager = () => {
       // Get the selected floor option to get the actual floor name
       const selectedFloorOption = floorOptions.find((option:any) => option.value === selectedFloor);
       const actualFloorName = selectedFloorOption?.floorName;
-      
+
       const floorMap = building.maps?.find((map: any) => {
         const stringMatch = map.floor === actualFloorName;
         const numberMatch = parseInt(map.floor) === selectedFloor;
         return stringMatch || numberMatch;
       });
-      
+
       const loadMap = async () => {
         if (floorMap && floorMap.map) {
           // Check if it's a Cloudinary URL (starts with http)
@@ -115,13 +131,13 @@ const NodeManager = () => {
 
   const handleCreateNode = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       const nodeData = { ...newNode, buildingId: buildingId!, floorNumber: selectedFloor };
-      
+
       const result = await createNode(nodeData);
       console.log(result)
-      
+
       if (result.success) {
         setNodes([...nodes, result.node]);
         setShowCreateForm(false);
@@ -154,7 +170,7 @@ const NodeManager = () => {
 
   const handleDeleteNode = async (nodeId: string) => {
     if (!confirm("Are you sure you want to delete this node?")) return;
-    
+
     try {
       const result = await deleteNode(nodeId);
       if (result.success) {
@@ -170,8 +186,8 @@ const NodeManager = () => {
       const result = await updateNode(nodeId, { x, y });
       if (result.success) {
         // Update the node in the local state
-        setNodes(nodes.map(node => 
-          node._id === nodeId 
+        setNodes(nodes.map(node =>
+          node._id === nodeId
             ? { ...node, x, y, updatedAt: new Date().toISOString() }
             : node
         ));
@@ -220,169 +236,175 @@ const NodeManager = () => {
   })) || [{ value: 1, label: 'Floor 1', floorName: '1' }];
 
   return (
-    <main className="min-h-screen bg-[#353535] text-white px-4 py-16">
-      < div className="w-full h-[5vh]"/>
-      <PageHeader title="Emergency Routing Nodes" />
-      
-      <div className="max-w-7xl mx-auto">
+    <div ref={rootRef}>
+      <PageShell width="wide">
+        <div data-hero>
+          <PageHeader
+            title="Emergency Routing Nodes"
+            description="Place, connect and manage the escape-route nodes for every floor."
+          />
+        </div>
+
         {/* Building Info */}
         {building && (
-          <div className="mb-8 p-6 bg-white/5 rounded-lg border border-white/10">
-            <h2 className="text-2xl font-bold text-[#FF7B22] mb-2">{building.buildingName}</h2>
-            <p className="text-gray-300">Manage emergency routing nodes for this building</p>
+          <div data-hero className="pt-8">
+            <Card className="flex items-center gap-4 p-6">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-subtle text-brand-text">
+                <BuildingIcon size={22} />
+              </span>
+              <div>
+                <h2 className="text-xl font-semibold text-ink">{building.buildingName}</h2>
+                <p className="text-sm text-ink-muted">Manage emergency routing nodes for this building</p>
+              </div>
+            </Card>
           </div>
         )}
 
         {/* Error Display */}
         {error && (
-          <div className="mb-6 p-4 bg-red-500/20 border border-red-500 rounded-lg text-red-300">
+          <Alert tone="danger" className="mt-6">
             {error}
-          </div>
+          </Alert>
         )}
 
         {/* Controls */}
-        <div className="mb-6 flex flex-wrap gap-4">
-          <select
-            value={selectedFloor}
-            onChange={(e) => setSelectedFloor(Number(e.target.value))}
-            className="px-4 py-2 bg-black/40 border border-white/20 rounded-lg text-white"
-          >
-            {floorOptions.map((option: { value: number; label: string }) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+        <div data-hero className="flex flex-wrap items-center gap-3 pt-6">
+          <Field label="Floor" hideLabel className="w-full sm:w-56">
+            {({ id }) => (
+              <select
+                id={id}
+                value={selectedFloor}
+                onChange={(e) => setSelectedFloor(Number(e.target.value))}
+                className={inputStyles({ className: "cursor-pointer" })}
+              >
+                {floorOptions.map((option: { value: number; label: string }) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
 
-          <button
+          <Button
             onClick={() => {
               setShowCreateForm(!showCreateForm);
             }}
-            className="px-4 py-2 bg-[#FF7B22] text-white rounded-lg hover:bg-[#FF7B22]/80"
+            variant={showCreateForm ? "secondary" : "primary"}
           >
+            {!showCreateForm && <PlusIcon size={18} />}
             {showCreateForm ? "Cancel" : "Create Node"}
-          </button>
+          </Button>
 
           {/* Map Upload Button - Always show if no map exists */}
           {(!floorSvgContent && !floorMapUrl) && (
-            <button
+            <Button
               onClick={() => setShowSvgUploader(!showSvgUploader)}
-              className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-500/80"
+              variant="secondary"
             >
+              <MapIcon size={18} />
               {showSvgUploader ? "Cancel Upload" : "Upload Map"}
-            </button>
+            </Button>
           )}
 
-          <button
+          <Button
             onClick={() => {
               setConnectingMode(!connectingMode);
               setSelectedNode(null);
             }}
-            className={`px-4 py-2 rounded-lg ${
-              connectingMode 
-                ? "bg-green-500 text-white" 
-                : "bg-blue-500 text-white hover:bg-blue-500/80"
-            }`}
+            variant={connectingMode ? "subtle" : "secondary"}
           >
+            <RouteIcon size={18} />
             {connectingMode ? "Connecting Mode ON" : "Connect Nodes"}
-          </button>
+          </Button>
         </div>
 
         {/* SVG Upload Form */}
         {showSvgUploader && (
-          <SvgUploader
-            buildingId={buildingId!}
-            floorNumber={selectedFloor}
-            onSvgUploaded={handleSvgUploaded}
-          />
+          <div className="pt-6">
+            <SvgUploader
+              buildingId={buildingId!}
+              floorNumber={selectedFloor}
+              onSvgUploaded={handleSvgUploaded}
+            />
+          </div>
         )}
 
         {/* Create Node Form */}
         {showCreateForm && (
-          <div className="mb-8 p-6 bg-white/5 rounded-lg border border-white/10">
-            <h3 className="text-xl font-bold mb-4">
-              Create New Node {(showCreateForm && (floorSvgContent || floorMapUrl)) && (
-                <span className="text-sm text-yellow-400 ml-2">
-                  - Click on map to set coordinates
+          <Card className="mt-6 p-6">
+            <h3 className="mb-4 text-xl font-semibold text-ink">
+              Create New Node
+              {(showCreateForm && (floorSvgContent || floorMapUrl)) && (
+                <span className="ml-2 text-sm font-normal text-warning-text">
+                  — Click on map to set coordinates
                 </span>
               )}
             </h3>
-            <form onSubmit={handleCreateNode} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Node Type</label>
-                  <select
-                    value={newNode.type}
-                    onChange={(e) => setNewNode({...newNode, type: e.target.value as any})}
-                    className="w-full px-4 py-2 bg-black/40 border border-white/20 rounded-lg text-white"
-                  >
-                    <option value="path">Path Point</option>
-                    <option value="exit">Emergency Exit</option>
-                    <option value="stairs">Stairs/Elevator</option>
-                  </select>
-                </div>
+            <form onSubmit={handleCreateNode} className="flex flex-col gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <Field label="Node Type">
+                  {({ id }) => (
+                    <select
+                      id={id}
+                      value={newNode.type}
+                      onChange={(e) => setNewNode({...newNode, type: e.target.value as any})}
+                      className={inputStyles({ className: "cursor-pointer" })}
+                    >
+                      <option value="path">Path Point</option>
+                      <option value="exit">Emergency Exit</option>
+                      <option value="stairs">Stairs/Elevator</option>
+                    </select>
+                  )}
+                </Field>
 
-                <div>
-                  <label className="block text-sm font-medium mb-2">Label</label>
-                  <input
-                    type="text"
-                    value={newNode.label}
-                    onChange={(e) => setNewNode({...newNode, label: e.target.value})}
-                    placeholder="e.g., Main Exit, Stairs to Floor 2"
-                    className="w-full px-4 py-2 bg-black/40 border border-white/20 rounded-lg text-white"
-                  />
-                </div>
+                <TextField
+                  label="Label"
+                  type="text"
+                  value={newNode.label}
+                  onChange={(e) => setNewNode({...newNode, label: e.target.value})}
+                  placeholder="e.g., Main Exit, Stairs to Floor 2"
+                />
 
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    X Position 
-                    {showCreateForm && (floorSvgContent || floorMapUrl) && (
-                      <span className="text-xs text-yellow-400 ml-2">
-                        (Click map to update)
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    type="number"
-                    value={newNode.x}
-                    onChange={(e) => setNewNode({...newNode, x: Number(e.target.value)})}
-                    className="w-full px-4 py-2 bg-black/40 border border-white/20 rounded-lg text-white"
-                    placeholder="0-1000"
-                    min="0"
-                    max="1000"
-                  />
-                </div>
+                <TextField
+                  label="X Position"
+                  type="number"
+                  hint={
+                    showCreateForm && (floorSvgContent || floorMapUrl)
+                      ? "Click the map to update"
+                      : undefined
+                  }
+                  value={newNode.x}
+                  onChange={(e) => setNewNode({...newNode, x: Number(e.target.value)})}
+                  placeholder="0-1000"
+                  min="0"
+                  max="1000"
+                />
 
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Y Position
-                    {showCreateForm && (floorSvgContent || floorMapUrl) && (
-                      <span className="text-xs text-yellow-400 ml-2">
-                        (Click map to update)
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    type="number"
-                    value={newNode.y}
-                    onChange={(e) => setNewNode({...newNode, y: Number(e.target.value)})}
-                    className="w-full px-4 py-2 bg-black/40 border border-white/20 rounded-lg text-white"
-                    placeholder="0-800"
-                    min="0"
-                    max="800"
-                  />
-                </div>
+                <TextField
+                  label="Y Position"
+                  type="number"
+                  hint={
+                    showCreateForm && (floorSvgContent || floorMapUrl)
+                      ? "Click the map to update"
+                      : undefined
+                  }
+                  value={newNode.y}
+                  onChange={(e) => setNewNode({...newNode, y: Number(e.target.value)})}
+                  placeholder="0-800"
+                  min="0"
+                  max="800"
+                />
               </div>
 
-              <div className="flex gap-4">
-                <button
-                  type="submit"
-                  className="px-6 py-2 bg-[#FF7B22] text-white rounded-lg hover:bg-[#FF7B22]/80"
-                >
+              <div className="flex flex-wrap gap-3">
+                <Button type="submit">
+                  <PlusIcon size={18} />
                   Create Node
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="secondary"
                   onClick={() => {
                     setShowCreateForm(false);
                     setNewNode({
@@ -394,29 +416,28 @@ const NodeManager = () => {
                       label: ""
                     });
                   }}
-                  className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-500/80"
                 >
                   Cancel
-                </button>
+                </Button>
               </div>
             </form>
-          </div>
+          </Card>
         )}
 
         {/* Connecting Mode Instructions */}
         {connectingMode && (
-          <div className="mb-6 p-4 bg-blue-500/20 border border-blue-500 rounded-lg text-blue-300">
-            <p>🔗 Click on two nodes to connect them with an escape route</p>
-            {selectedNode && <p>Selected node: {selectedNode}</p>}
-          </div>
+          <Alert tone="info" className="mt-6">
+            <p>Click on two nodes to connect them with an escape route</p>
+            {selectedNode && <p className="mt-1">Selected node: {selectedNode}</p>}
+          </Alert>
         )}
 
         {/* Nodes Display */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6 pt-6 xl:grid-cols-3" data-reveal>
           {/* Interactive Map - Takes 2 columns on large screens */}
           <div className="xl:col-span-2">
-            <div className="bg-white/5 rounded-lg border border-white/10 p-4">
-              <h3 className="text-lg font-bold mb-4 text-white">Floor Map</h3>
+            <Card className="p-4 sm:p-5">
+              <h3 className="mb-4 text-lg font-semibold text-ink">Floor Map</h3>
               <div className="relative" style={{ height: '600px', width: '100%' }}>
                 {(floorSvgContent || floorMapUrl) ? (
                   <InteractiveMap
@@ -435,111 +456,123 @@ const NodeManager = () => {
                     height={600}
                   />
                 ) : (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gray-800 rounded-lg border-2 border-dashed border-gray-600">
-                    <div className="text-center p-8">
-                      <svg className="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586 1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      <p className="text-gray-400 font-medium mb-2">No floor map uploaded</p>
-                      <p className="text-sm text-gray-500 mb-4">Upload a floor plan to start creating nodes</p>
-                      <button
-                        onClick={() => setShowSvgUploader(true)}
-                        className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-500/80"
-                      >
+                  <EmptyState
+                    className="absolute inset-0"
+                    icon={<MapIcon size={24} />}
+                    title="No floor map uploaded"
+                    description="Upload a floor plan to start creating nodes"
+                    action={
+                      <Button onClick={() => setShowSvgUploader(true)} variant="secondary">
+                        <MapIcon size={18} />
                         Upload Floor Map
-                      </button>
-                    </div>
-                  </div>
+                      </Button>
+                    }
+                  />
                 )}
               </div>
-            </div>
+            </Card>
           </div>
 
           {/* Nodes List - Takes 1 column on large screens */}
           <div className="xl:col-span-1">
-            <div className="p-6 bg-white/5 rounded-lg border border-white/10">
-              <h3 className="text-xl font-bold mb-4">Nodes on This Floor</h3>
+            <Card className="p-6">
+              <h3 className="mb-4 text-xl font-semibold text-ink">Nodes on This Floor</h3>
               {filteredNodes.length === 0 ? (
-                <p className="text-gray-400">No nodes on this floor yet</p>
+                <EmptyState
+                  icon={<MapPinIcon size={24} />}
+                  title="No nodes on this floor yet"
+                  description="Click the map or use Create Node to place the first one."
+                  className="py-10"
+                />
               ) : (
-                <div className="space-y-3 max-h-96 overflow-y-auto">
+                <ul className="flex max-h-96 list-none flex-col gap-3 overflow-y-auto">
                   {filteredNodes.map(node => (
-                    <div
+                    <li
                       key={node._id}
-                      className={`p-4 rounded-lg border ${
-                        selectedNode === node._id 
-                          ? 'bg-blue-500/20 border-blue-500' 
-                          : 'bg-black/40 border-white/20'
+                      className={`rounded-xl border p-4 transition-colors ${
+                        selectedNode === node._id
+                          ? 'border-info-border bg-info-subtle'
+                          : 'border-line bg-surface-2'
                       }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-semibold">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <h4 className="font-semibold text-ink">
                             {node.label || `${node.type} node`}
                           </h4>
-                          <p className="text-sm text-gray-300">
+                          <p className="text-sm text-ink-muted">
                             Type: {node.type} | Position: ({node.x}, {node.y})
                           </p>
-                          <p className="text-sm text-gray-400">
+                          <p className="text-sm text-ink-subtle">
                             Connections: {node.connections.length} nodes
                           </p>
                         </div>
-                        <div className="flex gap-2">
-                          <button
+                        <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+                          <Button
+                            size="sm"
+                            variant="secondary"
                             onClick={() => generateQRCode(node)}
-                            className="px-3 py-1 bg-green-500 text-white text-sm rounded hover:bg-green-500/80"
+                            aria-label={`Show QR code for ${node.label || node.type}`}
                           >
-                            📱 QR
-                          </button>
-                          <button
+                            <QrCodeIcon size={16} />
+                            QR
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="danger"
                             onClick={() => handleDeleteNode(node._id)}
-                            className="px-3 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-500/80"
                           >
+                            <TrashIcon size={16} />
                             Delete
-                          </button>
+                          </Button>
                         </div>
                       </div>
-                    </div>
+                    </li>
                   ))}
-                </div>
+                </ul>
               )}
-            </div>
+            </Card>
           </div>
         </div>
 
         {/* Legend */}
-        <div className="mt-8 p-4 bg-white/5 rounded-lg border border-white/10">
-          <h3 className="text-lg font-bold mb-2">Node Types</h3>
-          <div className="flex flex-wrap gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-              <span>Emergency Exit</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-              <span>Stairs/Elevator</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-              <span>Path Point</span>
-            </div>
-          </div>
+        <div className="pt-6" data-reveal>
+          <Card className="p-5">
+            <h3 className="mb-3 text-lg font-semibold text-ink">Node Types</h3>
+            <ul className="flex list-none flex-wrap gap-x-6 gap-y-2 text-sm text-ink-muted">
+              <li className="flex items-center gap-2">
+                <span aria-hidden="true" className="h-3 w-3 rounded-full bg-success" />
+                <span>Emergency Exit</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <span aria-hidden="true" className="h-3 w-3 rounded-full bg-info" />
+                <span>Stairs/Elevator</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <span aria-hidden="true" className="h-3 w-3 rounded-full bg-warning" />
+                <span>Path Point</span>
+              </li>
+            </ul>
+          </Card>
         </div>
-      </div>
+      </PageShell>
 
       {/* QR Code Modal */}
       {selectedQRNode && (
         <SimpleQRCodeDisplay
           node={selectedQRNode}
           buildingName={building?.buildingName}
-          floorName={building?.maps?.find((map: any) => 
-            map.floor === selectedFloor.toString() || 
-            parseInt(map.floor) === selectedFloor
-          )?.floor}
+          // Resolved through floorOptions, the same index-based mapping the
+          // floor selector and the map effect use. Matching on the floor name
+          // instead meant named floors ("Ground Floor") yielded NaN from
+          // parseInt and the modal showed the wrong floor, or none.
+          floorName={floorOptions.find(
+            (option: { value: number; floorName?: string }) => option.value === selectedFloor,
+          )?.floorName}
           onClose={() => setSelectedQRNode(null)}
         />
       )}
-    </main>
+    </div>
   );
 };
 

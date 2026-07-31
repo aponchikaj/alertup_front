@@ -1,124 +1,102 @@
-import axios from "axios"
 import { APIS } from "./APIS"
+import { get, post, put, errorMessage, type ApiResponse } from "./http"
 
-export const saveSettings = async (data: any) => {
+export const saveSettings = async (data: unknown) => {
   try {
-    // Use PUT instead of POST
-    const res = (await axios.put(APIS.settings.saveSettings, data, { withCredentials: true })).data;
-
+    const res = await put<ApiResponse>(APIS.settings.saveSettings, data);
     if (!res) return { Success: false, Message: 'Something went wrong.' };
-
     return res;
-  } catch (err: any) {
-    return { Success: false, Message: err.response?.data?.Message || 'Something went wrong.' };
+  } catch (err) {
+    return { Success: false, Message: errorMessage(err) };
   }
 }
 
-export const changeUserPassword = async(data:any)=>{
-    try{
-        const res = (await axios.put(APIS.settings.changePassword,data,{withCredentials:true})).data
-        console.log(res)
-        if(!res){
-            return {Success:false,Message:'Something went wrong.'}
-        }
-
-        return res;
-    }catch{
-        return {Success:false,Message:'Something went wrong.'}
-    }
+export const changeUserPassword = async (data: unknown) => {
+  try {
+    const res = await put<ApiResponse>(APIS.settings.changePassword, data);
+    if (!res) return { Success: false, Message: 'Something went wrong.' };
+    return res;
+  } catch (err) {
+    return { Success: false, Message: errorMessage(err) };
+  }
 }
 
-export const sendNewEmailVerification = async(data:any)=>{
-    try{
-        const res = (await axios.post(APIS.settings.email.POSTchangeEmailSendVerification,data,{withCredentials:true})).data
-        if(!res){
-            return {Success:false,Message:'Something went wrong.'}
-        }
-
-        return res;
-    }catch{
-        return {Success:false,Message:'Something went wrong.'}
-    }
+export const sendNewEmailVerification = async (data: unknown) => {
+  try {
+    const res = await post<ApiResponse>(APIS.settings.email.POSTchangeEmailSendVerification, data);
+    if (!res) return { Success: false, Message: 'Something went wrong.' };
+    return res;
+  } catch (err) {
+    return { Success: false, Message: errorMessage(err) };
+  }
 }
 
-export const verifyNewEmailCode = async(data:any)=>{
-    try{
-        const res = (await axios.put(APIS.settings.email.PUTchangeEmailVerifyCode,data,{withCredentials:true})).data
-        if(!res){
-            return {Success:false,Message:'Something went wrong.'}
-        }
-
-        return res;
-    }catch{
-        return {Success:false,Message:'Something went wrong.'}
-    }
+export const verifyNewEmailCode = async (data: unknown) => {
+  try {
+    const res = await put<ApiResponse>(APIS.settings.email.PUTchangeEmailVerifyCode, data);
+    if (!res) return { Success: false, Message: 'Something went wrong.' };
+    return res;
+  } catch (err) {
+    return { Success: false, Message: errorMessage(err) };
+  }
 }
 
-export const sendVerificationCode = async()=>{
-    try{
-        const res = (await axios.post(APIS.settings.verifyAccount.POSTSendAccountVerification,{},{withCredentials:true})).data
-        if(!res){
-            return {Success:false,Message:'Something went wrong.'}
-        }
-
-        return res;
-    }catch{
-        return {Success:false,Message:'Something went wrong.'}
-    }
+export const sendVerificationCode = async () => {
+  try {
+    const res = await post<ApiResponse>(APIS.settings.verifyAccount.POSTSendAccountVerification, {});
+    if (!res) return { Success: false, Message: 'Something went wrong.' };
+    return res;
+  } catch (err) {
+    return { Success: false, Message: errorMessage(err) };
+  }
 }
 
-export const verifyAccountCode = async(data:any)=>{
-    try{
-        const res = (await axios.put(APIS.settings.verifyAccount.PUTVerifyAccountCode,data,{withCredentials:true})).data
-        if(!res){
-            return {Success:false,Message:'Something went wrong.'}
-        }
-
-        return res;
-    }catch{
-        return {Success:false,Message:'Something went wrong.'}
-    }
+export const verifyAccountCode = async (data: unknown) => {
+  try {
+    const res = await put<ApiResponse>(APIS.settings.verifyAccount.PUTVerifyAccountCode, data);
+    if (!res) return { Success: false, Message: 'Something went wrong.' };
+    return res;
+  } catch (err) {
+    return { Success: false, Message: errorMessage(err) };
+  }
 }
 
-export const deleteAccount = async(data:any)=>{
-    try{
-        const res = (await axios.post(APIS.settings.deleteAccount,data,{withCredentials:true})).data
-        if(!res){
-            return {Success:false,Message:'Something went wrong.'}
-        }
+export const deleteAccount = async (data: unknown) => {
+  try {
+    const res = await post<ApiResponse>(APIS.settings.deleteAccount, data);
+    if (!res) return { Success: false, Message: 'Something went wrong.' };
 
-        // Clear localStorage token (Safari/iOS fallback)
-        localStorage.removeItem('userToken');
+    // Clear the Safari/iOS fallback token
+    localStorage.removeItem('userToken');
 
-        return res;
-    }catch{
-        return {Success:false,Message:'Something went wrong.'}
-    }
+    return res;
+  } catch (err) {
+    return { Success: false, Message: errorMessage(err) };
+  }
 }
 
-export const logoutFromAccount = async()=>{
-    try{
-        const res = (await axios.post(APIS.settings.logoutAccount,{},{withCredentials:true})).data
-        if(!res){
-            return {Success:false,Message:'Something went wrong.'}
-        }
+export const logoutFromAccount = async () => {
+  try {
+    const res = await post<ApiResponse>(APIS.settings.logoutAccount, {});
 
-        // Clear localStorage token (Safari/iOS fallback)
-        localStorage.removeItem('userToken');
+    // Clear the token regardless of what the server said — the user asked to
+    // log out, so the client-side session must not survive.
+    localStorage.removeItem('userToken');
 
-        return res;
-    }catch{
-        return {Success:false,Message:'Something went wrong.'}
-    }
+    if (!res) return { Success: false, Message: 'Something went wrong.' };
+    return res;
+  } catch (err) {
+    localStorage.removeItem('userToken');
+    return { Success: false, Message: errorMessage(err) };
+  }
 }
 
-export const getSettings = async()=>{
-    try{
-        const res = await (await axios.get(APIS.settings.getSettings,{withCredentials:true})).data
-        console.log(res)
-        if(!res) return {Success:false,Message:"Something went wrong."}
-        return res;
-    }catch{
-        return {Success:false,Message:"Something went wrong."}
-    }
+export const getSettings = async () => {
+  try {
+    const res = await get<ApiResponse>(APIS.settings.getSettings);
+    if (!res) return { Success: false, Message: "Something went wrong." };
+    return res;
+  } catch (err) {
+    return { Success: false, Message: errorMessage(err) };
+  }
 }

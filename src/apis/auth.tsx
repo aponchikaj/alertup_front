@@ -1,55 +1,47 @@
-import axios from "axios"
 import { APIS } from "./APIS"
+import { post, errorMessage } from "./http"
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const RegisterUser = async(data:any)=>{
-    console.log(data)
-    try{
-        const res = (await axios.post(APIS.auth.register,data,{withCredentials:true})).data;
-        if(!res){
-            return {Success:false,Message:'Something went wrong.'}
-        }
+interface AuthResponse {
+    Success: boolean;
+    Message: string;
+    token?: string;
+    user?: unknown;
+}
 
-        // Safari/iOS fallback: Store token in localStorage if provided
-        if(res.token){
-            localStorage.setItem('userToken', res.token);
-        }
+/** Persist the Safari/iOS fallback token, which http.ts sends as a Bearer header. */
+const storeToken = (res: AuthResponse) => {
+    if (res?.token) localStorage.setItem('userToken', res.token);
+};
 
+export const RegisterUser = async (data: unknown) => {
+    try {
+        const res = await post<AuthResponse>(APIS.auth.register, data);
+        if (!res) return { Success: false, Message: 'Something went wrong.' };
+        storeToken(res);
         return res;
-    }catch{
-        return {Success:false,Message:"Something went wrong."}
+    } catch (err) {
+        return { Success: false, Message: errorMessage(err) };
     }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const LoginUser = async(data:any)=>{
-    try{
-        const res = (await axios.post(APIS.auth.login,data,{withCredentials:true})).data;
-        if(!res){
-            return {Success:false,Message:'Something went wrong.'}
-        }
-
-        // Safari/iOS fallback: Store token in localStorage if provided
-        if(res.token){
-            localStorage.setItem('userToken', res.token);
-        }
-
+export const LoginUser = async (data: unknown) => {
+    try {
+        const res = await post<AuthResponse>(APIS.auth.login, data);
+        if (!res) return { Success: false, Message: 'Something went wrong.' };
+        storeToken(res);
         return res;
-    }catch{
-        return {Success:false,Message:'Something went wrong'}
+    } catch (err) {
+        return { Success: false, Message: errorMessage(err) };
     }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const Login2faUser = async(data:any)=>{
-    try{
-        const res = (await axios.post(APIS.auth.twoFaAuth,data,{withCredentials:true})).data;
-        if(!res) return {Success:false,Message:"Something went wrong."}
-
-        if(res.token) localStorage.setItem('userToken',res.token);
-
+export const Login2faUser = async (data: unknown) => {
+    try {
+        const res = await post<AuthResponse>(APIS.auth.twoFaAuth, data);
+        if (!res) return { Success: false, Message: "Something went wrong." };
+        storeToken(res);
         return res;
-    }catch{
-        return {Success:false,Message:"Something went wrong."}
+    } catch (err) {
+        return { Success: false, Message: errorMessage(err) };
     }
 }

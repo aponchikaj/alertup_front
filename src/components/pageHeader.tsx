@@ -1,30 +1,26 @@
 import { Link } from "react-router-dom";
-import backArrow from '../assets/images/backArrow.svg'
+import { ArrowLeftIcon } from "./ui/icons";
 
-const PageHeader = ({title="",backIcon=true})=>{
-    return(
-        <header className="w-full h-auto p-[10px] flex flex-col items-center justify-center">
-
-            <section className="w-full flex items-center justify-around">
-                {
-                    backIcon == true ? (
-                        <section className="w-auto flex items-center justify-center">
-                            <Link to={'/'}><img src={backArrow} alt="back" className="w-[30px] md:w-[40px]" /></Link>
-                        </section>
-                    ) : null
-                }
-                <section className="w-auto flex items-center justify-center">
-                    <h1 className="text-2xl text-white font-bold md:text-3xl">{title}</h1>
-                </section>
-                {
-                    backIcon == true ? (
-                        <section/>
-                    ) : null
-                }
-            </section>
-
-        </header>
-    )
-}
+/**
+ * Legacy centered page header, restyled on the token system. New screens
+ * should prefer PageHeader from ui/layout; this stays for pages that need the
+ * centered title + back-arrow arrangement.
+ */
+const PageHeader = ({ title = "", backIcon = true }) => (
+  <header className="relative flex w-full items-center justify-center px-14 py-3">
+    {backIcon && (
+      <Link
+        to="/"
+        aria-label="Back to home"
+        className="absolute left-2 grid h-11 w-11 place-items-center rounded-full text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      >
+        <ArrowLeftIcon size={22} />
+      </Link>
+    )}
+    <h1 className="text-center text-2xl font-semibold text-ink md:text-3xl">
+      {title}
+    </h1>
+  </header>
+);
 
 export default PageHeader;

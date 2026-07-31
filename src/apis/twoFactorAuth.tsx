@@ -1,37 +1,32 @@
-import axios from "axios"
 import { APIS } from "./APIS"
+import { post, errorMessage, type ApiResponse } from "./http"
 
-export const enable2fa = async()=>{
-    try{
-        const res = (await axios.post(APIS.twoFactorAuth.activate2fa,undefined,{withCredentials:true})).data;
-        if(!res) return {Success:false,Message:"Something went wrong."}
-
+export const enable2fa = async () => {
+    try {
+        const res = await post<ApiResponse>(APIS.twoFactorAuth.activate2fa);
+        if (!res) return { Success: false, Message: "Something went wrong." };
         return res;
-    }catch{
-        return {Success:false,Message:"Something went wrong."}
+    } catch (err) {
+        return { Success: false, Message: errorMessage(err) };
     }
 }
 
-export const deactivate2fa = async()=>{
-    try{
-        const res = (await axios.post(APIS.twoFactorAuth.deactivate2fa,undefined,{withCredentials:true})).data;
-        if(!res) return {Success:false,Message:"Something went wrong."}
-
+export const deactivate2fa = async () => {
+    try {
+        const res = await post<ApiResponse>(APIS.twoFactorAuth.deactivate2fa);
+        if (!res) return { Success: false, Message: "Something went wrong." };
         return res;
-    }catch{
-        return {Success:false,Message:"Something went wrong."}
+    } catch (err) {
+        return { Success: false, Message: errorMessage(err) };
     }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const verify2fa = async(data:any)=>{
-    console.log(data)
-    try{
-        const res = (await axios.post(APIS.twoFactorAuth.verify2fa,data,{withCredentials:true})).data;
-        if(!res) return {Success:false,Message:"Something went wrong."}
-
+export const verify2fa = async (data: unknown) => {
+    try {
+        const res = await post<ApiResponse>(APIS.twoFactorAuth.verify2fa, data);
+        if (!res) return { Success: false, Message: "Something went wrong." };
         return res;
-    }catch{
-        return {Success:false,Message:"Something went wrong."}
+    } catch (err) {
+        return { Success: false, Message: errorMessage(err) };
     }
 }

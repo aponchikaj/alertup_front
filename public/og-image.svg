@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="AlertUp — Scan once, find the safest way out">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3d3d3d"/>
+      <stop offset="55%" stop-color="#353535"/>
+      <stop offset="100%" stop-color="#241a12"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.82" cy="0.5" r="0.55">
+      <stop offset="0%" stop-color="#FF7B22" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="#FF7B22" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+  <rect x="0" y="0" width="1200" height="8" fill="#FF7B22"/>
+
+  <!-- Wordmark -->
+  <text x="80" y="188" font-family="Comfortaa, Trebuchet MS, Verdana, sans-serif" font-size="86" font-weight="300" fill="#ffffff">Alert<tspan fill="#FF7B22" font-size="46" font-weight="500">up</tspan></text>
+
+  <!-- Headline -->
+  <text x="80" y="290" font-family="Comfortaa, Trebuchet MS, Verdana, sans-serif" font-size="52" font-weight="500" fill="#ffffff">Scan once. Find the</text>
+  <text x="80" y="356" font-family="Comfortaa, Trebuchet MS, Verdana, sans-serif" font-size="52" font-weight="700" fill="#FF7B22">safest way out.</text>
+
+  <!-- Subline -->
+  <text x="80" y="428" font-family="Comfortaa, Trebuchet MS, Verdana, sans-serif" font-size="27" fill="#d6d6d6">QR-code evacuation routes, escape maps and</text>
+  <text x="80" y="468" font-family="Comfortaa, Trebuchet MS, Verdana, sans-serif" font-size="27" fill="#d6d6d6">emergency instructions for any building.</text>
+
+  <!-- Pill -->
+  <rect x="80" y="510" width="268" height="56" rx="28" fill="none" stroke="#FF7B22" stroke-width="2"/>
+  <text x="214" y="547" text-anchor="middle" font-family="Comfortaa, Trebuchet MS, Verdana, sans-serif" font-size="24" fill="#FF7B22">alertup.world</text>
+
+  <!-- QR scan frame -->
+  <g transform="translate(790 150)">
+    <rect x="0" y="0" width="330" height="330" rx="34" fill="#0f0f0f" fill-opacity="0.55"/>
+    <g fill="none" stroke="#FF7B22" stroke-width="9" stroke-linecap="round">
+      <path d="M34 96V52a18 18 0 0 1 18-18h44"/>
+      <path d="M234 34h44a18 18 0 0 1 18 18v44"/>
+      <path d="M296 234v44a18 18 0 0 1-18 18h-44"/>
+      <path d="M96 296H52a18 18 0 0 1-18-18v-44"/>
+    </g>
+    <path d="M165 108 245 240H85z" fill="#FF7B22"/>
+    <rect x="155.5" y="150" width="19" height="48" rx="9.5" fill="#353535"/>
+    <circle cx="165" cy="217" r="11" fill="#353535"/>
+  </g>
+</svg>

@@ -1,6 +1,19 @@
 import { useEffect, useState } from "react";
 import { deactivateBuilding, deleteBuilding, getMyBuildings } from "../../apis/building";
 import { Link } from "react-router-dom";
+import { usePageAnimations } from "../../lib/animations";
+import { PageHeader, PageShell } from "../../components/ui/layout";
+import { Button, ButtonLink } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
+import { Alert, Badge, EmptyState, Skeleton } from "../../components/ui/feedback";
+import {
+  BuildingIcon,
+  ChartIcon,
+  LayersIcon,
+  MapIcon,
+  PlusIcon,
+  TrashIcon,
+} from "../../components/ui/icons";
 
 interface Map {
   floor: string;
@@ -25,13 +38,13 @@ interface Building {
 }
 
 const Mybuildings = () => {
+  const rootRef = usePageAnimations();
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null); // track action per building
 
   useEffect(() => {
-    document.title = "My buildings - Alertup";
 
     const fetchBuildings = async () => {
       setLoading(true);
@@ -95,67 +108,128 @@ const Mybuildings = () => {
   };
 
   return (
-    <main className="p-4 min-h-screen bg-[#353535]">
-      <section className="w-full h-[10vh]" />
-      <h1 className="text-2xl font-medium mb-6 text-center text-white">
-        My Buildings
-      </h1>
+    <div ref={rootRef}>
+      <PageShell width="wide">
+        <div data-hero>
+          <PageHeader
+            title="My buildings"
+            description="Every building you manage, with its floors, maps and scan activity."
+            actions={
+              <ButtonLink to="/new">
+                <PlusIcon size={18} />
+                New building
+              </ButtonLink>
+            }
+          />
+        </div>
 
-      {loading && (
-        <p className="text-center text-white animate-pulse text-lg">
-          Loading buildings...
-        </p>
-      )}
-      {serverError && (
-        <p className="text-center text-red-500 text-lg">{serverError}</p>
-      )}
-      {!loading && !serverError && buildings.length === 0 && (
-        <p className="text-center text-white text-lg">No buildings found.</p>
-      )}
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-        {buildings.map((b) => (
-          <div
-            key={b._id}
-            className="p-5 rounded-lg shadow-lg hover:shadow-2xl transition transform hover:-translate-y-1 border border-[#FF7B22] text-white flex flex-col justify-between"
-          >
-            <Link to={`/building/${b._id}`}>
-              <div>
-                <h2 className="text-xl font-medium mb-2">{b.buildingName}</h2>
-                <p className="text-sm md:text-base">
-                  <span className="font-medium">Floors:</span> {b.floors}
-                </p>
-                <p className="text-sm md:text-base">
-                  <span className="font-medium">Maps uploaded:</span> {b.maps.length}
-                </p>
-                <p className="text-sm md:text-base">
-                  <span className="font-medium">Global scans:</span> {b.globalScans.length}
-                </p>
-              </div>
-            </Link>
-
-            <p className={`mt-4 font-semibold ${b.isDeactivated ? "text-red-500" : "text-green-400"}`}>
-              {b.isDeactivated ? "Inactive" : "Active"}
+        {loading && (
+          <div className="grid grid-cols-1 gap-6 pt-8 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Card key={i} className="flex flex-col gap-4 p-6">
+                <Skeleton className="h-6 w-2/3" />
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-10 w-full" />
+              </Card>
+            ))}
+            <p className="sr-only" role="status">
+              Loading buildings…
             </p>
-
-            <button
-              onClick={() => handleDeactivationOfBuilding(b._id)}
-              className="w-full bg-yellow-500 hover:bg-yellow-600 rounded-[5px] mt-2 py-2 font-medium"
-              disabled={actionLoading === b._id || b.isDeactivated}
-            >
-              {actionLoading === b._id ? "Processing..." : "DEACTIVATE"}
-            </button>
-            <button
-              onClick={() => handleBuildingDelete(b._id)}
-              className="w-full bg-red-500 hover:bg-red-600 rounded-[5px] mt-2 py-2 font-medium"
-              disabled={actionLoading === b._id}
-            >
-              {actionLoading === b._id ? "Deleting..." : "DELETE"}
-            </button>
           </div>
-        ))}
-      </div>
-    </main>
+        )}
+
+        {serverError && (
+          <Alert tone="danger" className="mt-8">
+            {serverError}
+          </Alert>
+        )}
+
+        {!loading && !serverError && buildings.length === 0 && (
+          <div className="pt-8">
+            <EmptyState
+              icon={<BuildingIcon size={24} />}
+              title="No buildings yet"
+              description="Create your first building to generate QR escape routes for every floor."
+              action={
+                <ButtonLink to="/new">
+                  <PlusIcon size={18} />
+                  Create a building
+                </ButtonLink>
+              }
+            />
+          </div>
+        )}
+
+        <ul
+          data-reveal-group
+          className="grid list-none grid-cols-1 gap-6 pt-8 sm:grid-cols-2 lg:grid-cols-3"
+        >
+          {buildings.map((b) => (
+            <li key={b._id} data-reveal-item className="h-full">
+              <Card interactive className="flex h-full flex-col gap-4 p-6">
+                <Link
+                  to={`/building/${b._id}`}
+                  className="group flex flex-col gap-3 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-subtle text-brand-text">
+                      <BuildingIcon size={22} />
+                    </span>
+                    <Badge tone={b.isDeactivated ? "danger" : "success"}>
+                      {b.isDeactivated ? "Inactive" : "Active"}
+                    </Badge>
+                  </div>
+                  <h2 className="text-lg font-semibold text-ink group-hover:text-brand-text">
+                    {b.buildingName}
+                  </h2>
+                  <ul className="flex flex-col gap-1.5 text-sm text-ink-muted">
+                    <li className="flex items-center gap-2">
+                      <LayersIcon size={16} className="text-ink-subtle" />
+                      <span className="font-medium text-ink">Floors:</span> {b.floors}
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <MapIcon size={16} className="text-ink-subtle" />
+                      <span className="font-medium text-ink">Maps uploaded:</span>{" "}
+                      {b.maps.length}
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <ChartIcon size={16} className="text-ink-subtle" />
+                      <span className="font-medium text-ink">Global scans:</span>{" "}
+                      {b.globalScans.length}
+                    </li>
+                  </ul>
+                </Link>
+
+                <div className="mt-auto flex flex-col gap-2 border-t border-line pt-4">
+                  <Button
+                    variant="secondary"
+                    fullWidth
+                    onClick={() => handleDeactivationOfBuilding(b._id)}
+                    disabled={actionLoading === b._id || b.isDeactivated}
+                    loading={actionLoading === b._id}
+                    loadingLabel="Processing…"
+                  >
+                    Deactivate
+                  </Button>
+                  <Button
+                    variant="danger"
+                    fullWidth
+                    onClick={() => handleBuildingDelete(b._id)}
+                    disabled={actionLoading === b._id}
+                    loading={actionLoading === b._id}
+                    loadingLabel="Deleting…"
+                  >
+                    <TrashIcon size={16} />
+                    Delete
+                  </Button>
+                </div>
+              </Card>
+            </li>
+          ))}
+        </ul>
+      </PageShell>
+    </div>
   );
 };
 

@@ -24,5 +24,14 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  // Tests are type-checked by ts-jest with their own compiler options (they
+  // need Node types and CommonJS interop). Keeping them out of the app build
+  // means `npm run build` only validates what actually ships.
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/setupTests.ts",
+    "src/__mocks__"
+  ]
 }

@@ -1,322 +1,490 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import Scanner from "../components/scanner";
 import Sponsors from "../components/sponsors";
-import { Link } from "react-router-dom";
+import Reviews from "../components/reviews";
 import { ContactAPI } from "../apis/contact";
 import { getMe } from "../apis/me";
-import Reviews from "../components/reviews";
-import './styles/styles.css'
-import DEFENCE_ICON from "../assets/images/defence.png"
-import PHONE_ICON from '../assets/images/smartphone.png'
-import TREASURE_ICON from '../assets/images/treasure-map.png'
+import Seo from "../seo/Seo";
+// FAQ and HOW_TO drive the visible sections further down the page; the JSON-LD
+// builders read the same data so the markup can never drift from the copy.
+import { FAQ, HOW_TO } from "../seo/seo.config";
+import { faqJsonLd, howToJsonLd } from "../seo/structuredData";
+import { usePageAnimations } from "../lib/animations";
+import { resolveQrTarget } from "../lib/qrTarget";
+import { Container, Section, SectionHeading } from "../components/ui/layout";
+import { Button, ButtonLink } from "../components/ui/button";
+import { Card } from "../components/ui/card";
+import { Alert, Badge } from "../components/ui/feedback";
+import { TextField, TextAreaField } from "../components/ui/field";
+import {
+  ArrowRightIcon,
+  BuildingIcon,
+  CheckCircleIcon,
+  MapIcon,
+  QrCodeIcon,
+  RouteIcon,
+  ShieldCheckIcon,
+  SmartphoneIcon,
+  ZapIcon,
+} from "../components/ui/icons";
+
+const SERVICES = [
+  {
+    icon: ShieldCheckIcon,
+    title: "Emergency Instructions",
+    text: "Clear, step-by-step safety guidance tailored to the building and the type of emergency.",
+  },
+  {
+    icon: RouteIcon,
+    title: "Escape Route Maps",
+    text: "Simple visual evacuation maps that show exits and safe paths inside the building.",
+  },
+  {
+    icon: QrCodeIcon,
+    title: "QR Code Access",
+    text: "No app needed. Scan a QR code and instantly access emergency safety information.",
+  },
+] as const;
+
+const TRUST_POINTS = [
+  { icon: ZapIcon, label: "Instant — no app install" },
+  { icon: BuildingIcon, label: "Per-building & per-floor maps" },
+  { icon: SmartphoneIcon, label: "Works on any phone" },
+] as const;
 
 const Home = () => {
+  const rootRef = usePageAnimations();
+  const [isLogged, setIsLogged] = useState(false);
 
-    const [isLogged, setIsLogged] = useState<boolean>(false);
+  useEffect(() => {
+    let cancelled = false;
+    const checkIfLogged = async () => {
+      try {
+        const res = await getMe();
+        if (!cancelled) setIsLogged(Boolean(res?.Success));
+      } catch {
+        if (!cancelled) setIsLogged(false);
+      }
+    };
+    checkIfLogged();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-    useEffect(() => {
+  /* --- Contact ----------------------------------------------------------- */
 
-        const checkIfLogged = async () => {
-            try {
-                // Replace this with your real API call
-                const res = await getMe() 
+  const [contactMessage, setContactMessage] = useState("");
+  const [contactLoading, setContactLoading] = useState(false);
+  const [contactData, setContactData] = useState({
+    email: "",
+    reason: "",
+    message: "",
+  });
 
-                if (!res || res.Success === false) {
-                    setIsLogged(false);
-                    return;
-                }
-
-                // If Success is true
-                setIsLogged(true);
-            } catch (err) {
-                console.error("Login check failed:", err);
-                setIsLogged(false);
-            }
-        };
-
-        checkIfLogged()
-        document.title = "Home - Alertup";
-    }, []);
-
-    const [contactMessage,setContactMessage] = useState<string>("");
-    const [contactLoading,setContactLoading] = useState<boolean>(false);
-
-    const [contactData,setContactData] = useState({
-        email:"",
-        reason:"",
-        message:""
-    })
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const SendMessage = async(e:any)=>{
-        e.preventDefault()
-        setContactLoading(true)
-        try{
-            const res = await ContactAPI(contactData);
-            if(res.Success == false){
-                setContactMessage(res.Message)
-                setContactLoading(false);
-                return;
-            }
-
-            setContactMessage("Sent.")
-            setContactLoading(false);
-            return;
-        }catch{
-            setContactLoading(false);
-            setContactMessage("Sent.")
-            console.error('Error occured')
-        }
+  const sendMessage = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setContactLoading(true);
+    try {
+      const res = await ContactAPI(contactData);
+      if (res?.Success === false) {
+        setContactMessage(res.Message);
+        return;
+      }
+      setContactMessage("Sent.");
+    } catch {
+      // Was "Sent." — reporting success from the failure path.
+      setContactMessage("Couldn't send your message. Please try again.");
+    } finally {
+      setContactLoading(false);
     }
+  };
 
-    //for qr code
+  /* --- QR scanning -------------------------------------------------------- */
 
-    const [qrCodeMessage,setQrCodeMessage] = useState("");
+  const [qrCodeMessage, setQrCodeMessage] = useState("");
 
-   const GetQR = (data: string) => {
+  const getQR = (data: string) => {
     if (!data) return;
-
-    if (!data.includes("alertup")) {
+    // Allowlisted by hostname — see lib/qrTarget. A substring check accepted
+    // any URL merely containing "alertup".
+    const target = resolveQrTarget(data);
+    if (!target) {
       setQrCodeMessage("Other QR codes can't be used.");
       return;
     }
-
     try {
-        window.location.href = data;
-        setQrCodeMessage(""); // Clear any previous message
-    } catch (err) {
-        console.error("Failed to open QR link:", err);
-        setQrCodeMessage("Unable to open QR link.");
+      window.location.href = target;
+      setQrCodeMessage("");
+    } catch {
+      setQrCodeMessage("Unable to open QR link.");
     }
-    };
+  };
 
-    return (
-        <>
-            {/* HERO */}
-            <header className="w-full bg-[#353535] flex flex-col items-center justify-center gap-4 px-3 py-4">
-                <section className="w-full h-[12vh]" />
+  return (
+    <div ref={rootRef}>
+      {/* The FAQ and HowTo nodes are only valid because both are rendered
+          as visible content further down this page. */}
+      <Seo jsonLd={[faqJsonLd(), howToJsonLd()]} />
 
-                <section className="w-full flex items-center justify-center mb-[10px] forAnim">
-                    <div className="rounded-[50px] p-[6px] border border-[#FF7B22] bg-black hover:shadow-xl hover:translate-y-[-3px] ease-in-out duration-200 w-[200px] text-center">
-                        <h1 className="text-white text-sm md:text-md font-thin hover:font-medium cursor-pointer">
-                            Scan & Be safe
-                        </h1>
-                    </div>
-                </section>
+      {/* ================= HERO ================= */}
+      <section className="relative overflow-hidden bg-canvas">
+        {/* Floor-plan grid backdrop, fading toward the fold. */}
+        <div className="bg-grid pointer-events-none absolute inset-0" aria-hidden="true" />
+        {/* Soft brand glow behind the scanner column. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-32 right-[-10%] h-[28rem] w-[28rem] rounded-full bg-brand/15 blur-3xl"
+        />
 
-                <main className="w-full min-h-[60vh] flex flex-col items-center justify-center gap-8 md:flex-row md:gap-4">
+        <Container
+          width="wide"
+          className="relative grid items-center gap-12 pb-16 pt-28 sm:pt-32 lg:grid-cols-2 lg:gap-16 lg:pb-24 lg:pt-40"
+        >
+          {/* Left — message */}
+          <div className="flex flex-col items-center gap-6 text-center lg:items-start lg:text-left">
+            <span data-hero>
+              <Badge tone="brand" className="px-3 py-1.5 text-[0.8125rem]">
+                <ShieldCheckIcon size={15} />
+                Scan once &amp; be safe
+              </Badge>
+            </span>
 
-                    {/* LEFT */}
-                    <section className="w-full md:w-1/3 flex flex-col items-center md:items-start justify-center text-center md:text-start gap-4 px-2">
-                        <h1 className="text-white text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-light leading-tight forAnim">
-                            Alert<span className="text-[#FF7B22] text-2xl md:text-3xl">up</span>
-                        </h1>
-
-                        <p className="text-white text-sm sm:text-md md:text-lg max-w-md forAnim">
-                            Scan Once & Find the{" "}
-                            <span className="text-[#FF7B22] font-medium">
-                                Safest Way
-                            </span>
-                            . Instant access to evacuation routes through QR codes.
-                        </p>
-                        {!isLogged ? (
-                            <ul className="flex forAnim flex-wrap items-center justify-center md:justify-start gap-4 text-white mt-2">
-                                <Link to={'/login'} className="font-thin text-lg hover:text-[#FF7B22] duration-200">
-                                    Log in
-                                </Link>
-                                {/* <div className="hidden md:flex h-5 w-[1px] bg-[#FF7B22]" /> */}
-                                <Link to={'/register'} className="font-thin text-lg hover:bg-[#FF7B22]/80 bg-[#FF7B22] p-[8px] rounded-[30px] duration-200 ">
-                                    Join now
-                                </Link>
-                            </ul>
-                        ) : (
-                            <Link to={'/dashboard'} className="text-white forAnim font-thin text-lg hover:bg-[#FF7B22]/80 bg-[#FF7B22] p-[8px] rounded-[30px] duration-200">
-                                Dashboard
-                            </Link>
-                        )}
-                    </section>
-
-                    {/* RIGHT */}
-                    <section className="w-full md:w-1/3 flex flex-col items-center justify-center gap-4 forAnim">
-                        <div className="flex md:hidden ">
-                            <Scanner
-                                w={250}
-                                h={250}
-                                foxIcon
-                                onScan={(d)=>GetQR(d)}
-                            />
-                        </div>
-
-                        <div className="hidden md:flex hover:translate-y-[-5px] ease-in-out duration-200">
-                            <Scanner
-                                w={300}
-                                h={300}
-                                foxIcon
-                                onScan={(d)=>GetQR(d)}
-                            />
-                        </div>
-
-                        <section className="flex flex-col items-center text-center">
-                            { qrCodeMessage == "" ? <p className="text-sm text-[#FF7B22]">or</p> : <p className="text-sm text-red-500">{qrCodeMessage}</p>}
-                            <Link to={'/new'} className="text-white font-bold hover:underline">
-                                Create new
-                            </Link>
-                        </section>
-                    </section>
-
-                </main>
-            </header>
-
-            <section className="w-full py-4 bg-[#353535]" />
-
-            {/* OUR THINGS */}
-            <main className="w-full h-auto md:h-[60vh] lg:h-[50vh] flex items-center justify-center bg-[#353535]">
-                <section className="w-[90%] md:w-[70%] h-full rounded-[10px] backdrop-shadow-xl shadow-2xl bg-[#353535]/150 border border-[#FF7B22]/30 flex flex-col items-center justify-center forAnim p-[10px] ease-in-out duration-200 hover:-translate-y-1" >
-                    <h1 className="text-2xl text-center md:text-[30px] text-white font-bold ease-in-out duration-200 hover:text-[#FF7B22] p-[10px]">Our services</h1>
-                    <div className="w-[80%] md:w-[70%] lg:w-[50%] h-[1px] bg-[#FF7B22]" />
-                    <section className="w-full p-[10px] flex items-center justify-center flex-wrap h-full">
-                        <ul className="w-full p-[10px] flex flex-col md:flex-row items-center justify-center text-center md:justify-around h-full gap-10">
-
-                            <section className="flex flex-col gap-2 items-center justify-center w-full md:w-1/3">
-                                <section className="text-center flex items-center justify-center">
-                                    <img src={DEFENCE_ICON} alt="defence" className="w-[50px] md:w-[70px] lg:w-[80px] text-center" />
-                                </section>
-                                <section className="text-center text-white w-full md:w-1/2 p-[5px]">
-                                    <h1 className="md:text-lg font-semibold">Emergency Instructions</h1>
-                                    <p className="py-[5px] text-sm md:text-md text-gray-300">Clear, step-by-step safety guidance tailored to the building and emergency type.</p>
-                                </section>
-                            </section>
-
-                            <section className="flex flex-col gap-2 items-center justify-center w-full md:w-1/3">
-                                <section className="text-center flex items-center justify-center">
-                                    <img src={TREASURE_ICON} alt="treasure" className="w-[50px] md:w-[70px] lg:w-[80px]" />
-                                </section>
-                                <section className="text-center text-white w-full md:w-1/2 p-[5px]">
-                                    <h1 className="md:text-lg font-semibold">Escape Route Maps</h1>
-                                    <p className="py-[5px] text-sm md:text-md text-gray-300">Simple visual evacuation maps that show exits and safe paths inside the building.</p>
-                                </section>
-                            </section>
-
-                             <section className="flex flex-col gap-2 items-center justify-center w-full md:w-1/3">
-                                <section className="text-center flex items-center justify-center">
-                                    <img src={PHONE_ICON} alt="phone" className="w-[50px] md:w-[70px] lg:w-[80px]" />
-                                </section>
-                                <section className="text-center text-white w-full md:w-1/2 p-[5px]">
-                                    <h1 className="md:text-lg font-semibold">QR Code Access</h1>
-                                    <p className="py-[5px] text-sm md:text-md text-gray-300">No app needed. Scan a QR code and instantly access emergency safety information.</p>
-                                </section>
-                            </section>
-
-                        </ul>
-                    </section>
-                </section>
-            </main>
-
-            <main className="w-full py-6 flex flex-col items-center justify-center gap-4 bg-[#353535]">
-                <div className="w-[200px] h-[1px] bg-[#FF7B22]" />
-                <Sponsors />
-                <div className="w-[200px] h-[1px] bg-[#FF7B22]" />
-            </main>
-
-            <main className="w-full h-auto bg-[#353535] p-[10px] flex items-center justify-center">
-                <Reviews/>  
-            </main>
-
-            <main className="w-full py-6 px-4 flex flex-col items-center justify-center gap-4 bg-[#353535] text-center">
-                <h1 className="text-xl md:text-2xl font-medium text-[#FF7B22]">
-                    What's this?
-                </h1>
-                <p className="max-w-[500px] text-sm sm:text-md md:text-lg text-white font-thin leading-relaxed">
-                    AlertUp is a building safety platform that provides instant
-                    access to evacuation routes through QR codes. Building
-                    owners can create digital profiles for their buildings,
-                    upload official escape and evacuation maps, and generate QR
-                    codes for each location.
-                    <br /><br />
-                    These QR codes can be printed and placed throughout the
-                    building. When scanned, users instantly see escape routes
-                    and safety maps, helping them reach exits quickly during
-                    emergencies.
-                </p>
-            </main>
-
-            <main className="w-full bg-[#353535] py-10 px-4 flex items-center justify-center">
-            <form
-                onSubmit={SendMessage}
-                className="w-full max-w-md bg-white/5 backdrop-blur-lg rounded-2xl p-6 md:p-8 shadow-xl border border-white/10 text-white"
+            {/* The page's only <h1>. The wordmark stays visual; the
+                screen-reader text carries what the page is actually about,
+                which is also what search engines index. */}
+            <h1
+              data-hero
+              className="text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl"
             >
-                <h1 className="text-2xl font-bold text-center mb-6">
-                Contact Us
-                </h1>
+              <span className="sr-only">
+                AlertUp — QR code evacuation routes and escape maps for buildings
+              </span>
+              <span aria-hidden="true">
+                <span className="text-ink">Every second</span>
+                <br />
+                <span className="text-gradient-brand">finds the exit.</span>
+              </span>
+            </h1>
 
-                {contactMessage !== "" && (
-                <p
-                    className={`mb-4 text-center text-sm font-semibold ${
-                    contactMessage === "Sent."
-                        ? "text-green-400"
-                        : "text-red-500"
-                    }`}
+            <p
+              data-hero
+              className="max-w-xl text-base leading-relaxed text-ink-muted sm:text-lg"
+            >
+              Scan once and find the{" "}
+              <span className="font-semibold text-brand-text">safest way out</span>.
+              AlertUp turns official escape maps into instant QR-code evacuation
+              routes — for any building, on any phone.
+            </p>
+
+            <div data-hero className="flex flex-wrap items-center justify-center gap-3 lg:justify-start">
+              {isLogged ? (
+                <ButtonLink to="/dashboard" size="lg">
+                  Open dashboard
+                  <ArrowRightIcon size={18} />
+                </ButtonLink>
+              ) : (
+                <>
+                  <ButtonLink to="/register" size="lg">
+                    Get started free
+                    <ArrowRightIcon size={18} />
+                  </ButtonLink>
+                  <ButtonLink to="/login" variant="secondary" size="lg">
+                    Log in
+                  </ButtonLink>
+                </>
+              )}
+              <a
+                href="#how-it-works"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-4 text-[0.9375rem] font-medium text-ink-muted transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                How it works
+              </a>
+            </div>
+
+            <ul
+              data-hero
+              className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 lg:justify-start"
+            >
+              {TRUST_POINTS.map(({ icon: PointIcon, label }) => (
+                <li
+                  key={label}
+                  className="flex items-center gap-1.5 text-sm text-ink-subtle"
                 >
-                    {contactMessage}
-                </p>
+                  <PointIcon size={15} className="text-brand-text" />
+                  {label}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Right — live scanner */}
+          <div data-hero className="flex flex-col items-center gap-4">
+            <Card className="w-full max-w-sm p-6 sm:p-8">
+              <Scanner brandMark onScan={getQR} />
+              <div className="mt-5 flex flex-col items-center gap-1 border-t border-line pt-5 text-center">
+                {qrCodeMessage ? (
+                  <p role="alert" className="text-sm font-medium text-danger-text">
+                    {qrCodeMessage}
+                  </p>
+                ) : (
+                  <p className="text-sm text-ink-subtle">
+                    Own a building?
+                  </p>
                 )}
+                <Link
+                  to="/new"
+                  className="text-sm font-semibold text-brand-text underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring rounded-sm"
+                >
+                  Create a QR route for it
+                </Link>
+              </div>
+            </Card>
+          </div>
+        </Container>
+      </section>
 
-                {/* Email */}
-                <input
-                type="email"
-                placeholder="Email"
-                className="w-full mb-3 px-4 py-2 rounded-lg bg-black/40 text-white outline-none border border-white/10 focus:border-[#FF7B22]"
-                value={contactData.email}
-                onChange={(e) =>
+      {/* ================= SERVICES ================= */}
+      <Section tone="subtle" aria-labelledby="services-title">
+        <Container width="wide" className="flex flex-col gap-12">
+          <div data-reveal>
+            <SectionHeading
+              eyebrow="What you get"
+              title={<span id="services-title">Safety that fits on a sticker</span>}
+              description="Everything a visitor needs in an emergency, behind one small printed code."
+            />
+          </div>
+
+          <ul data-reveal-group className="grid gap-5 md:grid-cols-3">
+            {SERVICES.map(({ icon: ServiceIcon, title, text }) => (
+              <li key={title} data-reveal-item className="h-full">
+                <Card interactive className="flex h-full flex-col gap-4 p-7">
+                  <span className="grid h-12 w-12 place-items-center rounded-xl bg-brand-subtle text-brand-text">
+                    <ServiceIcon size={24} />
+                  </span>
+                  <h3 className="text-lg font-semibold text-ink">{title}</h3>
+                  <p className="text-sm leading-relaxed text-ink-muted">{text}</p>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        </Container>
+      </Section>
+
+      {/* ================= WHAT IS ALERTUP ================= */}
+      <Section aria-labelledby="about-title">
+        <Container className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
+          <div data-reveal="left" className="flex flex-col gap-5">
+            <SectionHeading
+              align="left"
+              eyebrow="Why AlertUp"
+              title={<span id="about-title">Official maps, one scan away</span>}
+              description="Building owners create a digital profile, upload their official escape and evacuation maps, and generate QR codes for every location. Printed and placed through the building, each code opens the safest route to an exit the moment it's scanned."
+            />
+            <ul className="flex flex-col gap-3">
+              {[
+                "Emergency instructions tailored to the building and emergency type",
+                "Per-floor escape route maps showing exits and safe paths",
+                "QR access with nothing to install",
+              ].map((point) => (
+                <li key={point} className="flex items-start gap-2.5 text-[0.9375rem] text-ink-muted">
+                  <CheckCircleIcon size={19} className="mt-0.5 shrink-0 text-success-text" />
+                  {point}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div data-reveal="right" className="relative">
+            <Card className="p-8">
+              <div className="flex items-center gap-4 border-b border-line pb-5">
+                <span className="grid h-12 w-12 place-items-center rounded-xl bg-brand-subtle text-brand-text">
+                  <MapIcon size={24} />
+                </span>
+                <div>
+                  <p className="font-semibold text-ink">Floor 2 — East wing</p>
+                  <p className="text-sm text-ink-subtle">Nearest exit: Stairwell B</p>
+                </div>
+              </div>
+              <div className="flex flex-col gap-3 pt-5">
+                {HOW_TO.steps.slice(0, 3).map((step, i) => (
+                  <div key={step.name} className="flex items-center gap-3">
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand text-xs font-bold text-brand-ink">
+                      {i + 1}
+                    </span>
+                    <p className="text-sm text-ink-muted">{step.name}</p>
+                  </div>
+                ))}
+              </div>
+            </Card>
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -bottom-8 -right-6 -z-10 h-40 w-40 rounded-full bg-brand/10 blur-2xl"
+            />
+          </div>
+        </Container>
+      </Section>
+
+      {/* ================= HOW IT WORKS ================= */}
+      {/* The visible counterpart of the HowTo schema. */}
+      <Section tone="subtle" id="how-it-works" aria-labelledby="how-it-works-title">
+        <Container width="wide" className="flex flex-col gap-12">
+          <div data-reveal>
+            <SectionHeading
+              eyebrow="How it works"
+              title={<span id="how-it-works-title">{HOW_TO.name}</span>}
+              description={HOW_TO.description}
+            />
+          </div>
+
+          <ol data-reveal-group className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+            {HOW_TO.steps.map((step, i) => (
+              <li
+                key={step.name}
+                id={`step-${i + 1}`}
+                data-reveal-item
+                className="h-full"
+              >
+                <Card className="flex h-full flex-col gap-3 p-6">
+                  <span
+                    aria-hidden="true"
+                    className="grid h-9 w-9 place-items-center rounded-full bg-brand font-bold text-brand-ink"
+                  >
+                    {i + 1}
+                  </span>
+                  <h3 className="font-semibold text-ink">{step.name}</h3>
+                  <p className="text-sm leading-relaxed text-ink-muted">{step.text}</p>
+                </Card>
+              </li>
+            ))}
+          </ol>
+        </Container>
+      </Section>
+
+      {/* ================= SOCIAL PROOF ================= */}
+      <Section aria-label="Partners and feedback">
+        <Container className="flex flex-col items-center gap-12">
+          <div data-reveal>
+            <Sponsors align="center" />
+          </div>
+          <div data-reveal className="flex w-full justify-center">
+            <Reviews />
+          </div>
+        </Container>
+      </Section>
+
+      {/* ================= FAQ ================= */}
+      {/* The visible counterpart of the FAQPage schema. Google only honours
+          FAQ rich results when the answers are on the page. */}
+      <Section tone="subtle" id="faq" aria-labelledby="faq-title">
+        <Container width="prose" className="flex flex-col gap-10">
+          <div data-reveal>
+            <SectionHeading
+              eyebrow="FAQ"
+              title={<span id="faq-title">Frequently asked questions</span>}
+            />
+          </div>
+
+          <div data-reveal-group className="flex flex-col gap-3">
+            {FAQ.map((item) => (
+              <details
+                key={item.question}
+                data-reveal-item
+                className="group rounded-2xl border border-line bg-surface p-5 transition-colors open:border-brand-border"
+              >
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold text-ink [&::-webkit-details-marker]:hidden">
+                  <h3 className="inline text-[0.9375rem] font-semibold sm:text-base">
+                    {item.question}
+                  </h3>
+                  <span
+                    aria-hidden="true"
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-subtle text-lg text-brand-text transition-transform duration-200 ease-out group-open:rotate-45"
+                  >
+                    +
+                  </span>
+                </summary>
+                <p className="pt-3 text-sm leading-relaxed text-ink-muted">
+                  {item.answer}
+                </p>
+              </details>
+            ))}
+          </div>
+        </Container>
+      </Section>
+
+      {/* ================= CONTACT ================= */}
+      <Section aria-labelledby="contact-title">
+        <Container width="prose">
+          <Card data-reveal className="p-7 sm:p-10">
+            <div className="mb-7 flex flex-col gap-2 text-center">
+              <h2 id="contact-title" className="text-2xl font-semibold text-ink sm:text-3xl">
+                Contact us
+              </h2>
+              <p className="text-sm text-ink-muted sm:text-base">
+                Questions about setting up your building? We answer every message.
+              </p>
+            </div>
+
+            {contactMessage !== "" && (
+              <Alert
+                tone={contactMessage === "Sent." ? "success" : "danger"}
+                className="mb-5"
+              >
+                {contactMessage === "Sent."
+                  ? "Message sent — we'll get back to you soon."
+                  : contactMessage}
+              </Alert>
+            )}
+
+            <form onSubmit={sendMessage} className="flex flex-col gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <TextField
+                  label="Email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  value={contactData.email}
+                  onChange={(e) =>
                     setContactData({ ...contactData, email: e.target.value })
-                }
-                required
+                  }
+                  required
                 />
-
-                {/* Reason */}
-                <input
-                type="text"
-                placeholder="Reason"
-                className="w-full mb-3 px-4 py-2 rounded-lg bg-black/40 text-white outline-none border border-white/10 focus:border-[#FF7B22]"
-                value={contactData.reason}
-                onChange={(e) =>
+                <TextField
+                  label="Reason"
+                  placeholder="e.g. Setting up my building"
+                  value={contactData.reason}
+                  onChange={(e) =>
                     setContactData({ ...contactData, reason: e.target.value })
-                }
-                required
+                  }
+                  required
                 />
-
-                {/* Message */}
-                <textarea
-                placeholder="Message"
-                className="w-full mb-4 px-4 py-2 resize-none h-[180px] rounded-lg bg-black/40 text-white outline-none border border-white/10 focus:border-[#FF7B22]"
+              </div>
+              <TextAreaField
+                label="Message"
+                placeholder="Tell us what you need…"
+                rows={6}
                 value={contactData.message}
                 onChange={(e) =>
-                    setContactData({ ...contactData, message: e.target.value })
+                  setContactData({ ...contactData, message: e.target.value })
                 }
                 required
-                />
-
-                {/* Submit */}
-                {!contactLoading ? (
-                <button
-                    type="submit"
-                    className="w-full py-2 rounded-lg bg-[#FF7B22] hover:scale-105 transition text-white font-semibold"
-                >
-                    Send Message
-                </button>
-                ) : (
-                <button
-                    disabled
-                    className="w-full py-2 rounded-lg bg-[#FF7B22]/50 cursor-not-allowed text-white font-semibold"
-                >
-                    Sending...
-                </button>
-                )}
+              />
+              <Button
+                type="submit"
+                size="lg"
+                fullWidth
+                loading={contactLoading}
+                loadingLabel="Sending…"
+              >
+                Send message
+              </Button>
             </form>
-            </main>
-
-        </>
-    );
+          </Card>
+        </Container>
+      </Section>
+    </div>
+  );
 };
 
 export default Home;

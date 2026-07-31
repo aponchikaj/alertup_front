@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 // import userEvent from '@testing-library/user-event';
 import { BrowserRouter } from 'react-router-dom';
-import InteractiveMap from './interactiveMap';
+import InteractiveMap from './interactiveMapImproved';
 import { type Node } from '../apis/nodesApi';
 
 // Mock data
@@ -109,7 +109,7 @@ describe('InteractiveMap Node Management', () => {
       <InteractiveMap {...defaultProps} svgContent={mockSvgContent} />
     );
     
-    expect(screen.getByText('⚡ Shift+drag nodes to move')).toBeInTheDocument();
+    expect(screen.getByText('Shift+drag nodes to move')).toBeInTheDocument();
   });
 
   it('filters nodes by floor', () => {

@@ -1,6 +1,4 @@
-import axios from 'axios';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://alertup-backend.onrender.com';
+import { post, del, getBlob } from './http';
 
 export interface QRCodeRequest {
   nodeId?: string;
@@ -8,14 +6,14 @@ export interface QRCodeRequest {
   floorNumber?: number;
   format?: 'png' | 'svg';
   customization?: {
-    primaryColor?: string;      // Main QR code color
-    backgroundColor?: string;    // Background color
-    title?: string;             // Title text
-    titleColor?: string;        // Title color
-    subtitle?: string;          // Subtitle text (building/floor info)
-    subtitleColor?: string;     // Subtitle color
-    logo?: string;              // Logo URL (optional)
-    size?: 'small' | 'medium' | 'large'; // QR code size
+    primaryColor?: string;
+    backgroundColor?: string;
+    title?: string;
+    titleColor?: string;
+    subtitle?: string;
+    subtitleColor?: string;
+    logo?: string;
+    size?: 'small' | 'medium' | 'large';
   };
 }
 
@@ -30,14 +28,6 @@ export interface QRCodeResponse {
     svgContent?: string;
     dimensions?: { width: number; height: number };
     size?: number;
-    customization?: {
-      primaryColor: string;
-      backgroundColor: string;
-      title: string;
-      titleColor: string;
-      subtitle: string;
-      subtitleColor: string;
-    };
   };
 }
 
@@ -45,74 +35,43 @@ export interface QRCodeResponse {
  * Generate QR code for a node
  */
 export const generateQRCode = async (request: QRCodeRequest): Promise<QRCodeResponse> => {
-  try {
-    const response = await axios.post(`${API_BASE_URL}/api/qr/generate`, request, { withCredentials: true });
-    return response.data;
-  } catch (error: any) {
-    console.error('Error generating QR code:', error);
-    throw new Error(error.response?.data?.message || 'Failed to generate QR code');
-  }
+  return post<QRCodeResponse>('/api/qr/generate', request);
 };
 
 /**
  * Download QR code file
  */
 export const downloadQRCode = async (filename: string): Promise<Blob> => {
-  try {
-    const response = await axios.get(`${API_BASE_URL}/api/qr/download/${filename}`, {
-      responseType: 'blob',
-      withCredentials: true
-    });
-    return response.data;
-  } catch (error: any) {
-    console.error('Error downloading QR code:', error);
-    throw new Error(error.response?.data?.message || 'Failed to download QR code');
-  }
+  return getBlob(`/api/qr/download/${encodeURIComponent(filename)}`);
 };
 
 /**
  * Delete QR code file
  */
-export const deleteQRCode = async (filename: string): Promise<{ success: boolean; message: string }> => {
-  try {
-    const response = await axios.delete(`${API_BASE_URL}/api/qr/${filename}`, { withCredentials: true });
-    return response.data;
-  } catch (error: any) {
-    console.error('Error deleting QR code:', error);
-    throw new Error(error.response?.data?.message || 'Failed to delete QR code');
-  }
+export const deleteQRCode = async (buildingId: string, qrUrl: string) => {
+  // buildingId is part of the path so the server can authorize the caller and
+  // confirm the asset belongs to that building.
+  return del<{ success: boolean; message: string }>(
+    `/api/qr/${encodeURIComponent(buildingId)}/${encodeURIComponent(qrUrl)}`,
+  );
 };
 
-/**
- * Get QR code URL for display
- */
-export const getQRCodeUrl = (filename: string): string => {
-  return `${API_BASE_URL}/uploads/qr-codes/${filename}`;
-};
-
-/**
- * Get QR code public URL (with full domain)
- */
-export const getQRCodePublicUrl = (filename: string): string => {
-  return `${API_BASE_URL}/api/qr/file/${filename}`;
-};
+// getQRCodeUrl and getQRCodePublicUrl were removed. QR images live on
+// Cloudinary and are referenced by their secure_url; nothing is written to the
+// API server's uploads/qr-codes directory, so both helpers produced URLs that
+// could only 404.
 
 /**
  * Download QR code as file
  */
 export const downloadQRCodeAsFile = async (filename: string, nodeName: string): Promise<void> => {
-  try {
-    const blob = await downloadQRCode(filename);
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `qr-code-${nodeName.replace(/\s+/g, '-').toLowerCase()}-${filename}`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error('Error downloading QR code file:', error);
-    throw error;
-  }
+  const blob = await downloadQRCode(filename);
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `qr-code-${nodeName.replace(/\s+/g, '-').toLowerCase()}-${filename}`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
 };

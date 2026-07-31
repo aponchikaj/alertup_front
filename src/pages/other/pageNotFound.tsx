@@ -1,43 +1,54 @@
-import { useEffect } from "react";
-import { Link } from "react-router-dom";
+import { usePageAnimations } from "../../lib/animations";
+import { ButtonLink } from "../../components/ui/button";
+import { ArrowLeftIcon, MapPinIcon } from "../../components/ui/icons";
 
 const PageNotFound = () => {
-  useEffect(() => {
-        document.title = "404 - AlertUp";
-    }, []);
+  const rootRef = usePageAnimations();
+
   return (
-    <main className="w-full h-screen flex items-center justify-center bg-[#353535] text-white px-4">
-      
-      <section className="flex flex-col items-center text-center gap-4">
-        
-        {/* Big 404 */}
-        <h1 className="text-[6rem] md:text-[8rem] font-extrabold text-[#FF7B22] leading-none">
-          404
-        </h1>
+    <div ref={rootRef}>
+      <section className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-canvas px-4 pb-16 pt-28 sm:pt-32">
+        {/* Floor-plan grid backdrop, echoing the home hero. */}
+        <div className="bg-grid pointer-events-none absolute inset-0" aria-hidden="true" />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute left-1/2 top-1/3 h-[24rem] w-[24rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand/10 blur-3xl"
+        />
 
-        {/* Title */}
-        <h2 className="text-2xl md:text-4xl font-semibold">
-          Page Not Found
-        </h2>
+        <div className="relative flex flex-col items-center gap-5 text-center">
+          <span
+            data-hero
+            className="grid h-16 w-16 place-items-center rounded-2xl bg-brand-subtle text-brand-text"
+          >
+            <MapPinIcon size={32} />
+          </span>
 
-        {/* Subtitle */}
-        <p className="text-sm md:text-lg text-gray-300 max-w-md">
-          The page you’re looking for doesn’t exist or was moved.
-        </p>
+          <h1
+            data-hero
+            className="font-display text-7xl font-semibold leading-none tracking-tight sm:text-8xl"
+          >
+            <span className="text-gradient-brand">404</span>
+          </h1>
 
-        {/* Button */}
-        <Link
-          to="/"
-          className="mt-4 px-6 py-2 rounded-full border-2 border-[#FF7B22] text-[#FF7B22] 
-                     hover:bg-[#FF7B22] hover:text-[#353535] transition-all duration-300 
-                     hover:scale-105 active:scale-95"
-        >
-          Go back home
-        </Link>
+          <div data-hero className="flex flex-col gap-2">
+            <p className="text-2xl font-semibold text-ink sm:text-3xl">
+              This route isn't on the map
+            </p>
+            <p className="max-w-md text-sm text-ink-muted sm:text-base">
+              The page you're looking for doesn't exist or was moved. Let's get
+              you back to safety.
+            </p>
+          </div>
 
+          <div data-hero className="mt-2">
+            <ButtonLink to="/" size="lg">
+              <ArrowLeftIcon size={18} />
+              Go back home
+            </ButtonLink>
+          </div>
+        </div>
       </section>
-
-    </main>
+    </div>
   );
 };
 

@@ -1,6 +1,11 @@
 import { useEffect, useState, type JSX } from "react";
 import { ConnectApis } from "../../apis/connect";
 import { MAIN_API_URL } from "../../apis/APIS";
+import { LogoMark } from "../../components/ui/logo";
+import { Card } from "../../components/ui/card";
+import { Alert } from "../../components/ui/feedback";
+import { Button } from "../../components/ui/button";
+import { CheckIcon, SpinnerIcon } from "../../components/ui/icons";
 
 const ServerGate = ({ children }: { children: JSX.Element }) => {
   const [loading, setLoading] = useState(true);
@@ -30,13 +35,13 @@ const ServerGate = ({ children }: { children: JSX.Element }) => {
           setLoading(false);
           return;
         }
-        
+
         // Success - server is available
         setLoading(false);
         setServerDown(false);
       } catch (err: any) {
         console.error("ServerGate error:", err);
-        
+
         if (attempt < MAX_RETRIES) {
           // Retry after delay
           setTimeout(() => {
@@ -45,7 +50,7 @@ const ServerGate = ({ children }: { children: JSX.Element }) => {
           }, RETRY_DELAY);
           return;
         }
-        
+
         setErrorMessage(err?.message || "Failed to connect to server");
         setServerDown(true);
         setLoading(false);
@@ -57,49 +62,89 @@ const ServerGate = ({ children }: { children: JSX.Element }) => {
 
   if (loading) {
     return (
-      <main className="w-full h-screen flex items-center justify-center bg-[#353535] text-white">
-        <div className="text-center">
-          <h1 className="text-3xl mb-4">Alert<span className="text-[#FF7B22]">up</span></h1>
-          <p className="mb-2">Connecting to server…</p>
-          {retryCount > 0 && (
-            <p className="text-sm opacity-60">Retry attempt {retryCount}/{MAX_RETRIES}</p>
-          )}
-          <p className="text-sm opacity-80 mt-4">Hosted on free service</p>
+      <section className="flex min-h-screen w-full items-center justify-center bg-canvas px-4">
+        <div className="flex flex-col items-center gap-6 text-center">
+          <span className="relative grid place-items-center">
+            <span
+              aria-hidden="true"
+              className="absolute inset-0 rounded-full bg-brand animate-pulse-ring"
+            />
+            <LogoMark size={64} className="relative" />
+          </span>
+
+          <div className="flex flex-col items-center gap-2">
+            <p className="font-display text-2xl font-semibold tracking-tight text-ink">
+              Alert<span className="text-brand-text">Up</span>
+            </p>
+            <p
+              role="status"
+              aria-live="polite"
+              className="flex items-center gap-2 text-sm text-ink-muted"
+            >
+              <SpinnerIcon size={16} className="text-brand-text" />
+              Connecting to server…
+            </p>
+            {retryCount > 0 && (
+              <p className="text-sm text-ink-subtle">
+                Retry attempt {retryCount}/{MAX_RETRIES}
+              </p>
+            )}
+          </div>
+
+          <p className="text-xs text-ink-subtle">Hosted on free service</p>
         </div>
-      </main>
+      </section>
     );
   }
 
   if (serverDown) {
     return (
-      <main className="w-full h-screen flex items-center justify-center bg-black text-white">
-        <div className="text-center max-w-md px-4">
-          <h1 className="text-2xl mb-4">Server is currently unavailable</h1>
-          {errorMessage && (
-            <p className="text-red-400 mb-4 text-sm">{errorMessage}</p>
-          )}
-          <p className="text-sm opacity-70 mb-4">
-            Please check:
-          </p>
-          <ul className="text-left text-sm opacity-60 mb-6 space-y-2">
-            <li>• Backend server is running</li>
-            <li>• API URL is correct: {MAIN_API_URL}</li>
-            <li>• CORS is properly configured</li>
-            <li>• Network connection is active</li>
-          </ul>
-          <button
-            onClick={() => {
-              setLoading(true);
-              setServerDown(false);
-              setRetryCount(0);
-              window.location.reload();
-            }}
-            className="px-6 py-2 bg-[#FF7B22] rounded-lg hover:bg-[#FF8B33] transition"
-          >
-            Retry Connection
-          </button>
-        </div>
-      </main>
+      <section className="flex min-h-screen w-full items-center justify-center bg-canvas px-4">
+        <Card className="w-full max-w-md p-7 sm:p-8">
+          <div className="flex flex-col gap-5">
+            <div className="flex flex-col items-center gap-3 text-center">
+              <LogoMark size={44} />
+              <h1 className="text-xl font-semibold text-ink">
+                Server is currently unavailable
+              </h1>
+            </div>
+
+            {errorMessage && <Alert tone="danger">{errorMessage}</Alert>}
+
+            <div className="flex flex-col gap-2">
+              <p className="text-sm text-ink-muted">Please check:</p>
+              <ul className="flex flex-col gap-2 text-sm text-ink-subtle">
+                {[
+                  "Backend server is running",
+                  `API URL is correct: ${MAIN_API_URL}`,
+                  "CORS is properly configured",
+                  "Network connection is active",
+                ].map((point) => (
+                  <li key={point} className="flex items-start gap-2 text-left">
+                    <CheckIcon
+                      size={15}
+                      className="mt-0.5 shrink-0 text-brand-text"
+                    />
+                    <span className="break-all">{point}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <Button
+              fullWidth
+              onClick={() => {
+                setLoading(true);
+                setServerDown(false);
+                setRetryCount(0);
+                window.location.reload();
+              }}
+            >
+              Retry Connection
+            </Button>
+          </div>
+        </Card>
+      </section>
     );
   }
 

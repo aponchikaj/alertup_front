@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { getFloor } from "../../apis/building";
+import { usePageAnimations } from "../../lib/animations";
+import { escapeHtml } from "../../lib/escapeHtml";
+import { PageHeader, PageShell } from "../../components/ui/layout";
+import { Button } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
+import { Alert, Skeleton } from "../../components/ui/feedback";
+import { PrinterIcon } from "../../components/ui/icons";
 
 interface FloorData {
   floor: string;
@@ -20,6 +27,7 @@ interface ApiResponse {
 }
 
 const Floor = () => {
+  const rootRef = usePageAnimations();
   const { id, floor } = useParams<{ id: string; floor: string }>();
 
   const [floorData, setFloorData] = useState<FloorData | null>(null);
@@ -31,7 +39,7 @@ const Floor = () => {
   useEffect(() => {
     const fetchFloorData = async () => {
       try {
-        const res: ApiResponse = await getFloor({ id, floor });
+        const res: ApiResponse = await getFloor({ id: id!, floor: floor! });
         console.log("Floor API response:", res);
 
         if (!res ) {
@@ -39,7 +47,17 @@ const Floor = () => {
           return;
         }
 
-        const data = res.Message.floorData;
+        // On an error response Message is a string, so reading .floorData off
+        // it yielded undefined and every auth/404/network failure was reported
+        // to the user as "Floor data not found".
+        if (res.Success === false) {
+          setServerError(
+            typeof res.Message === "string" ? res.Message : "Could not load this floor",
+          );
+          return;
+        }
+
+        const data = res.Message?.floorData;
         if (!data) {
           setServerError("Floor data not found");
           return;
@@ -199,7 +217,7 @@ const Floor = () => {
               <div class="poster">
                 <div class="header">
                   <h1>Emergency Escape Route</h1>
-                  <p>${buildingName} — ${floorData.floor}</p>
+                  <p>${escapeHtml(buildingName)} — ${escapeHtml(floorData.floor)}</p>
                 </div>
 
                 <div class="content">
@@ -219,84 +237,117 @@ const Floor = () => {
 
   w.document.close();
   w.focus();
-  w.print();
-  w.close();
+
+  // The QR is an <img>, so printing has to wait for it to load. Calling print()
+  // and close() synchronously produced posters with a blank square where the
+  // code should be.
+  const startPrint = () => w.print();
+  if (w.document.readyState === 'complete') {
+    startPrint();
+  } else {
+    w.addEventListener('load', startPrint, { once: true });
+  }
+  w.addEventListener('afterprint', () => w.close(), { once: true });
 };
 
   if (loading)
     return (
-      <main className="flex items-center justify-center min-h-screen bg-[#353535]">
-        <p className="text-[#FF7B22] animate-pulse text-lg">Loading floor data...</p>
-      </main>
+      <div ref={rootRef}>
+        <PageShell width="wide">
+          <div className="flex flex-col gap-6">
+            <Skeleton className="h-10 w-1/2" />
+            <Skeleton className="h-72 w-full" />
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <Skeleton className="h-20" />
+              <Skeleton className="h-20" />
+              <Skeleton className="h-20" />
+            </div>
+            <p className="sr-only" role="status">
+              Loading floor data…
+            </p>
+          </div>
+        </PageShell>
+      </div>
     );
 
   if (serverError)
     return (
-      <main className="flex items-center justify-center min-h-screen bg-[#353535]">
-        <p className="text-red-500 text-lg">{serverError}</p>
-      </main>
+      <div ref={rootRef}>
+        <PageShell width="wide">
+          <Alert tone="danger">{serverError}</Alert>
+        </PageShell>
+      </div>
     );
 
   return (
-    <main className="min-h-screen bg-[#353535] p-6 flex flex-col items-center">
-      {/* Top spacing for navbar */}
-      <div className="h-[10vh]" />
-
-      {/* Page Title */}
-      <header className="w-full max-w-6xl px-4 mb-6">
-        <h1 className="text-3xl md:text-4xl font-bold text-center md:text-start text-white">
-          {buildingName} <br/> {floorData?.floor}
-        </h1>
-      </header>
-
-      {/* Map Card */}
-      <div className="w-full max-w-6xl bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-6 shadow-xl mb-6 flex flex-col items-center">
-        <h2 className="text-2xl font-bold mb-4 text-white">Floor Map</h2>
-        <img
-          src={floorData?.map}
-          alt={`Map of ${floorData?.floor}`}
-          className="w-full h-auto rounded-xl shadow-lg mb-4 object-cover"
-        />
-      </div>
-
-      {/* Info Card */}
-      <div className="w-full max-w-6xl bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-6 shadow-xl mb-6">
-        <h2 className="text-2xl font-bold mb-4 text-white">Floor Information</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Stat label="Floor Name" value={floorData?.floor} />
-          <Stat label="Created At" value={new Date(floorData?.createdAt || "").toLocaleString()} />
-          <Stat label="Scanned Count" value={scannedCount} />
+    <div ref={rootRef}>
+      <PageShell width="wide">
+        <div data-hero>
+          <PageHeader
+            title={
+              <>
+                {buildingName} <br /> {floorData?.floor}
+              </>
+            }
+            description="Escape map, floor details and the printable QR code for this floor."
+          />
         </div>
-      </div>
 
-      {/* QR Code Card */}
-      <div className="w-full max-w-6xl bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-6 shadow-xl flex flex-col items-center">
-        <h2 className="text-2xl font-bold mb-4 text-white">QR Code</h2>
-        <img src={floorData?.qrCode} alt="QR Code" className="w-40 h-40 mb-4" />
-        <div className="flex gap-4">
-        <button
-          onClick={() => handlePrintQRCode("poster")}
-          className="bg-[#FF7B22] text-white px-6 py-2 rounded-xl hover:bg-[#e66b1c]"
-        >
-          Print Poster
-        </button>
+        <div data-reveal-group className="flex flex-col gap-6 pt-8">
+          {/* Map Card */}
+          <Card data-reveal-item className="flex flex-col items-center p-6">
+            <h2 className="mb-4 text-xl font-semibold text-ink">Floor map</h2>
+            <img
+              src={floorData?.map}
+              alt={`Map of ${floorData?.floor}`}
+              className="h-auto w-full rounded-xl border border-line object-cover shadow-md"
+            />
+          </Card>
 
-        <button
-          onClick={() => handlePrintQRCode("card")}
-          className="bg-white/10 text-white px-6 py-2 rounded-xl border border-white/20 hover:bg-white/20"
-        >
-          Print Card
-        </button>
-      </div>
-      </div>
-    </main>
+          {/* Info Card */}
+          <Card data-reveal-item className="p-6">
+            <h2 className="mb-4 text-xl font-semibold text-ink">
+              Floor information
+            </h2>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <Stat label="Floor Name" value={floorData?.floor} />
+              <Stat label="Created At" value={new Date(floorData?.createdAt || "").toLocaleString()} />
+              <Stat label="Scanned Count" value={scannedCount} />
+            </div>
+          </Card>
+
+          {/* QR Code Card */}
+          <Card data-reveal-item className="flex flex-col items-center p-6">
+            <h2 className="mb-4 text-xl font-semibold text-ink">QR code</h2>
+            <img
+              src={floorData?.qrCode}
+              alt="QR Code"
+              className="mb-4 h-40 w-40 rounded-xl border border-line bg-surface p-2"
+            />
+            <div className="flex flex-wrap justify-center gap-3">
+              <Button onClick={() => handlePrintQRCode("poster")}>
+                <PrinterIcon size={18} />
+                Print poster
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => handlePrintQRCode("card")}
+              >
+                <PrinterIcon size={18} />
+                Print card
+              </Button>
+            </div>
+          </Card>
+        </div>
+      </PageShell>
+    </div>
   );
 };
 
 const Stat = ({ label, value }: { label: string; value: any }) => (
-  <div className="bg-black/30 rounded-xl p-4 text-center border border-white/10">
-    <p className="text-sm text-white/60">{label}</p>
-    <p className="text-2xl font-bold text-[#FF7B22]">{value}</p>
+  <div className="rounded-xl border border-line bg-surface-2 p-4 text-center">
+    <p className="text-sm text-ink-subtle">{label}</p>
+    <p className="text-2xl font-bold text-brand-text">{value}</p>
   </div>
 );
 

@@ -1,6 +1,4 @@
-import axios from 'axios';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://alertup-backend.onrender.com';
+import { get, post, put, del } from './http';
 
 export interface Node {
   _id: string;
@@ -11,6 +9,7 @@ export interface Node {
   type: 'path' | 'exit' | 'stairs';
   connections: string[];
   label?: string;
+  scanCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -25,84 +24,63 @@ export interface CreateNodeRequest {
   connections?: string[];
 }
 
+/** Matches what connectNodes actually sends and what the backend expects. */
 export interface ConnectNodesRequest {
-  fromNodeId: string;
-  toNodeId: string;
+  buildingId: string;
+  node1Id: string;
+  node2Id: string;
 }
 
 /**
  * Create a new node
  */
-export const createNode = async (nodeData: CreateNodeRequest): Promise<{ success: boolean; node: Node; message: string }> => {
-  try {
-    const response = await axios.post(`${API_BASE_URL}/api/nodes`, nodeData, { withCredentials: true });
-    console.log(response)
-    return response.data;
-  } catch (error: any) {
-    console.error('Error creating node:', error);
-    throw new Error(error.response?.data?.message || 'Failed to create node');
-  }
+export const createNode = async (nodeData: CreateNodeRequest) => {
+  return post<{ success: boolean; node: Node; message: string }>('/api/nodes', nodeData);
 };
 
 /**
  * Get all nodes for a building
  */
-export const getNodesByBuilding = async (buildingId: string): Promise<{ success: boolean; nodes: Node[] }> => {
-  try {
-    const response = await axios.get(`${API_BASE_URL}/api/nodes/building/${buildingId}`, { withCredentials: true });
-    return response.data;
-  } catch (error: any) {
-    console.error('Error fetching nodes:', error);
-    throw new Error(error.response?.data?.message || 'Failed to fetch nodes');
-  }
+export const getNodesByBuilding = async (buildingId: string) => {
+  return get<{ success: boolean; nodes: Node[] }>(`/api/nodes/building/${buildingId}`);
 };
 
 /**
  * Update a node
  */
-export const updateNode = async (nodeId: string, nodeData: Partial<CreateNodeRequest>): Promise<{ success: boolean; node: Node; message: string }> => {
-  try {
-    const response = await axios.put(`${API_BASE_URL}/api/nodes/${nodeId}`, nodeData, { withCredentials: true });
-    return response.data;
-  } catch (error: any) {
-    console.error('Error updating node:', error);
-    throw new Error(error.response?.data?.message || 'Failed to update node');
-  }
+export const updateNode = async (nodeId: string, nodeData: Partial<CreateNodeRequest>) => {
+  return put<{ success: boolean; node: Node; message: string }>(`/api/nodes/${nodeId}`, nodeData);
 };
 
 /**
  * Delete a node
  */
-export const deleteNode = async (nodeId: string): Promise<{ success: boolean; message: string }> => {
-  try {
-    const response = await axios.delete(`${API_BASE_URL}/api/nodes/${nodeId}`, { withCredentials: true });
-    return response.data;
-  } catch (error: any) {
-    console.error('Error deleting node:', error);
-    throw new Error(error.response?.data?.message || 'Failed to delete node');
-  }
+export const deleteNode = async (nodeId: string) => {
+  return del<{ success: boolean; message: string }>(`/api/nodes/${nodeId}`);
 };
 
 /**
  * Connect two nodes
  */
-export const connectNodes = async (buildingId: string, node1Id: string, node2Id: string): Promise<{ success: boolean; message: string; data?: any }> => {
-  try {
-    const response = await axios.post(`${API_BASE_URL}/api/nodes/connect`, {
-      buildingId,
-      node1Id,
-      node2Id
-    }, { withCredentials: true });
-    return response.data;
-  } catch (error: any) {
-    console.error('Error connecting nodes:', error);
-    throw new Error(error.response?.data?.message || 'Failed to connect nodes');
-  }
+export const connectNodes = async (buildingId: string, node1Id: string, node2Id: string) => {
+  return post<{ success: boolean; message: string; data?: unknown }>('/api/nodes/connect', {
+    buildingId,
+    node1Id,
+    node2Id,
+  });
 };
 
 /**
- * Generate QR code data for a node
+ * Build the URL a printed QR code points at.
+ *
+ * Single source of truth, shared with the QR display components. This used to
+ * emit `/route/qr_...` here while simpleQRCodeDisplay emitted `/scan/route/qr_...`,
+ * so QR codes generated through this helper landed on a page that 404'd.
  */
-export const generateNodeQRData = (buildingId: string, floorNumber: number, nodeId: string): string => {
-  return `${window.location.origin}/route/qr_${buildingId}_${floorNumber}_${nodeId}`;
+export const buildScanUrl = (buildingId: string, floorNumber: number, nodeId: string, origin?: string): string => {
+  const base = origin || window.location.origin;
+  return `${base}/scan/route/qr_${buildingId}_${floorNumber}_${nodeId}`;
 };
+
+/** @deprecated Use buildScanUrl — kept so existing call sites keep compiling. */
+export const generateNodeQRData = buildScanUrl;
