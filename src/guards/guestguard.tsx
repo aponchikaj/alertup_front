@@ -1,32 +1,29 @@
 // src/guards/GuestGuard.js
 import { Navigate } from "react-router-dom";
-import { getAuthState } from "../apis/me";
 import { useEffect, useState } from "react";
+import { useAuth } from "../auth/useAuth";
 import { SpinnerIcon } from "../components/ui/icons";
 
 const GuestGuard = ({ children }: { children: any }) => {
-  const [user, setUser] = useState<boolean | null>(null); // null = loading
+  const { status, refresh } = useAuth();
 
+  // Re-validate once when the shared context says "authed" at mount time: the
+  // user may have just signed out and navigated here before the context
+  // caught up. Mirrors the old fetch-per-mount behaviour.
+  const [revalidating, setRevalidating] = useState(() => status === "authed");
   useEffect(() => {
+    if (!revalidating) return;
     let cancelled = false;
-
-    const checkUser = async () => {
-      const result = await getAuthState();
-      if (cancelled) return;
-      // On an unreachable backend, fall through to the guest page rather than
-      // bouncing to /dashboard — pairing that with AuthGuard's own failure
-      // handling is what produced a /login ↔ /dashboard redirect loop.
-      setUser(result.state === "authenticated");
-    };
-
-    checkUser();
+    refresh().finally(() => {
+      if (!cancelled) setRevalidating(false);
+    });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [revalidating, refresh]);
 
   // while checking auth, show a loading spinner or null
-  if (user === null)
+  if (status === "loading" || revalidating)
     return (
       <div
         role="status"
@@ -38,8 +35,11 @@ const GuestGuard = ({ children }: { children: any }) => {
       </div>
     );
 
-  if (user) return <Navigate to="/dashboard" replace />; // redirect if logged in
+  if (status === "authed") return <Navigate to="/dashboard" replace />; // redirect if logged in
 
+  // On an unreachable backend ("error"), fall through to the guest page rather
+  // than bouncing to /dashboard — pairing that with AuthGuard's own failure
+  // handling is what produced a /login ↔ /dashboard redirect loop.
   return children;
 };
 

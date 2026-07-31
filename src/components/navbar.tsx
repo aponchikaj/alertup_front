@@ -8,7 +8,7 @@ import {
   stagger,
   type Scope,
 } from "animejs";
-import { getMe } from "../apis/me";
+import { useAuth } from "../auth/useAuth";
 import { cn } from "../lib/cn";
 import { reducedMotion } from "../lib/animations";
 import { Logo } from "./ui/logo";
@@ -49,8 +49,9 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 
 const Navbar = () => {
   const { t } = useI18n();
+  const { status } = useAuth();
+  const isLogged = status === "authed";
   const [menuOpen, setMenuOpen] = useState(false);
-  const [isLogged, setIsLogged] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [hidden, setHidden] = useState(false);
 
@@ -65,22 +66,6 @@ const Navbar = () => {
   const isClosingRef = useRef(false);
 
   const links = isLogged ? MEMBER_LINKS : GUEST_LINKS;
-
-  useEffect(() => {
-    let cancelled = false;
-    const check = async () => {
-      try {
-        const res = await getMe();
-        if (!cancelled) setIsLogged(Boolean(res?.Success));
-      } catch {
-        if (!cancelled) setIsLogged(false);
-      }
-    };
-    check();
-    return () => {
-      cancelled = true;
-    };
-  }, [location.pathname]);
 
   // Close the drawer on navigation, otherwise it stays open over the new page.
   useEffect(() => {

@@ -21,6 +21,31 @@ export {
 } from "./layout";
 export { ThemeToggle, ThemePicker } from "./themeToggle";
 export {
+  Portal,
+  useScrollLock,
+  useEscapeClose,
+  useFocusTrap,
+} from "./overlayUtils";
+export { Modal, type ModalProps, type ModalSize } from "./modal";
+export { ConfirmDialog, type ConfirmDialogProps } from "./confirmDialog";
+export { Sheet, type SheetProps, type SheetSide } from "./sheet";
+export {
+  ToastProvider,
+  useToast,
+  type ToastOptions,
+  type ToastTone,
+} from "./toast";
+export { Select, type SelectProps, type SelectOption } from "./select";
+export {
+  Tabs,
+  TabList,
+  Tab,
+  TabPanel,
+  type TabsProps,
+  type TabProps,
+  type TabPanelProps,
+} from "./tabs";
+export {
   buttonStyles,
   cardStyles,
   inputStyles,
