@@ -47,10 +47,14 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
         floorNumber: node.floorNumber,
         format: 'svg',
         customization: {
+          // Literal hex, deliberately: a QR code has to stay maximum-contrast
+          // black-on-white to scan reliably off a wall in poor light. This is a
+          // functional requirement, not a style choice, so it does not follow
+          // the theme tokens. The surrounding text is monochrome ink.
           primaryColor: '#000000',
           backgroundColor: '#FFFFFF',
-          title: buildingName || 'Emergency Route',
-          titleColor: '#FF7B22',
+          title: buildingName || 'AlertUp',
+          titleColor: '#111111',
           subtitle: node ? `${node.label || node.type} - Floor ${floorName || '1'}` : `Floor ${floorName || '1'}`,
           subtitleColor: '#353535',
           size: 'medium'
@@ -86,7 +90,7 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Emergency Route QR Code</title>
+          <title>AlertUp QR code</title>
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
             body {
@@ -112,11 +116,13 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
             .qr-header {
               margin-bottom: 30px;
             }
+            /* The print window has no access to the app's design tokens, so the
+               monochrome palette is spelled out literally here. */
             .qr-title {
               font-size: clamp(20px, 5vw, 32px);
               font-weight: bold;
               margin-bottom: 12px;
-              color: #FF7B22;
+              color: #111111;
             }
             .qr-subtitle {
               font-size: clamp(14px, 3.5vw, 20px);
@@ -258,7 +264,7 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
           <div class="qr-container">
             <div class="qr-size-indicator">${isPoster ? 'POSTER' : 'CARD'}</div>
             <div class="qr-header">
-              <div class="qr-title">${escapeHtml(buildingName || 'Emergency Route')}</div>
+              <div class="qr-title">${escapeHtml(buildingName || 'AlertUp')}</div>
               <div class="qr-subtitle">${escapeHtml(node.label || node.type)} - Floor ${escapeHtml(floorName || '1')}</div>
             </div>
 
@@ -269,7 +275,7 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
             <div class="qr-info">
               <strong>Node Type:</strong> ${escapeHtml(node.type)}<br>
               <strong>Position:</strong> (${Number(node.x)}, ${Number(node.y)})<br>
-              <strong>Scan for Emergency Route</strong><br>
+              <strong>Scan for directions — and the way out</strong><br>
               <strong>Building:</strong> ${escapeHtml(buildingName || 'N/A')}
             </div>
 
@@ -403,7 +409,7 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
               {/* Emergency Route Link */}
               <div className="flex flex-col gap-2">
                 <TextField
-                  label="Emergency Route Link"
+                  label="Scan link"
                   readOnly
                   value={buildScanUrl(node.buildingId, node.floorNumber, node._id, PUBLIC_ORIGIN)}
                   inputClassName="font-mono text-sm"
@@ -430,7 +436,7 @@ const SimpleQRCodeDisplay = ({ node, buildingName, floorName, onClose }: SimpleQ
                   )}
                   <div className="mt-2 sm:mt-3">
                     <div className="text-xs font-bold text-brand-text sm:text-sm">
-                      {buildingName || 'Emergency Route'}
+                      {buildingName || 'AlertUp'}
                     </div>
                     <div className="text-xs text-ink-muted">
                       {node.label || node.type} - Floor {floorName || '1'}

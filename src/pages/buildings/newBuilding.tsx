@@ -14,6 +14,7 @@ import {
   MailIcon,
   PlusIcon,
 } from "../../components/ui/icons";
+import { useI18n } from "../../i18n/LanguageProvider";
 
 interface BuildingSchema {
   buildingName: string;
@@ -25,6 +26,7 @@ interface BuildingSchema {
 const NewBuilding = () => {
   const rootRef = usePageAnimations();
   const navigate = useNavigate();
+  const { t } = useI18n();
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -85,7 +87,7 @@ const NewBuilding = () => {
   ----------------------------------- */
   const goNext = () => {
     if (!buildingData.buildingName.trim()) {
-      setServerError("Building name is required.");
+      setServerError(t("buildings.createNameRequired"));
       return;
     }
     setServerError("");
@@ -119,14 +121,14 @@ const NewBuilding = () => {
 
         const res = await createNewBuilding(formData); // FormData: the browser sets the multipart boundary
         if (!res || res.Success === false) {
-        setServerError(res?.Message || "Something went wrong.");
+        setServerError(res?.Message || t("buildings.createFailed"));
         setLoading(false);
         return;
         }
 
         navigate("/mybuildings");
     } catch (err) {
-        setServerError("Couldn't create new building.");
+        setServerError(t("buildings.createFailed"));
         setLoading(false);
     }
     };
@@ -142,10 +144,10 @@ const NewBuilding = () => {
         className="flex flex-col gap-4 rounded-xl border border-line bg-surface-2 p-4"
       >
         <legend className="px-1.5 text-sm font-semibold text-ink">
-          Floor {i + 1}
+          {t("wayfinding.floor", { number: i + 1 })}
         </legend>
         <TextField
-          label={`Floor ${i + 1} name`}
+          label={t("buildings.floorName")}
           value={buildingData.floorNames[i] || ""}
           onChange={(e) => {
             const names = [...buildingData.floorNames];
@@ -155,7 +157,11 @@ const NewBuilding = () => {
           required
         />
 
-        <Field label={`Floor ${i + 1} map`} required hint="Image of the escape route map for this floor.">
+        <Field
+          label={t("buildings.floorMapLabel", { number: i + 1 })}
+          required
+          hint={t("buildings.floorMapHint")}
+        >
           {({ id, describedBy }) => (
             <input
               id={id}
@@ -184,8 +190,8 @@ const NewBuilding = () => {
       <PageShell>
         <div data-hero>
           <PageHeader
-            title="Create building"
-            description="Name your building, then upload an escape map for every floor — unlimited floors available."
+            title={t("buildings.createTitle")}
+            description={t("buildings.createLead")}
           />
         </div>
 
@@ -198,15 +204,15 @@ const NewBuilding = () => {
                 <MailIcon size={26} />
               </span>
               <h2 className="text-xl font-semibold text-ink">
-                Verify your email first
+                {t("buildings.verifyTitle")}
               </h2>
               <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-ink-muted">
-                Adding a building publishes safety information other people
-                rely on, so we ask you to confirm your email address before
-                creating one. It takes under a minute in Settings.
+                {t("buildings.verifyLead")}
               </p>
               <div className="mt-6 flex justify-center">
-                <ButtonLink to="/settings">Go to verification</ButtonLink>
+                <ButtonLink to="/settings">
+                  {t("buildings.goToVerification")}
+                </ButtonLink>
               </div>
             </Card>
           </div>
@@ -216,7 +222,7 @@ const NewBuilding = () => {
         <div className="pt-8" data-reveal>
           <Card className="mx-auto w-full max-w-xl p-6 sm:p-8">
             <p className="mb-5 text-xs font-semibold uppercase tracking-[0.14em] text-brand-text">
-              Step {step} of 2
+              {t("buildings.stepOf", { current: step, total: 2 })}
             </p>
 
             {serverError && (
@@ -230,7 +236,7 @@ const NewBuilding = () => {
               {step === 1 && (
                 <>
                   <TextField
-                    label="Building name"
+                    label={t("buildings.buildingName")}
                     value={buildingData.buildingName}
                     onChange={(e) =>
                       setBuildingData({
@@ -242,7 +248,7 @@ const NewBuilding = () => {
                   />
 
                   <TextField
-                    label="Number of floors"
+                    label={t("buildings.numberOfFloors")}
                     type="number"
                     min={1}
                     value={buildingData.floors}
@@ -257,7 +263,7 @@ const NewBuilding = () => {
                   />
 
                   <Button type="button" onClick={goNext} fullWidth className="mt-2">
-                    Next
+                    {t("common.next")}
                     <ArrowRightIcon size={18} />
                   </Button>
                 </>
@@ -276,17 +282,17 @@ const NewBuilding = () => {
                       fullWidth
                     >
                       <ArrowLeftIcon size={18} />
-                      Back
+                      {t("common.back")}
                     </Button>
 
                     <Button
                       type="submit"
                       fullWidth
                       loading={loading}
-                      loadingLabel="Creating…"
+                      loadingLabel={t("buildings.working")}
                     >
                       <PlusIcon size={18} />
-                      Create
+                      {t("common.create")}
                     </Button>
                   </div>
                 </>

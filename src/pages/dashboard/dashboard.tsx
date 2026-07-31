@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { getDashboard } from "../../apis/dashboard";
 import { usePageAnimations } from "../../lib/animations";
@@ -17,6 +17,7 @@ import {
   ScanIcon,
   ZapIcon,
 } from "../../components/ui/icons";
+import { useI18n } from "../../i18n/LanguageProvider";
 
 interface RecentScan {
   buildingName: string | null;
@@ -42,8 +43,9 @@ interface DashboardData {
   scanActivity?: ActivityPoint[];
 }
 
-const formatDateTime = (value: string | null) => {
-  if (!value) return "N/A";
+/** `fallback` is passed in so this stays a pure helper outside the component. */
+const formatDateTime = (value: string | null, fallback: string) => {
+  if (!value) return fallback;
   const date = new Date(value);
   return isNaN(date.getTime()) ? value : date.toLocaleString();
 };
@@ -55,32 +57,9 @@ const formatDay = (iso: string) => {
     : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 };
 
-const SCAN_COLUMNS: Column<RecentScan>[] = [
-  {
-    key: "building",
-    header: "Building",
-    render: (row) =>
-      row.buildingID ? (
-        <Link
-          to={`/building/${row.buildingID}`}
-          className="font-medium text-brand-text underline-offset-4 hover:underline"
-        >
-          {row.buildingName || "Unknown building"}
-        </Link>
-      ) : (
-        <span className="font-medium text-ink">{row.buildingName || "Unknown building"}</span>
-      ),
-  },
-  {
-    key: "scannedAt",
-    header: "Scanned",
-    render: (row) => formatDateTime(row.scannedAt),
-    className: "whitespace-nowrap",
-  },
-];
-
 const Dashboard = () => {
   const rootRef = usePageAnimations();
+  const { t } = useI18n();
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
@@ -92,7 +71,7 @@ const Dashboard = () => {
       try {
         const res = await getDashboard();
         if (!res) {
-          setServerError("Something went wrong.");
+          setServerError(t("common.error"));
           return;
         }
         if (res.Success === false) {
@@ -101,26 +80,57 @@ const Dashboard = () => {
         }
         setDashboard(res.Message);
       } catch {
-        setServerError("Something went wrong");
+        setServerError(t("common.error"));
       } finally {
         setLoading(false);
       }
     };
 
     getMyDashboard();
-  }, []);
+  }, [t]);
 
   const activity = dashboard?.scanActivity ?? [];
   const recentScans = dashboard?.recentScans ?? [];
   const isPremium = dashboard != null && dashboard.premiumStatus !== "Free";
+
+  // Built inside the component: the headers and cell fallbacks are translated,
+  // so this can no longer be a module-level constant.
+  const scanColumns = useMemo<Column<RecentScan>[]>(
+    () => [
+      {
+        key: "building",
+        header: t("dashboard.building"),
+        render: (row) =>
+          row.buildingID ? (
+            <Link
+              to={`/building/${row.buildingID}`}
+              className="font-medium text-brand-text underline-offset-4 hover:underline"
+            >
+              {row.buildingName || t("dashboard.unknownBuilding")}
+            </Link>
+          ) : (
+            <span className="font-medium text-ink">
+              {row.buildingName || t("dashboard.unknownBuilding")}
+            </span>
+          ),
+      },
+      {
+        key: "scannedAt",
+        header: t("dashboard.scanned"),
+        render: (row) => formatDateTime(row.scannedAt, t("dashboard.notAvailable")),
+        className: "whitespace-nowrap",
+      },
+    ],
+    [t],
+  );
 
   return (
     <div ref={rootRef}>
       <PageShell width="wide">
         <div data-hero>
           <PageHeader
-            title="Your dashboard"
-            description="Overview of your buildings, scans, and activity."
+            title={t("dashboard.title")}
+            description={t("dashboard.lead")}
             actions={
               <>
                 {dashboard && (
@@ -131,7 +141,7 @@ const Dashboard = () => {
                 )}
                 <ButtonLink to="/new" size="sm">
                   <PlusIcon size={16} />
-                  New building
+                  {t("dashboard.newBuilding")}
                 </ButtonLink>
               </>
             }
@@ -139,7 +149,7 @@ const Dashboard = () => {
         </div>
 
         {loading && (
-          <div aria-busy="true" aria-label="Loading dashboard" className="pt-8">
+          <div aria-busy="true" aria-label={t("dashboard.loadingAria")} className="pt-8">
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {Array.from({ length: 4 }).map((_, i) => (
                 <Skeleton key={i} className="h-32 rounded-2xl" />
@@ -166,38 +176,43 @@ const Dashboard = () => {
             >
               <StatCard
                 icon={BuildingIcon}
-                label="My buildings"
+                label={t("dashboard.myBuildings")}
                 value={dashboard.MyBuildings}
                 hint={
                   <Link to="/mybuildings" className="hover:text-brand-text hover:underline">
-                    Manage buildings →
+                    {t("dashboard.manageBuildings")}
                   </Link>
                 }
               />
               <StatCard
                 icon={QrCodeIcon}
-                label="Scans of my buildings"
+                label={t("dashboard.scansOfMyBuildings")}
                 value={dashboard.myBuildingsScanned}
-                hint="Total QR scans across all your buildings"
+                hint={t("dashboard.scansOfMyBuildingsHint")}
               />
               <StatCard
                 icon={ScanIcon}
-                label="Codes I scanned"
+                label={t("dashboard.codesIScanned")}
                 value={dashboard.scanned}
                 hint={
                   dashboard.lastScanned
-                    ? `Last: ${dashboard.lastScanned}`
-                    : "You haven't scanned a code yet"
+                    ? t("dashboard.lastScan", { name: dashboard.lastScanned })
+                    : t("dashboard.noScansYet")
                 }
               />
               <StatCard
                 icon={ZapIcon}
-                label="Plan"
+                label={t("dashboard.plan")}
                 value={dashboard.premiumStatus}
                 hint={
                   dashboard.premiumExpires
-                    ? `Renews ${formatDateTime(dashboard.premiumExpires)}`
-                    : "Free plan — first building included"
+                    ? t("dashboard.renews", {
+                        date: formatDateTime(
+                          dashboard.premiumExpires,
+                          t("dashboard.notAvailable"),
+                        ),
+                      })
+                    : t("dashboard.freePlanHint")
                 }
               />
             </div>
@@ -210,25 +225,23 @@ const Dashboard = () => {
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between gap-3">
-                    <CardTitle>Scan activity</CardTitle>
+                    <CardTitle>{t("dashboard.scanActivity")}</CardTitle>
                     <span className="grid h-9 w-9 place-items-center rounded-lg bg-brand-subtle text-brand-text">
                       <ChartIcon size={18} />
                     </span>
                   </div>
-                  <CardDescription>
-                    Codes you scanned over the last 14 days.
-                  </CardDescription>
+                  <CardDescription>{t("dashboard.scanActivityLead")}</CardDescription>
                 </CardHeader>
                 <CardBody>
                   {activity.length > 0 ? (
                     <BarChart
                       data={activity.map((p) => ({ label: p.date, value: p.count }))}
                       formatTick={formatDay}
-                      ariaLabel="Scans per day over the last 14 days"
+                      ariaLabel={t("dashboard.scanActivityAria")}
                     />
                   ) : (
                     <p className="py-10 text-center text-sm text-ink-subtle">
-                      Activity will appear here once scans start coming in.
+                      {t("dashboard.activityEmpty")}
                     </p>
                   )}
                 </CardBody>
@@ -237,20 +250,20 @@ const Dashboard = () => {
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between gap-3">
-                    <CardTitle>Recent scans</CardTitle>
+                    <CardTitle>{t("dashboard.recentScans")}</CardTitle>
                     <span className="grid h-9 w-9 place-items-center rounded-lg bg-brand-subtle text-brand-text">
                       <ClockIcon size={18} />
                     </span>
                   </div>
-                  <CardDescription>Your latest scanned codes.</CardDescription>
+                  <CardDescription>{t("dashboard.recentScansLead")}</CardDescription>
                 </CardHeader>
                 <CardBody>
                   <DataTable
-                    columns={SCAN_COLUMNS}
+                    columns={scanColumns}
                     rows={recentScans}
                     rowKey={(row, i) => `${row.buildingID ?? row.buildingName ?? "scan"}-${i}`}
-                    caption="Your most recent QR code scans"
-                    emptyLabel="No scans yet — point your camera at an AlertUp code."
+                    caption={t("dashboard.recentScansCaption")}
+                    emptyLabel={t("dashboard.recentScansEmpty")}
                   />
                 </CardBody>
               </Card>

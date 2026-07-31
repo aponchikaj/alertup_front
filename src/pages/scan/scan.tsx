@@ -10,9 +10,11 @@ import { Card } from "../../components/ui/card";
 import { Badge } from "../../components/ui/feedback";
 import { ButtonLink } from "../../components/ui/button";
 import { ArrowLeftIcon, QrCodeIcon } from "../../components/ui/icons";
+import { useI18n } from "../../i18n/LanguageProvider";
 
 const Scan = () => {
   const rootRef = usePageAnimations();
+  const { t } = useI18n();
   const [qrCodeMessage, setQrCodeMessage] = useState("");
 
 
@@ -23,7 +25,7 @@ const Scan = () => {
     // for "alertup" would happily accept https://evil.example.com/#alertup.
     const target = resolveQrTarget(data);
     if (!target) {
-      setQrCodeMessage("Other QR codes can't be used.");
+      setQrCodeMessage(t("home.qrRejected"));
       return;
     }
 
@@ -32,7 +34,7 @@ const Scan = () => {
       setQrCodeMessage(""); // Clear any previous message
     } catch (err) {
       console.error("Failed to open QR link:", err);
-      setQrCodeMessage("Unable to open QR link.");
+      setQrCodeMessage(t("home.qrOpenFailed"));
     }
   };
 
@@ -41,8 +43,8 @@ const Scan = () => {
       <Seo
         jsonLd={[
           breadcrumbJsonLd([
-            { name: "Home", path: "/" },
-            { name: "Scan a QR code", path: "/scan" },
+            { name: t("common.home"), path: "/" },
+            { name: t("scan.breadcrumbScan"), path: "/scan" },
           ]),
         ]}
       />
@@ -60,21 +62,20 @@ const Scan = () => {
           <div data-hero className="self-start">
             <ButtonLink to="/" variant="ghost" size="sm">
               <ArrowLeftIcon size={16} />
-              Back home
+              {t("scan.backHome")}
             </ButtonLink>
           </div>
 
           <div data-hero className="flex flex-col items-center gap-4 text-center">
             <Badge tone="brand" className="px-3 py-1.5 text-[0.8125rem]">
               <QrCodeIcon size={15} />
-              No app needed
+              {t("scan.eyebrow")}
             </Badge>
             <h1 className="text-4xl font-semibold tracking-tight text-ink sm:text-5xl">
-              Scan a QR code
+              {t("scan.title")}
             </h1>
             <p className="max-w-md text-base leading-relaxed text-ink-muted">
-              Point your camera at an AlertUp code to open the building's
-              escape route instantly.
+              {t("scan.lead")}
             </p>
           </div>
 
@@ -103,12 +104,12 @@ const Scan = () => {
               <div className="mt-5 flex w-full flex-col items-center gap-1 border-t border-line pt-5 text-center">
                 {qrCodeMessage === "" ? (
                   <p className="text-sm text-ink-subtle">
-                    Own a building?{" "}
+                    {t("scan.ownBuilding")}{" "}
                     <Link
                       to="/new"
                       className="rounded-sm font-semibold text-brand-text underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                     >
-                      Create a QR route
+                      {t("scan.createRoute")}
                     </Link>
                   </p>
                 ) : (

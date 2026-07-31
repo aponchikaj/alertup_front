@@ -16,6 +16,7 @@ import {
     RefreshIcon,
     UsersIcon,
 } from "../../components/ui/icons"
+import { useI18n } from "../../i18n/LanguageProvider"
 
 interface emergencySchema {
     _id:string;
@@ -40,6 +41,7 @@ export default function EmergencyAnalytics(){
 
     const {buildingId,emergencyId} = useParams()
     const rootRef = usePageAnimations()
+    const { t } = useI18n()
 
     const [serverError,setServerError] = useState('')
     const [loading,setLoading] = useState(true)
@@ -56,7 +58,7 @@ export default function EmergencyAnalytics(){
             const res = await GET_EMERGENCY_DATA({buildingID:buildingId!,emergencyID:emergencyId!}) // filters unda
             console.log(res)
             if(!res ) {
-                setServerError("Something went wrong.")
+                setServerError(t("common.error"))
                 setLoading(false)
                 return;
             };
@@ -69,7 +71,7 @@ export default function EmergencyAnalytics(){
             setEmergencyData(res.Message.emergency)
             setLogsData(res.Message.logs)
         }catch{
-            setServerError("Something went wrong.")
+            setServerError(t("common.error"))
         }finally{
             setLoading(false)
         }
@@ -83,7 +85,7 @@ export default function EmergencyAnalytics(){
                 const res = await GET_EMERGENCY_DATA({buildingID:buildingId!,emergencyID:emergencyId!}) // filters unda
                 console.log(res)
                 if(!res ) {
-                    setServerError("Something went wrong.")
+                    setServerError(t("common.error"))
                     setLoading(false)
                     return;
                 };
@@ -96,19 +98,19 @@ export default function EmergencyAnalytics(){
                 setEmergencyData(res.Message.emergency)
                 setLogsData(res.Message.logs)
             }catch{
-                setServerError("Something went wrong.")
+                setServerError(t("common.error"))
             }finally{
                 setLoading(false)
             }
         }
         getEmergencyData()
-    }, [buildingId, emergencyId])
+    }, [buildingId, emergencyId, t])
 
     const STATS = emergencyData
         ? [
-            { icon: UsersIcon, label: "Evacuated", value: emergencyData.evacuated },
-            { icon: ChartIcon, label: "Scanned", value: emergencyData.scanned },
-            { icon: BellIcon, label: "Called", value: emergencyData.calledEmergency },
+            { icon: UsersIcon, label: t("buildings.evacuated"), value: emergencyData.evacuated },
+            { icon: ChartIcon, label: t("buildings.scanned"), value: emergencyData.scanned },
+            { icon: BellIcon, label: t("buildings.calledEmergency"), value: emergencyData.calledEmergency },
         ]
         : []
 
@@ -116,10 +118,10 @@ export default function EmergencyAnalytics(){
         return(
             <PageShell width="wide">
                 <PageHeader
-                    title="Emergency"
-                    description="Full breakdown of a recorded emergency."
+                    title={t("buildings.emergency")}
+                    description={t("buildings.emergencyBreakdownLead")}
                 />
-                <p className="sr-only" role="status">Loading emergency data…</p>
+                <p className="sr-only" role="status">{t("common.loading")}</p>
                 <div className="grid grid-cols-1 gap-5 pt-8 sm:grid-cols-3">
                     {Array.from({ length: 3 }).map((_, i) => (
                         <Card key={i} className="flex flex-col gap-3 p-6">
@@ -143,14 +145,14 @@ export default function EmergencyAnalytics(){
         return(
             <PageShell width="wide">
                 <PageHeader
-                    title="Emergency"
-                    description="Full breakdown of a recorded emergency."
+                    title={t("buildings.emergency")}
+                    description={t("buildings.emergencyBreakdownLead")}
                 />
                 <div className="flex flex-col items-start gap-4 pt-8">
                     <Alert tone="danger" className="w-full">{serverError}</Alert>
                     <Button variant="secondary" onClick={()=>getEmergencyData()}>
                         <RefreshIcon size={18} />
-                        Retry
+                        {t("common.retry")}
                     </Button>
                 </div>
             </PageShell>
@@ -163,7 +165,7 @@ export default function EmergencyAnalytics(){
                 <PageShell width="wide">
                     <div data-hero>
                         <PageHeader
-                            title="Emergency"
+                            title={t("buildings.emergency")}
                             description={
                                 emergencyData ? (
                                     <span className="inline-flex items-center gap-2">
@@ -196,13 +198,13 @@ export default function EmergencyAnalytics(){
                             className="mb-4 flex items-center gap-2 text-xl font-semibold text-ink"
                         >
                             <FileTextIcon size={20} className="text-brand-text" />
-                            Logs
+                            {t("buildings.logs")}
                         </h2>
                         {logsData.length === 0 ? (
                             <EmptyState
                                 icon={<FileTextIcon size={24} />}
-                                title="No logs available"
-                                description="No activity was recorded during this emergency."
+                                title={t("buildings.emergencyLogsEmptyTitle")}
+                                description={t("buildings.emergencyLogsEmptyLead")}
                             />
                         ) : (
                             <Card className="overflow-hidden">

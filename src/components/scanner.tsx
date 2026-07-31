@@ -3,6 +3,7 @@ import { Html5Qrcode } from "html5-qrcode";
 import { cn } from "../lib/cn";
 import { Alert } from "./ui/feedback";
 import { ScanIcon } from "./ui/icons";
+import { useI18n } from "../i18n/LanguageProvider";
 
 type ScannerProps = {
   /** Shows the AlertUp mark above the frame. */
@@ -20,6 +21,7 @@ const Scanner = ({
   onScan,
   className,
 }: ScannerProps) => {
+  const { t } = useI18n();
   const [startScanning, setStartScanning] = useState(false);
   const [error, setError] = useState("");
   const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -36,6 +38,13 @@ const Scanner = ({
   useEffect(() => {
     onScanRef.current = onScan;
   }, [onScan]);
+
+  // Same reason as onScanRef: `t` changes identity when the language changes,
+  // and listing it below would tear the camera down mid-scan.
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
 
   useEffect(() => {
     if (!startScanning) return;
@@ -79,9 +88,7 @@ const Scanner = ({
       .catch((err) => {
         if (cancelled) return;
         console.error("Cannot start camera:", err);
-        setError(
-          "We couldn't reach your camera. Allow camera access in your browser settings, then tap to try again.",
-        );
+        setError(tRef.current("scan.cameraError"));
         setStartScanning(false);
       });
 
@@ -126,12 +133,10 @@ const Scanner = ({
               <ScanIcon size={28} className="relative" />
             </span>
             <span className="text-base font-semibold text-ink">
-              Tap to scan
+              {t("scan.tapToScan")}
             </span>
             <span className="max-w-[15rem] text-sm text-ink-muted">
-              {brandMark
-                ? "We'll ask for camera access, then point it at any AlertUp code."
-                : "Allow camera access and point at an AlertUp code."}
+              {brandMark ? t("scan.cameraPrompt") : t("scan.cameraHint")}
             </span>
           </span>
         </button>

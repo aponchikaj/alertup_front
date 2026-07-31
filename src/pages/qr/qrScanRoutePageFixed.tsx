@@ -12,6 +12,7 @@ import {
   AlertTriangleIcon,
   ArrowLeftIcon,
   CheckCircleIcon,
+  MapPinIcon,
   SpinnerIcon,
 } from '../../components/ui/icons';
 import { EmergencyProvider } from '../../emergency/EmergencyProvider';
@@ -143,6 +144,47 @@ const EmergencyLayer: React.FC<{ onShowExitRoute: () => void }> = ({
   );
 };
 
+/**
+ * Page framing, decided by the *live* emergency state rather than by the fact
+ * that this page can show an exit route.
+ *
+ * A visitor who scans a code in a calm building is doing everyday wayfinding —
+ * titling that screen "Emergency route" and stamping a red badge on it made the
+ * warning meaningless by the time it mattered. Kept as a child component so it
+ * sits inside EmergencyProvider and follows the same source of truth as the
+ * overlay: the scan payload seeds the provider, the stream updates it.
+ */
+const RouteHeader: React.FC<{ buildingName: string; floorNumber: number }> = ({
+  buildingName,
+  floorNumber,
+}) => {
+  const emergency = useEmergency();
+  const { t } = useI18n();
+  // 'bypassed' is still an active emergency — the visitor only acknowledged the
+  // overlay, so the framing must stay red.
+  const isEmergency =
+    emergency?.phase === 'emergency' || emergency?.phase === 'bypassed';
+
+  return (
+    <PageHeader
+      title={isEmergency ? t('route.emergencyTitle') : t('route.title')}
+      description={t('route.subtitle', {
+        building: buildingName,
+        floor: floorNumber,
+      })}
+      actions={
+        <Badge
+          tone={isEmergency ? 'danger' : 'brand'}
+          className="px-3 py-1.5 text-sm"
+        >
+          {isEmergency ? <AlertTriangleIcon size={16} /> : <MapPinIcon size={16} />}
+          {isEmergency ? t('route.badgeEmergency') : t('route.badgeNormal')}
+        </Badge>
+      }
+    />
+  );
+};
+
 /** Hides the AI launcher while the emergency overlay is demanding attention. */
 const AiLayer: React.FC<{ buildingId: string; nodeId: string; locale: 'en' | 'ka' }> = ({
   buildingId,
@@ -161,7 +203,16 @@ const AiLayer: React.FC<{ buildingId: string; nodeId: string; locale: 'en' | 'ka
 const QRScanRoutePageFixed: React.FC = () => {
   const { qrId } = useParams<{ qrId: string }>();
   const rootRef = usePageAnimations();
-  const { lang } = useI18n();
+  const { lang, t } = useI18n();
+
+  // Held in a ref so the fetch effect keeps its empty dependency list. Listing
+  // `t` there would re-run the scan request — and flash the loading screen —
+  // every time the language toggle is pressed, which is exactly the moment you
+  // do not want the route to disappear.
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
 
   const [routeData, setRouteData] = useState<RouteData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -192,21 +243,23 @@ const QRScanRoutePageFixed: React.FC = () => {
       if (response.success) {
         setRouteData(response.data);
       } else {
-        setError(response.message || 'Failed to load route data');
+        setError(response.message || tRef.current('route.loadFailed'));
       }
     } catch (err: unknown) {
       console.error('Error fetching route data:', err);
 
       if (err instanceof ApiError) {
         if (err.status === 404) {
-          setError('QR code not found. Please scan a valid emergency QR code.');
+          setError(tRef.current('route.qrNotFound'));
         } else if (err.status === 400) {
-          setError('Invalid QR code format.');
+          setError(tRef.current('route.qrInvalid'));
         } else {
-          setError(err.message || 'Failed to load route data');
+          setError(err.message || tRef.current('route.loadFailed'));
         }
       } else {
-        setError(err instanceof Error ? err.message : 'Failed to load route data');
+        setError(
+          err instanceof Error ? err.message : tRef.current('route.loadFailed'),
+        );
       }
     } finally {
       setLoading(false);
@@ -303,18 +356,18 @@ const QRScanRoutePageFixed: React.FC = () => {
     // Guarded: posting an undefined buildingId silently dropped the report, and
     // evacuation counts are what the building owner watches during an incident.
     if (!routeData?.buildingId) {
-      setError('Could not record your evacuation — building is unknown.');
+      setError(t('route.evacuatedUnknownBuilding'));
       return;
     }
 
     try {
       const res = await evacuatedFunc(routeData.buildingId)
       if (!res || res.Success === false) {
-        setError(res?.Message || "Couldn't record your evacuation. Please try again.");
+        setError(res?.Message || t('route.evacuatedFailed'));
         return;
       }
     } catch {
-      setError("Couldn't record your evacuation. Please try again.");
+      setError(t('route.evacuatedFailed'));
       return;
     }
 
@@ -328,13 +381,15 @@ const QRScanRoutePageFixed: React.FC = () => {
   if (loading) {
     return (
       <PageShell width="wide">
-        <PageHeader title="Loading Route" />
+        <PageHeader title={t('route.loadingTitle')} />
         <div
           role="status"
           className="flex min-h-[50vh] flex-col items-center justify-center gap-4 pt-8"
         >
           <SpinnerIcon size={48} className="text-brand-text" />
-          <p className="text-lg font-medium text-ink-muted">Loading emergency route...</p>
+          <p className="text-lg font-medium text-ink-muted">
+            {t('route.loadingBody')}
+          </p>
         </div>
       </PageShell>
     );
@@ -343,7 +398,7 @@ const QRScanRoutePageFixed: React.FC = () => {
   if (error) {
     return (
       <PageShell width="wide">
-        <PageHeader title="Error" />
+        <PageHeader title={t('route.errorTitle')} />
         <div className="mx-auto flex w-full max-w-xl flex-col gap-6 pt-10">
           <Alert tone="danger">
             <p className="text-base">{error}</p>
@@ -354,18 +409,18 @@ const QRScanRoutePageFixed: React.FC = () => {
               size="lg"
               fullWidth
               onClick={handleGoBack}
-              aria-label="Go back to previous page"
+              aria-label={t('common.back')}
             >
               <ArrowLeftIcon size={18} />
-              Back
+              {t('common.back')}
             </Button>
             <Button
               size="lg"
               fullWidth
               onClick={handleGoHome}
-              aria-label="Go to home page"
+              aria-label={t('common.home')}
             >
-              Home
+              {t('common.home')}
             </Button>
           </div>
         </div>
@@ -376,10 +431,12 @@ const QRScanRoutePageFixed: React.FC = () => {
   if (!routeData) {
     return (
       <PageShell width="wide">
-        <PageHeader title="Route Not Found" />
+        <PageHeader title={t('route.notFoundTitle')} />
         <div className="mx-auto flex w-full max-w-xl flex-col gap-6 pt-10">
           <Alert tone="danger">
-            <p className="text-base">No route data found for QR code: {qrId}</p>
+            <p className="text-base">
+              {t('route.notFoundBody', { qrId: qrId ?? '' })}
+            </p>
           </Alert>
           <div className="flex flex-col gap-3 sm:flex-row">
             <Button
@@ -387,18 +444,18 @@ const QRScanRoutePageFixed: React.FC = () => {
               size="lg"
               fullWidth
               onClick={handleGoBack}
-              aria-label="Go back to previous page"
+              aria-label={t('common.back')}
             >
               <ArrowLeftIcon size={18} />
-              Back
+              {t('common.back')}
             </Button>
             <Button
               size="lg"
               fullWidth
               onClick={handleGoHome}
-              aria-label="Go to home page"
+              aria-label={t('common.home')}
             >
-              Home
+              {t('common.home')}
             </Button>
           </div>
         </div>
@@ -432,15 +489,9 @@ const QRScanRoutePageFixed: React.FC = () => {
         {/* Header — the only animated element; route content below renders
             instantly, nothing safety-critical waits on an animation. */}
         <div data-hero>
-          <PageHeader
-            title="Emergency Route"
-            description={`${routeData.buildingName} • Floor ${routeData.floorNumber} • Scanned ${routeData.scanCount} times`}
-            actions={
-              <Badge tone="danger" className="px-3 py-1.5 text-sm">
-                <AlertTriangleIcon size={16} />
-                Emergency Exit Route
-              </Badge>
-            }
+          <RouteHeader
+            buildingName={routeData.buildingName}
+            floorNumber={routeData.floorNumber}
           />
         </div>
 
@@ -469,10 +520,10 @@ const QRScanRoutePageFixed: React.FC = () => {
             <Card className="p-6">
               <div className="mb-4">
                 <h2 className="text-xl font-semibold text-ink">
-                  Emergency Route Map
+                  {t('route.exitMapTitle')}
                 </h2>
                 <p className="mt-1 text-base text-ink-muted">
-                  Follow the orange path to the nearest emergency exit
+                  {t('route.exitMapLead')}
                 </p>
               </div>
 
@@ -561,7 +612,7 @@ const QRScanRoutePageFixed: React.FC = () => {
                         fill="var(--ink-muted)"
                         fontSize="18"
                       >
-                        No Floor Map Available
+                        {t('route.noFloorMap')}
                       </text>
                     </g>
                   )}
@@ -655,39 +706,49 @@ const QRScanRoutePageFixed: React.FC = () => {
           <div className="flex flex-col gap-6 lg:col-span-1">
             {/* Route Status Card */}
             <Card className="p-6">
-              <h2 className="mb-4 text-lg font-semibold text-ink">Route Information</h2>
+              <h2 className="mb-4 text-lg font-semibold text-ink">
+                {t('route.routeInfo')}
+              </h2>
 
               {routeData.emergencyRoute.found ? (
                 <div className="flex flex-col gap-4">
                   <Alert tone="success">
-                    <p className="text-base font-semibold">Route to exit found</p>
+                    <p className="text-base font-semibold">{t('route.routeFound')}</p>
                   </Alert>
 
                   {/* A route that leaves this floor is the single most
                       important thing to communicate — the drawn line stops at
                       the stairs, so without this the map looks truncated. */}
                   {routeData.requiresFloorChange && routeData.floorTransitions?.length > 0 && (
-                    <Alert tone="info" title="This route changes floors">
-                      {routeData.floorTransitions.map((t, i) => (
+                    <Alert tone="info" title={t('route.changesFloorsTitle')}>
+                      {routeData.floorTransitions.map((transition, i) => (
                         <p key={i} className="text-base">
-                          Take the {t.nodeType === 'stairs' ? 'stairs' : 'connection'} from floor {t.from} to floor {t.to}
+                          {t('route.changesFloorsStep', {
+                            transit:
+                              transition.nodeType === 'stairs'
+                                ? t('wayfinding.transitStairs')
+                                : t('route.transitConnection'),
+                            from: transition.from,
+                            to: transition.to,
+                          })}
                         </p>
                       ))}
-                      <p className="mt-1 text-sm">
-                        The orange path shows your current floor only.
-                      </p>
+                      <p className="mt-1 text-sm">{t('route.changesFloorsNote')}</p>
                     </Alert>
                   )}
 
                   <div>
-                    <p className="text-sm text-ink-subtle">Distance</p>
-                    <p className="text-xl font-semibold text-ink">{routeData.emergencyRoute.distance} steps</p>
+                    <p className="text-sm text-ink-subtle">{t('route.distance')}</p>
+                    <p className="text-xl font-semibold text-ink">
+                      {t('route.steps', { count: routeData.emergencyRoute.distance })}
+                    </p>
                   </div>
 
                   <div>
-                    <p className="text-sm text-ink-subtle">Exit Location</p>
+                    <p className="text-sm text-ink-subtle">{t('route.exitLocation')}</p>
                     <p className="text-xl font-semibold text-ink">
-                      {routeData.emergencyRoute.exitNode?.label || 'Emergency Exit'}
+                      {routeData.emergencyRoute.exitNode?.label ||
+                        t('route.emergencyExit')}
                     </p>
                     <p className="text-sm text-ink-subtle">
                       ({routeData.emergencyRoute.exitNode?.x}, {routeData.emergencyRoute.exitNode?.y})
@@ -695,7 +756,7 @@ const QRScanRoutePageFixed: React.FC = () => {
                   </div>
 
                   <div>
-                    <p className="text-sm text-ink-subtle">Your Location</p>
+                    <p className="text-sm text-ink-subtle">{t('route.yourLocation')}</p>
                     <p className="text-xl font-semibold text-ink">{routeData.nodeLabel}</p>
                     <p className="text-sm text-ink-subtle">
                       ({routeData.nodePosition.x}, {routeData.nodePosition.y})
@@ -703,10 +764,8 @@ const QRScanRoutePageFixed: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                <Alert tone="danger" title="No exit route found">
-                  <p className="text-sm">
-                    Please check with building staff for emergency instructions.
-                  </p>
+                <Alert tone="danger" title={t('route.noExitTitle')}>
+                  <p className="text-sm">{t('route.noExitBody')}</p>
                 </Alert>
               )}
             </Card>
@@ -714,23 +773,29 @@ const QRScanRoutePageFixed: React.FC = () => {
             {/* Selected Node Information */}
             {selectedNode && (
               <Card className="p-6">
-                <h2 className="mb-4 text-lg font-semibold text-ink">Node Details</h2>
+                <h2 className="mb-4 text-lg font-semibold text-ink">
+                  {t('route.nodeDetails')}
+                </h2>
                 <div className="flex flex-col gap-3">
                   <div>
-                    <p className="text-sm text-ink-subtle">Label</p>
+                    <p className="text-sm text-ink-subtle">{t('route.label')}</p>
                     <p className="font-medium text-ink">{selectedNode.label}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-ink-subtle">Type</p>
+                    <p className="text-sm text-ink-subtle">{t('route.type')}</p>
                     <p className="font-medium capitalize text-ink">{selectedNode.type}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-ink-subtle">Position</p>
+                    <p className="text-sm text-ink-subtle">{t('route.position')}</p>
                     <p className="font-medium text-ink">({selectedNode.x}, {selectedNode.y})</p>
                   </div>
                   <div>
-                    <p className="text-sm text-ink-subtle">Connections</p>
-                    <p className="font-medium text-ink">{selectedNode.connections.length} nodes</p>
+                    <p className="text-sm text-ink-subtle">{t('route.connections')}</p>
+                    <p className="font-medium text-ink">
+                      {t('route.connectionCount', {
+                        count: selectedNode.connections.length,
+                      })}
+                    </p>
                   </div>
                 </div>
                 <Button
@@ -738,44 +803,46 @@ const QRScanRoutePageFixed: React.FC = () => {
                   fullWidth
                   className="mt-4"
                   onClick={() => setSelectedNode(null)}
-                  aria-label="Clear selected node"
+                  aria-label={t('route.clearSelection')}
                 >
-                  Clear selection
+                  {t('route.clearSelection')}
                 </Button>
               </Card>
             )}
 
             {/* Emergency Instructions Card */}
-            <Alert tone="danger" title="Emergency Instructions">
-              <p className="text-sm">
-                Follow the highlighted route to the nearest emergency exit.
-              </p>
+            <Alert tone="danger" title={t('route.instructionsTitle')}>
+              <p className="text-sm">{t('route.instructionsLead')}</p>
               <ul className="mt-3 flex list-disc flex-col gap-2 pl-5 text-[0.9375rem] font-medium">
-                <li>Stay calm and move quickly</li>
-                <li>Follow the orange path on the map</li>
-                <li>Do not use elevators during fire</li>
-                <li>Help others if you can do so safely</li>
-                <li>Call emergency services if needed</li>
+                <li>{t('route.instruction1')}</li>
+                <li>{t('route.instruction2')}</li>
+                <li>{t('route.instruction3')}</li>
+                <li>{t('route.instruction4')}</li>
+                <li>{t('route.instruction5')}</li>
               </ul>
             </Alert>
 
             {/* Building Details Card */}
             <Card className="p-6">
-              <h2 className="mb-4 text-lg font-semibold text-ink">Building Details</h2>
+              <h2 className="mb-4 text-lg font-semibold text-ink">
+                {t('route.buildingDetails')}
+              </h2>
 
               <div className="flex flex-col gap-3">
                 <div>
-                  <p className="text-sm text-ink-subtle">Building</p>
+                  <p className="text-sm text-ink-subtle">{t('route.building')}</p>
                   <p className="font-medium text-ink">{routeData.buildingName}</p>
                 </div>
 
                 <div>
-                  <p className="text-sm text-ink-subtle">Floor</p>
-                  <p className="font-medium text-ink">Floor {routeData.floorNumber}</p>
+                  <p className="text-sm text-ink-subtle">{t('route.floor')}</p>
+                  <p className="font-medium text-ink">
+                    {t('wayfinding.floor', { number: routeData.floorNumber })}
+                  </p>
                 </div>
 
                 <div>
-                  <p className="text-sm text-ink-subtle">Last Updated</p>
+                  <p className="text-sm text-ink-subtle">{t('route.lastUpdated')}</p>
                   <p className="text-sm font-medium text-ink-muted">
                     {new Date(routeData.timestamp).toLocaleString()}
                   </p>
@@ -790,19 +857,19 @@ const QRScanRoutePageFixed: React.FC = () => {
                 size="lg"
                 fullWidth
                 onClick={handleGoBack}
-                aria-label="Go back to previous page"
+                aria-label={t('common.back')}
               >
                 <ArrowLeftIcon size={18} />
-                Back
+                {t('common.back')}
               </Button>
               <Button
                 size="lg"
                 fullWidth
                 onClick={handleEvacuated}
-                aria-label="Go to home page"
+                aria-label={t('route.evacuated')}
               >
                 <CheckCircleIcon size={18} />
-                Evacuated
+                {t('route.evacuated')}
               </Button>
             </div>
           </div>
@@ -810,27 +877,29 @@ const QRScanRoutePageFixed: React.FC = () => {
 
         {/* Legend */}
         <Card className="mt-8 p-6">
-          <h2 className="mb-4 text-lg font-semibold text-ink">Node Types</h2>
+          <h2 className="mb-4 text-lg font-semibold text-ink">
+            {t('route.legendTitle')}
+          </h2>
           <div className="flex flex-wrap gap-x-6 gap-y-3 text-sm text-ink-muted">
             <div className="flex items-center gap-2">
               <span aria-hidden="true" className="h-3 w-3 rounded-full bg-danger" />
-              Your Location
+              {t('route.legendYou')}
             </div>
             <div className="flex items-center gap-2">
               <span aria-hidden="true" className="h-3 w-3 rounded-full bg-success" />
-              Emergency Exit
+              {t('route.legendExit')}
             </div>
             <div className="flex items-center gap-2">
               <span aria-hidden="true" className="h-3 w-3 rounded-full bg-info" />
-              Stairs/Elevator
+              {t('route.legendTransit')}
             </div>
             <div className="flex items-center gap-2">
               <span aria-hidden="true" className="h-3 w-3 rounded-full bg-warning" />
-              Path Point
+              {t('route.legendPath')}
             </div>
             <div className="flex items-center gap-2">
               <span aria-hidden="true" className="h-1 w-8 rounded-full bg-brand" />
-              Emergency Route
+              {t('route.legendRoute')}
             </div>
           </div>
         </Card>

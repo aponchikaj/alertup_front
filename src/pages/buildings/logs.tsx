@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { Alert, Badge, EmptyState, Skeleton } from '../../components/ui/feedback'
 import { FileTextIcon, RefreshIcon, TrashIcon } from '../../components/ui/icons'
+import { useI18n } from '../../i18n/LanguageProvider'
 
 interface LOG_SCHEMA{
     logMessage:string,
@@ -19,6 +20,7 @@ interface LOG_SCHEMA{
 export default function Logs(){
 
     const rootRef = usePageAnimations()
+    const { t } = useI18n()
     const [LOGS,setLOGS] = useState<Array<LOG_SCHEMA>>([])
     const [serverError,setServerError] = useState("")
     const [loading,setLoading] = useState(true)
@@ -28,7 +30,7 @@ export default function Logs(){
             const res = await GETBUILDINGLOGS(buildingId!)
             console.log(res)
             if(!res) {
-                setServerError("Something went wrong.")
+                setServerError(t("common.error"))
                 setLoading(false)
                 return;
             }
@@ -45,7 +47,7 @@ export default function Logs(){
             setServerError("")
             setLoading(false)
         }catch{
-            setServerError("Something went wrong.")
+            setServerError(t("common.error"))
             setLoading(false)
             return;
         }
@@ -66,7 +68,7 @@ export default function Logs(){
         try{
             const res = await CLEARBUILDINGLOGS(buildingId!)
             if(!res) {
-                setServerError("Something went wrong.")
+                setServerError(t("common.error"))
                 setLoading(false)
                 return;
             }
@@ -78,7 +80,7 @@ export default function Logs(){
             window.location.reload()
             setLoading(false)
         }catch{
-            setServerError("Something went wrong.")
+            setServerError(t("common.error"))
             setLoading(false)
             return;
         }
@@ -89,17 +91,17 @@ export default function Logs(){
             <PageShell width="wide">
                 <div data-hero>
                     <PageHeader
-                        title="Logs"
-                        description="Live activity for this building — the feed refreshes every 10 seconds."
+                        title={t("buildings.logs")}
+                        description={t("buildings.logsLead")}
                         actions={
                             <>
-                                <Button variant="secondary" onClick={fetchLogs} title="Refresh">
+                                <Button variant="secondary" onClick={fetchLogs} title={t("common.refresh")}>
                                     <RefreshIcon size={18} />
-                                    Refresh
+                                    {t("common.refresh")}
                                 </Button>
                                 <Button variant="danger" onClick={clearLogs}>
                                     <TrashIcon size={16} />
-                                    Clear
+                                    {t("buildings.clearLogs")}
                                 </Button>
                             </>
                         }
@@ -109,7 +111,7 @@ export default function Logs(){
                 <div className="pt-8" data-reveal>
                     {loading && serverError === "" && (
                         <Card className="flex flex-col gap-3 p-6">
-                            <p className="sr-only" role="status">Loading logs…</p>
+                            <p className="sr-only" role="status">{t("common.loading")}</p>
                             {Array.from({ length: 6 }).map((_, i) => (
                                 <Skeleton key={i} className="h-5 w-full" />
                             ))}
@@ -143,8 +145,8 @@ export default function Logs(){
                         ) : (
                             <EmptyState
                                 icon={<FileTextIcon size={24} />}
-                                title="No logs yet"
-                                description="Activity for this building will appear here as it happens."
+                                title={t("buildings.logsEmptyTitle")}
+                                description={t("buildings.logsEmptyLead")}
                             />
                         )
                     )}

@@ -16,14 +16,15 @@ import {
   FileTextIcon,
   LayersIcon,
   MapIcon,
-  RouteIcon,
   UserIcon,
   UsersIcon,
 } from "../../components/ui/icons";
 import { useAuth } from "../../auth/useAuth";
+import { useI18n } from "../../i18n/LanguageProvider";
 
 const Building = () => {
   const rootRef = usePageAnimations();
+  const { t } = useI18n();
   const { buildingID } = useParams();
   // Team management is reachable by the owner and by anyone with a membership
   // in this building — the page itself decides which controls they get.
@@ -44,7 +45,7 @@ const Building = () => {
       // Each branch returns. Without the returns, a falsy `res` fell through to
       // res.Success on the next line and threw.
       if(!res){
-        setServerError("Something went wrong while using emergency mode function.")
+        setServerError(t("common.error"))
         return
       }
       if(res.Success==false){
@@ -54,7 +55,7 @@ const Building = () => {
 
       window.location.reload()
     }catch{
-      setServerError("Couldn't use emergency mode function.")
+      setServerError(t("common.error"))
     }
   }
 
@@ -66,7 +67,7 @@ const Building = () => {
         // console.log(res)
 
         if (!res || res.Success === false) {
-          setServerError(res?.Message || "Something went wrong.");
+          setServerError(res?.Message || t("common.error"));
           setLoading(false);
           return;
         }
@@ -137,22 +138,22 @@ const Building = () => {
           setIsOwner(false);
         }
       } catch {
-        setServerError("Something went wrong.");
+        setServerError(t("common.error"));
       } finally {
         setLoading(false);
       }
     };
 
     getBuildingData();
-  }, [buildingID]);
+  }, [buildingID, t]);
 
   return (
     <div ref={rootRef}>
       <PageShell width="wide">
         <div data-hero>
           <PageHeader
-            title="Building overview"
-            description="Floors, escape maps, scan activity and emergency controls for this building."
+            title={t("buildings.overviewTitle")}
+            description={t("buildings.overviewLead")}
           />
         </div>
 
@@ -174,7 +175,7 @@ const Building = () => {
               <Skeleton className="h-10 w-full" />
             </Card>
             <p className="sr-only" role="status">
-              Loading building…
+              {t("common.loading")}
             </p>
           </div>
         )}
@@ -200,13 +201,14 @@ const Building = () => {
               </h2>
 
               <p className="mb-6 text-sm text-ink-subtle">
-                Last updated: {new Date(buildingData.updatedAt).toLocaleString()}
+                {t("buildings.lastUpdated")}:{" "}
+                {new Date(buildingData.updatedAt).toLocaleString()}
               </p>
 
               <div className="grid grid-cols-2 gap-4 text-center md:grid-cols-3">
-                <Stat label="Floors" value={buildingData.floors} />
-                <Stat label="Global Scans" value={buildingData.globalScans ? buildingData.globalScans.length : null} />
-                <Stat label="Maps" value={buildingData.maps ? buildingData.maps.length : null} />
+                <Stat label={t("buildings.floors")} value={buildingData.floors} />
+                <Stat label={t("buildings.globalScans")} value={buildingData.globalScans ? buildingData.globalScans.length : null} />
+                <Stat label={t("buildings.mapsUploaded")} value={buildingData.maps ? buildingData.maps.length : null} />
               </div>
 
               {isOwner && (
@@ -217,7 +219,9 @@ const Building = () => {
                   onClick={EmergencyModeFunction}
                 >
                   <AlertTriangleIcon size={18} />
-                  Emergency mode: {emergencyMode}
+                  {emergencyMode === "on"
+                    ? t("emergency.resolve")
+                    : t("emergency.trigger")}
                 </Button>
               )}
             </Card>
@@ -225,12 +229,15 @@ const Building = () => {
             {/* STATUS CARD */}
             <Card data-reveal-item className="flex flex-col justify-between gap-6 p-6">
               <div>
-                <h3 className="mb-4 text-lg font-semibold text-ink">Status</h3>
+                <h3 className="mb-4 text-lg font-semibold text-ink">
+                  {t("buildings.status")}
+                </h3>
 
                 <p className="mb-3 flex items-center gap-2 text-sm text-ink-muted">
-                  Active:
                   <Badge tone={buildingData.isDeactivated ? "danger" : "success"}>
-                    {buildingData.isDeactivated ? "No" : "Yes"}
+                    {buildingData.isDeactivated
+                      ? t("buildings.deactivated")
+                      : t("buildings.active")}
                   </Badge>
                 </p>
 
@@ -238,7 +245,7 @@ const Building = () => {
                   <p className="text-sm text-ink-muted">
                     <span className="flex items-center gap-1.5">
                       <UserIcon size={15} className="text-ink-subtle" />
-                      Owner:
+                      {t("members.owner")}
                     </span>
                     <span className="mt-1 block break-all font-medium text-ink">
                       {ownerData.displayName}
@@ -251,11 +258,35 @@ const Building = () => {
               </div>
 
               <div className="flex flex-col gap-3">
+                {/* The map editor is the authoring surface for this building —
+                    walkways, shops, exits and floor links all live there, so it
+                    leads, with its own explanation. */}
                 {isOwner && (
-                  <ButtonLink to={`/building/${buildingData._id}/nodes`} fullWidth>
-                    <RouteIcon size={18} />
-                    Manage emergency routes
-                  </ButtonLink>
+                  <div className="flex flex-col gap-1.5">
+                    <ButtonLink to={`/building/${buildingData._id}/nodes`} fullWidth>
+                      <MapIcon size={18} />
+                      {t("buildings.mapEditor")}
+                    </ButtonLink>
+                    <p className="text-xs leading-relaxed text-ink-subtle">
+                      {t("buildings.mapEditorHint")}
+                    </p>
+                  </div>
+                )}
+
+                {(isOwner || isMember) && (
+                  <div className="flex flex-col gap-1.5">
+                    <ButtonLink
+                      to={`/building/${buildingData._id}/members`}
+                      variant="secondary"
+                      fullWidth
+                    >
+                      <UsersIcon size={18} />
+                      {t("buildings.team")}
+                    </ButtonLink>
+                    <p className="text-xs leading-relaxed text-ink-subtle">
+                      {t("buildings.teamHint")}
+                    </p>
+                  </div>
                 )}
 
                 {isOwner && buildingData.emergencyMode == true && (
@@ -265,18 +296,7 @@ const Building = () => {
                     fullWidth
                   >
                     <FileTextIcon size={18} />
-                    Check logs
-                  </ButtonLink>
-                )}
-
-                {(isOwner || isMember) && (
-                  <ButtonLink
-                    to={`/building/${buildingData._id}/members`}
-                    variant="secondary"
-                    fullWidth
-                  >
-                    <UsersIcon size={18} />
-                    Team
+                    {t("buildings.logs")}
                   </ButtonLink>
                 )}
 
@@ -286,20 +306,22 @@ const Building = () => {
                   fullWidth
                 >
                   <ChartIcon size={18} />
-                  Analytics
+                  {t("buildings.analytics")}
                 </ButtonLink>
               </div>
             </Card>
 
             {/* MAPS SECTION */}
             <Card data-reveal-item className="p-6 lg:col-span-3">
-              <h3 className="mb-4 text-lg font-semibold text-ink">Maps</h3>
+              <h3 className="mb-4 text-lg font-semibold text-ink">
+                {t("buildings.mapsUploaded")}
+              </h3>
 
               {buildingData.maps && buildingData.maps.length === 0 ? (
                 <EmptyState
                   icon={<MapIcon size={24} />}
-                  title="No maps available"
-                  description="Uploaded floor maps will appear here."
+                  title={t("buildings.noMapsTitle")}
+                  description={t("buildings.noMapsLead")}
                 />
               ) : (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
@@ -314,10 +336,10 @@ const Building = () => {
                       </span>
                       <span>
                         <span className="block font-semibold text-ink group-hover:text-brand-text">
-                          Floor {map.floor}
+                          {t("wayfinding.floor", { number: map.floor })}
                         </span>
                         <span className="block text-sm text-ink-subtle">
-                          Scans: {map.scanned?.length || 0}
+                          {t("buildings.scannedCount")}: {map.scanned?.length || 0}
                         </span>
                       </span>
                     </Link>

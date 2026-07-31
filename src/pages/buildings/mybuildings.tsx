@@ -14,6 +14,7 @@ import {
   PlusIcon,
   TrashIcon,
 } from "../../components/ui/icons";
+import { useI18n } from "../../i18n/LanguageProvider";
 
 interface Map {
   floor: string;
@@ -39,6 +40,7 @@ interface Building {
 
 const Mybuildings = () => {
   const rootRef = usePageAnimations();
+  const { t } = useI18n();
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
@@ -53,19 +55,19 @@ const Mybuildings = () => {
       try {
         const res = await getMyBuildings();
         if (res.Success) setBuildings(res.Message);
-        else setServerError(res.Message || "Failed to fetch buildings");
+        else setServerError(res.Message || t("common.error"));
       } catch (err: any) {
-        setServerError(err.message || "Something went wrong");
+        setServerError(err.message || t("common.error"));
       } finally {
         setLoading(false);
       }
     };
 
     fetchBuildings();
-  }, []);
+  }, [t]);
 
   const handleDeactivationOfBuilding = async (id: string) => {
-    const confirm = window.confirm("Are you sure you want to deactivate this building?");
+    const confirm = window.confirm(t("buildings.deactivateConfirm"));
     if (!confirm) return;
 
     try {
@@ -76,18 +78,18 @@ const Mybuildings = () => {
           prev.map((b) => (b._id === id ? { ...b, isDeactivated: true } : b))
         );
       } else {
-        alert(res.Message || "Failed to deactivate building.");
+        alert(res.Message || t("common.error"));
       }
     } catch (err) {
       console.error(err);
-      alert("Something went wrong.");
+      alert(t("common.error"));
     } finally {
       setActionLoading(null);
     }
   };
 
   const handleBuildingDelete = async (id: string) => {
-    const confirm = window.confirm("Are you sure you want to delete this building?");
+    const confirm = window.confirm(t("buildings.deleteConfirm"));
     if (!confirm) return;
 
     try {
@@ -97,11 +99,11 @@ const Mybuildings = () => {
       if (res.Success) {
         setBuildings((prev) => prev.filter((b) => b._id !== id));
       } else {
-        alert(res.Message || "Failed to delete building.");
+        alert(res.Message || t("common.error"));
       }
     } catch (err) {
       console.error(err);
-      alert("Something went wrong.");
+      alert(t("common.error"));
     } finally {
       setActionLoading(null);
     }
@@ -112,12 +114,12 @@ const Mybuildings = () => {
       <PageShell width="wide">
         <div data-hero>
           <PageHeader
-            title="My buildings"
-            description="Every building you manage, with its floors, maps and scan activity."
+            title={t("buildings.myTitle")}
+            description={t("buildings.myLead")}
             actions={
               <ButtonLink to="/new">
                 <PlusIcon size={18} />
-                New building
+                {t("buildings.createTitle")}
               </ButtonLink>
             }
           />
@@ -134,7 +136,7 @@ const Mybuildings = () => {
               </Card>
             ))}
             <p className="sr-only" role="status">
-              Loading buildings…
+              {t("common.loading")}
             </p>
           </div>
         )}
@@ -149,12 +151,12 @@ const Mybuildings = () => {
           <div className="pt-8">
             <EmptyState
               icon={<BuildingIcon size={24} />}
-              title="No buildings yet"
-              description="Create your first building to generate QR escape routes for every floor."
+              title={t("buildings.emptyTitle")}
+              description={t("buildings.emptyLead")}
               action={
                 <ButtonLink to="/new">
                   <PlusIcon size={18} />
-                  Create a building
+                  {t("buildings.createTitle")}
                 </ButtonLink>
               }
             />
@@ -177,7 +179,9 @@ const Mybuildings = () => {
                       <BuildingIcon size={22} />
                     </span>
                     <Badge tone={b.isDeactivated ? "danger" : "success"}>
-                      {b.isDeactivated ? "Inactive" : "Active"}
+                      {b.isDeactivated
+                        ? t("buildings.deactivated")
+                        : t("buildings.active")}
                     </Badge>
                   </div>
                   <h2 className="text-lg font-semibold text-ink group-hover:text-brand-text">
@@ -186,16 +190,21 @@ const Mybuildings = () => {
                   <ul className="flex flex-col gap-1.5 text-sm text-ink-muted">
                     <li className="flex items-center gap-2">
                       <LayersIcon size={16} className="text-ink-subtle" />
-                      <span className="font-medium text-ink">Floors:</span> {b.floors}
+                      <span className="font-medium text-ink">{t("buildings.floors")}</span>{" "}
+                      {b.floors}
                     </li>
                     <li className="flex items-center gap-2">
                       <MapIcon size={16} className="text-ink-subtle" />
-                      <span className="font-medium text-ink">Maps uploaded:</span>{" "}
+                      <span className="font-medium text-ink">
+                        {t("buildings.mapsUploaded")}
+                      </span>{" "}
                       {b.maps.length}
                     </li>
                     <li className="flex items-center gap-2">
                       <ChartIcon size={16} className="text-ink-subtle" />
-                      <span className="font-medium text-ink">Global scans:</span>{" "}
+                      <span className="font-medium text-ink">
+                        {t("buildings.globalScans")}
+                      </span>{" "}
                       {b.globalScans.length}
                     </li>
                   </ul>
@@ -208,9 +217,9 @@ const Mybuildings = () => {
                     onClick={() => handleDeactivationOfBuilding(b._id)}
                     disabled={actionLoading === b._id || b.isDeactivated}
                     loading={actionLoading === b._id}
-                    loadingLabel="Processing…"
+                    loadingLabel={t("buildings.working")}
                   >
-                    Deactivate
+                    {t("buildings.deactivate")}
                   </Button>
                   <Button
                     variant="danger"
@@ -218,10 +227,10 @@ const Mybuildings = () => {
                     onClick={() => handleBuildingDelete(b._id)}
                     disabled={actionLoading === b._id}
                     loading={actionLoading === b._id}
-                    loadingLabel="Deleting…"
+                    loadingLabel={t("buildings.working")}
                   >
                     <TrashIcon size={16} />
-                    Delete
+                    {t("common.delete")}
                   </Button>
                 </div>
               </Card>

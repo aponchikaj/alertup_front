@@ -1,9 +1,11 @@
 import { usePageAnimations } from "../../lib/animations";
 import { ButtonLink } from "../../components/ui/button";
 import { ArrowLeftIcon, MapPinIcon } from "../../components/ui/icons";
+import { useI18n } from "../../i18n/LanguageProvider";
 
 const PageNotFound = () => {
   const rootRef = usePageAnimations();
+  const { t } = useI18n();
 
   return (
     <div ref={rootRef}>
@@ -32,18 +34,17 @@ const PageNotFound = () => {
 
           <div data-hero className="flex flex-col gap-2">
             <p className="text-2xl font-semibold text-ink sm:text-3xl">
-              This route isn't on the map
+              {t("notFound.title")}
             </p>
             <p className="max-w-md text-sm text-ink-muted sm:text-base">
-              The page you're looking for doesn't exist or was moved. Let's get
-              you back to safety.
+              {t("notFound.lead")}
             </p>
           </div>
 
           <div data-hero className="mt-2">
             <ButtonLink to="/" size="lg">
               <ArrowLeftIcon size={18} />
-              Go back home
+              {t("notFound.goHome")}
             </ButtonLink>
           </div>
         </div>

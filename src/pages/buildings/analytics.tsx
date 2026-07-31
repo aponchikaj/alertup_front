@@ -18,6 +18,7 @@ import {
     ClockIcon,
     RefreshIcon,
 } from "../../components/ui/icons"
+import { useI18n } from "../../i18n/LanguageProvider"
 
 interface EMERGENCY_SCHEMA {
     _id:string;
@@ -34,6 +35,7 @@ export default function AnalyticsPage(){
 
     const {buildingId} = useParams()
     const rootRef = usePageAnimations()
+    const { t } = useI18n()
 
     const [loading,setLoading] = useState(true)
     const [serverError,setServerError] = useState("")
@@ -57,17 +59,17 @@ export default function AnalyticsPage(){
                 dateFrom: dateFrom || undefined,
                 dateTo: dateTo || undefined})
             if (seq !== requestSeq.current) return
-            if(!res) {setServerError("Something went wrong."); return}
+            if(!res) {setServerError(t("common.error")); return}
             if(res.Success==false) {setServerError(res.Message);return}
 
             SET_EMERGENCIES(res.Message)
         }catch{
             if (seq !== requestSeq.current) return
-            setServerError("Something went wrong.")
+            setServerError(t("common.error"))
         }finally{
             if (seq === requestSeq.current) setLoading(false)
         }
-    }, [buildingId, dateFrom, dateTo])
+    }, [buildingId, dateFrom, dateTo, t])
 
     useEffect(() => {
         if (!buildingId) return
@@ -78,10 +80,10 @@ export default function AnalyticsPage(){
         return(
             <PageShell width="wide">
                 <PageHeader
-                    title="Analytics"
-                    description="Emergency history for this building."
+                    title={t("buildings.analytics")}
+                    description={t("buildings.analyticsLead")}
                 />
-                <p className="sr-only" role="status">Loading analytics…</p>
+                <p className="sr-only" role="status">{t("common.loading")}</p>
                 <div className="pt-8">
                     <Card className="flex flex-col gap-4 p-6 sm:flex-row">
                         <Skeleton className="h-11 w-full" />
@@ -105,14 +107,14 @@ export default function AnalyticsPage(){
         return(
             <PageShell width="wide">
                 <PageHeader
-                    title="Analytics"
-                    description="Emergency history for this building."
+                    title={t("buildings.analytics")}
+                    description={t("buildings.analyticsLead")}
                 />
                 <div className="flex flex-col items-start gap-4 pt-8">
                     <Alert tone="danger" className="w-full">{serverError}</Alert>
                     <Button variant="secondary" onClick={getAnalytics}>
                         <RefreshIcon size={18} />
-                        Retry
+                        {t("common.retry")}
                     </Button>
                 </div>
             </PageShell>
@@ -125,8 +127,8 @@ export default function AnalyticsPage(){
                 <PageShell width="wide">
                     <div data-hero>
                         <PageHeader
-                            title="Analytics"
-                            description="Every recorded emergency for this building. Pick one to see its full breakdown."
+                            title={t("buildings.analytics")}
+                            description={t("buildings.analyticsPickLead")}
                         />
                     </div>
 
@@ -136,11 +138,11 @@ export default function AnalyticsPage(){
                                 <Card className="p-6">
                                     <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-ink">
                                         <ClockIcon size={18} className="text-brand-text" />
-                                        Filter by date
+                                        {t("buildings.filterByDate")}
                                     </h2>
                                     <div className="grid gap-4 sm:grid-cols-2">
                                         <TextField
-                                            label="From"
+                                            label={t("buildings.dateFrom")}
                                             type="date"
                                             value={dateFrom}
                                             // The effect above refetches when
@@ -151,7 +153,7 @@ export default function AnalyticsPage(){
                                             onChange={(e)=>setDateFrom(e.target.value)}
                                         />
                                         <TextField
-                                            label="To"
+                                            label={t("buildings.dateTo")}
                                             type="date"
                                             value={dateTo}
                                             onChange={(e)=>setDateTo(e.target.value)}
@@ -165,15 +167,15 @@ export default function AnalyticsPage(){
                                     <div className="pt-6">
                                         <EmptyState
                                             icon={<ChartIcon size={24} />}
-                                            title="No emergencies found"
-                                            description="No emergencies were recorded for this period."
+                                            title={t("buildings.analyticsEmptyTitle")}
+                                            description={t("buildings.analyticsEmptyLead")}
                                             action={
                                                 <Button
                                                     variant="secondary"
                                                     onClick={()=>{setDateFrom("");setDateTo("");getAnalytics()}}
                                                 >
                                                     <RefreshIcon size={18} />
-                                                    Retry
+                                                    {t("common.retry")}
                                                 </Button>
                                             }
                                         />
@@ -202,7 +204,7 @@ export default function AnalyticsPage(){
                                                     />
                                                 </div>
                                                 <h3 className="text-lg font-semibold text-ink group-hover:text-brand-text">
-                                                    Emergency
+                                                    {t("buildings.emergency")}
                                                 </h3>
                                                 <div className="flex flex-col gap-1 text-sm text-ink-muted">
                                                     <span className="flex items-center gap-2">

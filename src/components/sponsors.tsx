@@ -1,4 +1,5 @@
 import { cn } from "../lib/cn";
+import { useI18n } from "../i18n/LanguageProvider";
 import IllusionImage from "../assets/images/sponsors/illusion.png";
 
 const SPONSORS = [
@@ -10,7 +11,10 @@ const SPONSORS = [
 ];
 
 /** `align="center"` for centered marketing sections; default start for the footer. */
-const Sponsors = ({ align = "start" }: { align?: "start" | "center" }) => (
+const Sponsors = ({ align = "start" }: { align?: "start" | "center" }) => {
+  const { t } = useI18n();
+
+  return (
   <section
     className={cn(
       "flex flex-col gap-2.5",
@@ -18,7 +22,7 @@ const Sponsors = ({ align = "start" }: { align?: "start" | "center" }) => (
     )}
   >
     <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-subtle">
-      Trusted by
+      {t("sponsors.trustedBy")}
     </h2>
     <ul className="flex flex-wrap items-center justify-center gap-3">
       {SPONSORS.map((sponsor) => (
@@ -44,6 +48,7 @@ const Sponsors = ({ align = "start" }: { align?: "start" | "center" }) => (
       ))}
     </ul>
   </section>
-);
+  );
+};
 
 export default Sponsors;

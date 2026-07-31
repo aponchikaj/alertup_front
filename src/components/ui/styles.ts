@@ -26,7 +26,8 @@ const BUTTON_BASE = cn(
 );
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
-  // Dark ink on the vivid orange: white on #FF7B22 is only 2.6:1 and fails AA.
+  // `brand-ink` is the token paired with `brand` for AA contrast; never
+  // hardcode a foreground here.
   primary: cn(
     "bg-brand text-brand-ink shadow-sm",
     "hover:bg-brand-hover hover:shadow-md",

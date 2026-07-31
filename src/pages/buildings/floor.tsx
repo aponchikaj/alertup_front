@@ -8,6 +8,7 @@ import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Alert, Skeleton } from "../../components/ui/feedback";
 import { PrinterIcon } from "../../components/ui/icons";
+import { useI18n } from "../../i18n/LanguageProvider";
 
 interface FloorData {
   floor: string;
@@ -28,6 +29,7 @@ interface ApiResponse {
 
 const Floor = () => {
   const rootRef = usePageAnimations();
+  const { t } = useI18n();
   const { id, floor } = useParams<{ id: string; floor: string }>();
 
   const [floorData, setFloorData] = useState<FloorData | null>(null);
@@ -43,7 +45,7 @@ const Floor = () => {
         console.log("Floor API response:", res);
 
         if (!res ) {
-          setServerError("Something went wrong");
+          setServerError(t("common.error"));
           return;
         }
 
@@ -52,14 +54,16 @@ const Floor = () => {
         // to the user as "Floor data not found".
         if (res.Success === false) {
           setServerError(
-            typeof res.Message === "string" ? res.Message : "Could not load this floor",
+            typeof res.Message === "string"
+              ? res.Message
+              : t("buildings.floorLoadFailed"),
           );
           return;
         }
 
         const data = res.Message?.floorData;
         if (!data) {
-          setServerError("Floor data not found");
+          setServerError(t("buildings.floorLoadFailed"));
           return;
         }
 
@@ -68,14 +72,14 @@ const Floor = () => {
         setScannedCount(res.Message.scannedCount);
       } catch (err) {
         console.error(err);
-        setServerError("Something went wrong");
+        setServerError(t("common.error"));
       } finally {
         setLoading(false);
       }
     };
 
     fetchFloorData();
-  }, [id, floor]);
+  }, [id, floor, t]);
 
   const handlePrintQRCode = (type: "poster" | "card" = "poster") => {
   if (!floorData) return;
@@ -85,10 +89,16 @@ const Floor = () => {
 
   const isCard = type === "card";
 
+  // Everything interpolated below lands in a raw HTML string, so translated
+  // copy is escaped exactly like the API-supplied names are.
+  const scanFor = escapeHtml(t("buildings.printScanFor"));
+  const subtitle = escapeHtml(t("buildings.printSubtitle"));
+  const place = `${escapeHtml(buildingName)} — ${escapeHtml(floorData.floor)}`;
+
   w.document.write(`
     <html>
       <head>
-        <title>Print QR</title>
+        <title>${escapeHtml(t("buildings.printTitle"))}</title>
         <style>
           @page {
             size: ${isCard ? "90mm 55mm" : "A4"};
@@ -146,9 +156,12 @@ const Floor = () => {
             justify-content: space-between;
           }
 
+          /* The print document is a bare window with no access to the app's
+             design tokens, so the monochrome palette is spelled out literally
+             here. Ink on white — no brand colour on a printed artifact. */
           .header {
-            background: #FF7B22;
-            color: white;
+            background: #111111;
+            color: #FFFFFF;
             padding: 40px;
             text-align: center;
           }
@@ -172,7 +185,7 @@ const Floor = () => {
           }
 
           .qr-box {
-            border: 6px solid #FF7B22;
+            border: 6px solid #111111;
             border-radius: 24px;
             padding: 40px;
             text-align: center;
@@ -204,7 +217,7 @@ const Floor = () => {
           isCard
             ? `
               <div class="card">
-                <div class="card-title">Escape Route</div>
+                <div class="card-title">${scanFor}</div>
 
                 <div class="card-qr">
                   <img src="${floorData.qrCode}" />
@@ -216,14 +229,14 @@ const Floor = () => {
             : `
               <div class="poster">
                 <div class="header">
-                  <h1>Emergency Escape Route</h1>
-                  <p>${escapeHtml(buildingName)} — ${escapeHtml(floorData.floor)}</p>
+                  <h1>${scanFor}</h1>
+                  <p>${subtitle}</p>
                 </div>
 
                 <div class="content">
                   <div class="qr-box">
                     <img src="${floorData.qrCode}" />
-                    <div class="scan-text">SCAN FOR EXIT MAP</div>
+                    <div class="scan-text">${place}</div>
                   </div>
                 </div>
 
@@ -263,7 +276,7 @@ const Floor = () => {
               <Skeleton className="h-20" />
             </div>
             <p className="sr-only" role="status">
-              Loading floor data…
+              {t("common.loading")}
             </p>
           </div>
         </PageShell>
@@ -289,17 +302,19 @@ const Floor = () => {
                 {buildingName} <br /> {floorData?.floor}
               </>
             }
-            description="Escape map, floor details and the printable QR code for this floor."
+            description={t("buildings.floorLead")}
           />
         </div>
 
         <div data-reveal-group className="flex flex-col gap-6 pt-8">
           {/* Map Card */}
           <Card data-reveal-item className="flex flex-col items-center p-6">
-            <h2 className="mb-4 text-xl font-semibold text-ink">Floor map</h2>
+            <h2 className="mb-4 text-xl font-semibold text-ink">
+              {t("buildings.floorMap")}
+            </h2>
             <img
               src={floorData?.map}
-              alt={`Map of ${floorData?.floor}`}
+              alt={t("buildings.floorMapAlt", { floor: floorData?.floor ?? "" })}
               className="h-auto w-full rounded-xl border border-line object-cover shadow-md"
             />
           </Card>
@@ -307,34 +322,36 @@ const Floor = () => {
           {/* Info Card */}
           <Card data-reveal-item className="p-6">
             <h2 className="mb-4 text-xl font-semibold text-ink">
-              Floor information
+              {t("buildings.floorTitle")}
             </h2>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <Stat label="Floor Name" value={floorData?.floor} />
-              <Stat label="Created At" value={new Date(floorData?.createdAt || "").toLocaleString()} />
-              <Stat label="Scanned Count" value={scannedCount} />
+              <Stat label={t("buildings.floorName")} value={floorData?.floor} />
+              <Stat label={t("buildings.createdAt")} value={new Date(floorData?.createdAt || "").toLocaleString()} />
+              <Stat label={t("buildings.scannedCount")} value={scannedCount} />
             </div>
           </Card>
 
           {/* QR Code Card */}
           <Card data-reveal-item className="flex flex-col items-center p-6">
-            <h2 className="mb-4 text-xl font-semibold text-ink">QR code</h2>
+            <h2 className="mb-4 text-xl font-semibold text-ink">
+              {t("buildings.qrCode")}
+            </h2>
             <img
               src={floorData?.qrCode}
-              alt="QR Code"
+              alt={t("buildings.qrCode")}
               className="mb-4 h-40 w-40 rounded-xl border border-line bg-surface p-2"
             />
             <div className="flex flex-wrap justify-center gap-3">
               <Button onClick={() => handlePrintQRCode("poster")}>
                 <PrinterIcon size={18} />
-                Print poster
+                {t("buildings.printPoster")}
               </Button>
               <Button
                 variant="secondary"
                 onClick={() => handlePrintQRCode("card")}
               >
                 <PrinterIcon size={18} />
-                Print card
+                {t("buildings.printCard")}
               </Button>
             </div>
           </Card>

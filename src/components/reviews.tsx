@@ -6,11 +6,15 @@ import { Alert } from "./ui/feedback";
 import { Card } from "./ui/card";
 import { CheckCircleIcon, StarIcon } from "./ui/icons";
 import { TextAreaField } from "./ui/field";
+import { useI18n } from "../i18n/LanguageProvider";
 
-const RATING_LABELS = ["Terrible", "Bad", "Okay", "Good", "Excellent"];
 const MAX_COMMENT = 300;
 
 const Reviews = () => {
+  const { t } = useI18n();
+  // Resolved per render so the labels follow the active language.
+  const ratingLabel = (star: number) => t(`reviews.rating${star}`);
+
   const [step, setStep] = useState(1);
   const [stars, setStars] = useState(0);
   const [hoverStars, setHoverStars] = useState(0);
@@ -33,7 +37,7 @@ const Reviews = () => {
 
   const sendFeedback = async () => {
     if (stars === 0) {
-      setServerError("Please choose a rating first.");
+      setServerError(t("reviews.chooseRating"));
       return;
     }
 
@@ -42,19 +46,19 @@ const Reviews = () => {
     try {
       const res = await sendFeedbackReview({ stars, comment });
       if (!res) {
-        setServerError("Something went wrong. Please try again.");
+        setServerError(t("reviews.failed"));
         return;
       }
       if (res.Success === false) {
         // Falls back to a message: a rejection without one set serverError to
         // undefined, so the alert rendered nothing and the form silently
         // returned to idle.
-        setServerError(res.Message || "Something went wrong. Please try again.");
+        setServerError(res.Message || t("reviews.failed"));
         return;
       }
       setStep(3);
     } catch {
-      setServerError("Something went wrong. Please try again.");
+      setServerError(t("reviews.failed"));
     } finally {
       setSending(false);
     }
@@ -65,17 +69,17 @@ const Reviews = () => {
   return (
     <Card className="w-full max-w-xl p-6 sm:p-8">
       <h2 className="text-center text-xl font-semibold text-ink">
-        How are we doing?
+        {t("reviews.title")}
       </h2>
       <p className="mt-1 text-center text-sm text-ink-muted">
-        Thirty seconds of feedback makes the next version better.
+        {t("reviews.lead")}
       </p>
 
       {step === 1 && (
         <div className="mt-6 flex flex-col items-center gap-4">
           <div
             role="radiogroup"
-            aria-label="Rating out of five"
+            aria-label={t("reviews.ratingLabel")}
             className="flex gap-1"
             onMouseLeave={() => setHoverStars(0)}
           >
@@ -87,7 +91,10 @@ const Reviews = () => {
                   type="button"
                   role="radio"
                   aria-checked={stars === star}
-                  aria-label={`${star} of 5 — ${RATING_LABELS[star - 1]}`}
+                  aria-label={t("reviews.ratingValue", {
+                    star,
+                    label: ratingLabel(star),
+                  })}
                   onMouseEnter={() => setHoverStars(star)}
                   onFocus={() => setHoverStars(star)}
                   onBlur={() => setHoverStars(0)}
@@ -112,7 +119,9 @@ const Reviews = () => {
           {/* The number is stated in text as well, so the rating never depends
               on colour alone. */}
           <p className="min-h-6 text-sm font-medium text-ink-muted" aria-live="polite">
-            {stars > 0 ? `${stars} of 5 — ${RATING_LABELS[stars - 1]}` : ""}
+            {stars > 0
+              ? t("reviews.ratingValue", { star: stars, label: ratingLabel(stars) })
+              : ""}
           </p>
 
           {serverError && <Alert tone="danger">{serverError}</Alert>}
@@ -123,11 +132,11 @@ const Reviews = () => {
                 setStep(2);
                 setServerError("");
               } else {
-                setServerError("Please choose a rating first.");
+                setServerError(t("reviews.chooseRating"));
               }
             }}
           >
-            Continue
+            {t("common.next")}
           </Button>
         </div>
       )}
@@ -135,13 +144,13 @@ const Reviews = () => {
       {step === 2 && (
         <div className="mt-6 flex flex-col gap-4">
           <TextAreaField
-            label="Anything you'd like to add?"
-            hint="Optional — but the specifics are the useful part."
+            label={t("reviews.commentLabel")}
+            hint={t("reviews.commentHint")}
             value={comment}
             maxLength={MAX_COMMENT}
             rows={4}
             onChange={(e) => setComment(e.target.value)}
-            placeholder="What worked, what didn't…"
+            placeholder={t("reviews.commentPlaceholder")}
           />
           <p className="self-end text-xs tabular-nums text-ink-subtle">
             {comment.length}/{MAX_COMMENT}
@@ -151,10 +160,14 @@ const Reviews = () => {
 
           <div className="flex justify-center gap-3">
             <Button variant="secondary" onClick={() => setStep(1)}>
-              Back
+              {t("common.back")}
             </Button>
-            <Button onClick={sendFeedback} loading={sending} loadingLabel="Sending…">
-              Send feedback
+            <Button
+              onClick={sendFeedback}
+              loading={sending}
+              loadingLabel={t("common.sending")}
+            >
+              {t("reviews.submit")}
             </Button>
           </div>
         </div>
@@ -165,10 +178,10 @@ const Reviews = () => {
           <span className="grid h-12 w-12 place-items-center rounded-full bg-success-subtle text-success-text">
             <CheckCircleIcon size={26} />
           </span>
-          <p className="text-lg font-semibold text-ink">Thank you</p>
-          <p className="text-sm text-ink-muted">
-            Your feedback goes straight to the person building this.
+          <p className="text-lg font-semibold text-ink">
+            {t("reviews.thankYouTitle")}
           </p>
+          <p className="text-sm text-ink-muted">{t("reviews.thankYouBody")}</p>
         </div>
       )}
     </Card>
