@@ -220,11 +220,11 @@ export const request = async <T = unknown>(path: string, options: RequestOptions
  */
 function normalizeEnvelope(body: unknown): unknown {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return body;
-  const record = body as Record<string, unknown>;
+  const record = mirrorIds(body) as Record<string, unknown>;
 
   const hasLower = 'success' in record || 'message' in record;
   const hasUpper = 'Success' in record || 'Message' in record;
-  if (!hasLower || hasUpper) return body;
+  if (!hasLower || hasUpper) return record;
 
   const mirrored: Record<string, unknown> = { ...record };
   if ('success' in record) mirrored.Success = record.success;
@@ -234,6 +234,41 @@ function normalizeEnvelope(body: unknown): unknown {
     mirrored.Message = 'data' in record ? record.data : record.message;
   }
   return mirrored;
+}
+
+/** Cheap insurance against a pathological payload; real ones nest ~4 deep. */
+const MAX_MIRROR_DEPTH = 8;
+
+/**
+ * `id` → `_id` compatibility shim.
+ *
+ * The database moved from MongoDB to PostgreSQL, so records now carry `id`
+ * where every existing screen reads `_id`. Roughly forty call sites assume the
+ * Mongo spelling — including the auth check, where a missing `_id` made a
+ * perfectly valid session look logged-out and bounced the user straight back
+ * to the login page.
+ *
+ * Mirroring it once here fixes all of them at the boundary. `_id` is only ever
+ * added, never overwritten, so a record that already has one is untouched.
+ *
+ * REMOVE once `grep -rn "\._id" src/` comes back empty.
+ */
+function mirrorIds(value: unknown, depth = 0): unknown {
+  if (depth > MAX_MIRROR_DEPTH || !value || typeof value !== 'object') return value;
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => mirrorIds(entry, depth + 1));
+  }
+
+  const record = value as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(record)) {
+    out[key] = mirrorIds(entry, depth + 1);
+  }
+  if (typeof record.id === 'string' && !('_id' in record)) {
+    out._id = record.id;
+  }
+  return out;
 }
 
 export const get = <T = unknown>(path: string, options?: Omit<RequestOptions, 'method' | 'body'>) =>

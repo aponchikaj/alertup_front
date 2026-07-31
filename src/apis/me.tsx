@@ -31,7 +31,11 @@ export const getAuthState = async (): Promise<AuthState> => {
         if (res.Success === false) return { state: "unauthenticated" };
 
         const user = res.user || res.Message?.user || res.Message;
-        if (!user || !user._id) return { state: "unauthenticated" };
+        // Accepts either spelling deliberately. This used to require `_id`,
+        // which is MongoDB's field name — after the move to PostgreSQL the API
+        // returns `id`, so a perfectly valid session was read as logged-out and
+        // the user was bounced back to /login the instant they signed in.
+        if (!user || !(user._id || user.id)) return { state: "unauthenticated" };
 
         return { state: "authenticated", response: res, user };
     } catch (err) {
