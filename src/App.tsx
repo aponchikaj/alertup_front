@@ -5,6 +5,7 @@ import Footer from "./components/footer";
 import GuestGuard from "./guards/guestguard";
 import AuthGuard from "./guards/authguard";
 import BuildingOwnerGuard from "./guards/buildingOwnerGuard";
+import PermissionGuard from "./guards/permissionGuard";
 import ServerGate from "./pages/other/loading";
 import { Analytics } from "@vercel/analytics/react";
 import Seo from "./seo/Seo";
@@ -24,7 +25,7 @@ const Reset = lazy(() => import("./pages/reset/reset"));
 const Dashboard = lazy(() => import("./pages/dashboard/dashboard"));
 const NewBuilding = lazy(() => import("./pages/buildings/newBuilding"));
 const Mybuildings = lazy(() => import("./pages/buildings/mybuildings"));
-const NodeManager = lazy(() => import("./pages/buildings/nodeManager"));
+const MapEditor = lazy(() => import("./pages/buildings/mapEditor/mapEditorPage"));
 const Building = lazy(() => import("./pages/buildings/building"));
 const Floor = lazy(() => import("./pages/buildings/floor"));
 const Settings = lazy(() => import("./pages/settings/settings"));
@@ -173,9 +174,9 @@ const App = () => {
             <Route
               path="/building/:buildingId/nodes"
               element={
-                <BuildingOwnerGuard>
-                  <NodeManager />
-                </BuildingOwnerGuard>
+                <PermissionGuard permission="CAN_EDIT_MAP">
+                  <MapEditor />
+                </PermissionGuard>
               }
             />
 
