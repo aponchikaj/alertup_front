@@ -1,5 +1,12 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Link, NavLink, useLocation } from "react-router-dom";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   animate,
   createScope,
@@ -9,32 +16,64 @@ import {
   type Scope,
 } from "animejs";
 import { useAuth } from "../auth/useAuth";
+import { logoutFromAccount } from "../apis/settings";
 import { cn } from "../lib/cn";
 import { reducedMotion } from "../lib/animations";
 import { Logo } from "./ui/logo";
 import { ThemeToggle } from "./ui/themeToggle";
 import { ButtonLink } from "./ui/button";
 import { buttonStyles } from "./ui/styles";
-import { CloseIcon, MenuIcon, SettingsIcon } from "./ui/icons";
+import {
+  BuildingIcon,
+  ChartIcon,
+  CloseIcon,
+  LogOutIcon,
+  MenuIcon,
+  PlusIcon,
+  ScanIcon,
+  SettingsIcon,
+  UserIcon,
+} from "./ui/icons";
 import { LanguageToggle } from "./ui/languageToggle";
 import { useI18n } from "../i18n/LanguageProvider";
 
-/* Labels are dictionary keys — resolved through t() at render so the bar
-   re-labels instantly when the language flips. */
-const GUEST_LINKS = [
-  { to: "/", label: "common.home" },
-  { to: "/scan", label: "common.scan" },
+/* ============================================================================
+   Navbar
+   ----------------------------------------------------------------------------
+   A floating glass pill that tucks away while you scroll down and returns the
+   moment you scroll up. Three things it must get right:
+
+   1. Scanning is the primary visitor action, so it is a button, not a link
+      buried among the others.
+   2. A signed-in person needs somewhere to go and a way out — the account menu
+      carries dashboard/buildings/settings and, finally, log out (there was no
+      way to sign out from the bar at all before).
+   3. Every string is translatable, including the accessible names, which were
+      the last hardcoded English left in this component.
+   ========================================================================= */
+
+type NavItem = { to: string; label: string; end?: boolean };
+
+const GUEST_LINKS: NavItem[] = [
+  { to: "/", label: "common.home", end: true },
   { to: "/pricing", label: "common.pricing" },
   { to: "/help", label: "common.help" },
   { to: "/contact", label: "common.contact" },
 ];
 
-const MEMBER_LINKS = [
+const MEMBER_LINKS: NavItem[] = [
   { to: "/dashboard", label: "common.dashboard" },
-  { to: "/scan", label: "common.scan" },
   { to: "/mybuildings", label: "common.buildings" },
-  { to: "/new", label: "common.new" },
-  { to: "/contact", label: "common.contact" },
+  { to: "/pricing", label: "common.pricing" },
+  { to: "/help", label: "common.help" },
+];
+
+/** Items inside the account dropdown (desktop) and the drawer's account block. */
+const ACCOUNT_LINKS: Array<NavItem & { icon: typeof UserIcon }> = [
+  { to: "/dashboard", label: "common.dashboard", icon: ChartIcon },
+  { to: "/mybuildings", label: "nav.myBuildings", icon: BuildingIcon },
+  { to: "/new", label: "nav.addBuilding", icon: PlusIcon },
+  { to: "/settings", label: "common.settings", icon: SettingsIcon },
 ];
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -47,11 +86,31 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
       : "font-medium text-ink-muted hover:bg-surface-hover hover:text-ink",
   );
 
+const drawerLinkClass = ({ isActive }: { isActive: boolean }) =>
+  cn(
+    "flex min-h-12 items-center gap-3 rounded-xl px-4 text-base",
+    "transition-colors duration-200",
+    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+    isActive
+      ? "bg-brand-subtle font-semibold text-brand-text"
+      : "font-medium text-ink-muted hover:bg-surface-hover hover:text-ink",
+  );
+
+const iconButtonClass = cn(
+  "grid h-10 w-10 place-items-center rounded-full",
+  "border border-line bg-surface text-ink-muted",
+  "transition-colors duration-200 hover:bg-surface-hover hover:text-ink",
+  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+);
+
 const Navbar = () => {
   const { t } = useI18n();
-  const { status } = useAuth();
+  const { status, user, refresh } = useAuth();
   const isLogged = status === "authed";
+  const navigate = useNavigate();
+
   const [menuOpen, setMenuOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [hidden, setHidden] = useState(false);
 
@@ -63,14 +122,29 @@ const Navbar = () => {
   const scrimRef = useRef<HTMLButtonElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const accountRef = useRef<HTMLDivElement>(null);
+  const accountButtonRef = useRef<HTMLButtonElement>(null);
   const isClosingRef = useRef(false);
 
   const links = isLogged ? MEMBER_LINKS : GUEST_LINKS;
 
-  // Close the drawer on navigation, otherwise it stays open over the new page.
+  const accountName = useMemo(() => {
+    if (!user) return "";
+    const parts = [user.name, user.lastname].filter(
+      (part): part is string => typeof part === "string" && part.length > 0,
+    );
+    if (parts.length) return parts.join(" ");
+    if (typeof user.company === "string" && user.company) return user.company;
+    return typeof user.email === "string" ? user.email : "";
+  }, [user]);
+
+  const accountInitial = accountName.trim().charAt(0).toUpperCase() || "?";
+
+  // Close both overlays on navigation, otherwise they hang over the new page.
   useEffect(() => {
     isClosingRef.current = false;
     setMenuOpen(false);
+    setAccountOpen(false);
   }, [location.pathname]);
 
   /* --- Scroll behaviour ---------------------------------------------------
@@ -79,21 +153,21 @@ const Navbar = () => {
      up — content gets the full viewport, navigation stays one flick away. */
   useEffect(() => {
     let lastY = window.scrollY;
-    const onScroll = () => {
+    const onScrollHandler = () => {
       const y = window.scrollY;
       setScrolled(y > 8);
-      // Never hide near the top, while the drawer is open, or on tiny jitters.
-      if (menuOpen || Math.abs(y - lastY) < 6) {
+      // Never hide near the top, while an overlay is open, or on tiny jitters.
+      if (menuOpen || accountOpen || Math.abs(y - lastY) < 6) {
         lastY = y;
         return;
       }
       setHidden(y > lastY && y > 160);
       lastY = y;
     };
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [menuOpen]);
+    onScrollHandler();
+    window.addEventListener("scroll", onScrollHandler, { passive: true });
+    return () => window.removeEventListener("scroll", onScrollHandler);
+  }, [menuOpen, accountOpen]);
 
   /* --- Entrance (anime.js) ------------------------------------------------
      The pill drops in once on app load, then its items cascade. Runs on the
@@ -123,9 +197,7 @@ const Navbar = () => {
     return () => scope.revert();
   }, []);
 
-  /* --- Reading progress (anime.js scroll sync) ----------------------------
-     A hairline brand gradient across the very top of the viewport whose width
-     tracks how far down the page you are. */
+  /* --- Reading progress (anime.js scroll sync) ---------------------------- */
   useLayoutEffect(() => {
     const el = progressRef.current;
     if (!el || reducedMotion()) return;
@@ -133,15 +205,47 @@ const Navbar = () => {
     const anim = animate(el, {
       scaleX: [0, 1],
       ease: "linear",
-      autoplay: onScroll({
-        container: document.documentElement,
-        sync: true,
-      }),
+      autoplay: onScroll({ container: document.documentElement, sync: true }),
     });
     return () => {
       anim.cancel();
     };
   }, []);
+
+  /* --- Account dropdown ---------------------------------------------------
+     Closes on outside pointerdown and on Escape, and returns focus to its
+     trigger so keyboard users are not dropped at the top of the document. */
+  useEffect(() => {
+    if (!accountOpen) return;
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (!accountRef.current?.contains(e.target as Node)) setAccountOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setAccountOpen(false);
+      accountButtonRef.current?.focus();
+    };
+
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [accountOpen]);
+
+  useLayoutEffect(() => {
+    const panel = accountRef.current?.querySelector<HTMLElement>("[data-account-panel]");
+    if (!accountOpen || !panel || reducedMotion()) return;
+    animate(panel, {
+      opacity: [0, 1],
+      translateY: [-8, 0],
+      scale: [0.97, 1],
+      duration: 200,
+      ease: "outQuint",
+    });
+  }, [accountOpen]);
 
   /* --- Drawer open (anime.js timeline) ------------------------------------ */
   useLayoutEffect(() => {
@@ -218,6 +322,20 @@ const Navbar = () => {
     };
   }, [menuOpen, closeMenu]);
 
+  /** Sign out, then refresh the auth context so guards re-evaluate. */
+  const handleLogout = useCallback(async () => {
+    setAccountOpen(false);
+    setMenuOpen(false);
+    try {
+      await logoutFromAccount();
+    } catch {
+      // The cookie is cleared server-side on a best-effort basis; either way
+      // the local session is dropped below.
+    }
+    await refresh();
+    navigate("/", { replace: true });
+  }, [refresh, navigate]);
+
   return (
     <>
       {/* Keyboard users can jump the nav instead of tabbing it on every page. */}
@@ -248,11 +366,9 @@ const Navbar = () => {
           hidden && "-translate-y-[130%]",
         )}
       >
-        {/* Floating glass pill — visibly a surface even at the very top of the
-            page, instead of dissolving into the hero. */}
         <nav
           ref={barRef}
-          aria-label="Main"
+          aria-label={t("nav.mainLabel")}
           className={cn(
             "mx-auto flex w-full max-w-6xl items-center justify-between gap-3",
             "rounded-2xl border px-3 sm:px-4",
@@ -267,17 +383,17 @@ const Navbar = () => {
             <Link
               to="/"
               className="rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
-              aria-label="AlertUp — home"
+              aria-label={t("nav.homeAria")}
             >
               <Logo size={30} />
             </Link>
           </span>
 
-          {/* Desktop */}
+          {/* Desktop links */}
           <ul className="hidden items-center gap-0.5 lg:flex">
             {links.map((link) => (
               <li key={link.to} data-nav-item>
-                <NavLink to={link.to} end={link.to === "/"} className={navLinkClass}>
+                <NavLink to={link.to} end={link.end} className={navLinkClass}>
                   {({ isActive }) => (
                     <>
                       {t(link.label)}
@@ -297,29 +413,103 @@ const Navbar = () => {
           </ul>
 
           <div className="flex items-center gap-2">
-            <span data-nav-item>
+            {/* Scanning is the primary visitor action — it gets a button, not a
+                link lost among the others. Icon-only on small screens. */}
+            <span data-nav-item className="hidden sm:block">
+              <ButtonLink to="/scan" variant="secondary" size="sm">
+                <ScanIcon size={17} aria-hidden="true" />
+                {t("nav.scanCta")}
+              </ButtonLink>
+            </span>
+            <span data-nav-item className="sm:hidden">
+              <Link to="/scan" aria-label={t("nav.scanCta")} className={iconButtonClass}>
+                <ScanIcon size={19} />
+              </Link>
+            </span>
+
+            <span data-nav-item className="hidden sm:block">
               <LanguageToggle />
             </span>
-            <span data-nav-item>
+            <span data-nav-item className="hidden sm:block">
               <ThemeToggle />
             </span>
 
             {isLogged ? (
-              <span data-nav-item className="hidden lg:block">
-                <Link
-                  to="/settings"
-                  aria-label="Settings"
-                  title="Settings"
+              <div ref={accountRef} data-nav-item className="relative hidden lg:block">
+                <button
+                  ref={accountButtonRef}
+                  type="button"
+                  onClick={() => setAccountOpen((open) => !open)}
+                  aria-label={t("nav.accountMenu")}
+                  aria-expanded={accountOpen}
+                  aria-haspopup="menu"
                   className={cn(
                     "grid h-10 w-10 place-items-center rounded-full",
-                    "border border-line bg-surface text-ink-muted",
-                    "transition-colors duration-200 hover:bg-surface-hover hover:text-ink",
+                    "border border-line bg-brand text-sm font-semibold text-brand-ink",
+                    "transition-transform duration-200 hover:scale-105",
                     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
                   )}
                 >
-                  <SettingsIcon size={19} />
-                </Link>
-              </span>
+                  <span aria-hidden="true">{accountInitial}</span>
+                </button>
+
+                {accountOpen && (
+                  <div
+                    data-account-panel
+                    role="menu"
+                    aria-label={t("nav.accountMenu")}
+                    className={cn(
+                      "absolute right-0 top-full z-50 mt-2 w-64 origin-top-right",
+                      "overflow-hidden rounded-2xl border border-line bg-surface shadow-xl",
+                    )}
+                  >
+                    <div className="border-b border-line px-4 py-3">
+                      <p className="truncate text-sm font-semibold text-ink">
+                        {accountName}
+                      </p>
+                      {typeof user?.email === "string" && user.email !== accountName ? (
+                        <p className="truncate text-xs text-ink-subtle">{user.email}</p>
+                      ) : null}
+                    </div>
+
+                    <ul className="p-1.5">
+                      {ACCOUNT_LINKS.map(({ to, label, icon: Icon }) => (
+                        <li key={to}>
+                          <Link
+                            to={to}
+                            role="menuitem"
+                            onClick={() => setAccountOpen(false)}
+                            className={cn(
+                              "flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm",
+                              "text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink",
+                              "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                            )}
+                          >
+                            <Icon size={17} aria-hidden="true" />
+                            {t(label)}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <div className="border-t border-line p-1.5">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={handleLogout}
+                        className={cn(
+                          "flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-sm",
+                          "text-danger-text transition-colors hover:bg-danger-subtle",
+                          "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                        )}
+                      >
+                        <LogOutIcon size={17} aria-hidden="true" />
+                        {t("common.logout")}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : (
               <div className="hidden items-center gap-2 lg:flex">
                 <span data-nav-item>
@@ -340,15 +530,10 @@ const Navbar = () => {
                 ref={menuButtonRef}
                 type="button"
                 onClick={() => setMenuOpen(true)}
-                aria-label="Open menu"
+                aria-label={t("nav.openMenu")}
                 aria-expanded={menuOpen}
                 aria-controls="mobile-menu"
-                className={cn(
-                  "grid h-10 w-10 place-items-center rounded-full",
-                  "border border-line bg-surface text-ink",
-                  "transition-colors duration-200 hover:bg-surface-hover",
-                  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                )}
+                className={cn(iconButtonClass, "text-ink")}
               >
                 <MenuIcon size={20} />
               </button>
@@ -360,7 +545,6 @@ const Navbar = () => {
       {/* Mobile drawer */}
       {menuOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          {/* Scrim: strong enough that the page behind stops competing. */}
           <button
             ref={scrimRef}
             type="button"
@@ -375,7 +559,7 @@ const Navbar = () => {
             id="mobile-menu"
             role="dialog"
             aria-modal="true"
-            aria-label="Menu"
+            aria-label={t("nav.menuLabel")}
             className={cn(
               "absolute inset-y-0 left-0 flex w-[min(20rem,85vw)] flex-col",
               "border-r border-line bg-canvas shadow-xl",
@@ -387,7 +571,7 @@ const Navbar = () => {
                 ref={closeButtonRef}
                 type="button"
                 onClick={closeMenu}
-                aria-label="Close menu"
+                aria-label={t("nav.closeMenu")}
                 className={cn(
                   "grid h-10 w-10 place-items-center rounded-full",
                   "text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink",
@@ -398,50 +582,80 @@ const Navbar = () => {
               </button>
             </div>
 
+            {isLogged && accountName ? (
+              <div
+                data-drawer-item
+                className="flex items-center gap-3 border-b border-line px-5 py-4"
+              >
+                <span
+                  aria-hidden="true"
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand text-sm font-semibold text-brand-ink"
+                >
+                  {accountInitial}
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-ink">
+                    {accountName}
+                  </span>
+                  {typeof user?.email === "string" && user.email !== accountName ? (
+                    <span className="block truncate text-xs text-ink-subtle">
+                      {user.email}
+                    </span>
+                  ) : null}
+                </span>
+              </div>
+            ) : null}
+
             <ul className="flex flex-1 flex-col gap-1 overflow-y-auto p-4">
+              <li data-drawer-item>
+                <NavLink to="/scan" className={drawerLinkClass}>
+                  <ScanIcon size={19} aria-hidden="true" />
+                  {t("nav.scanCta")}
+                </NavLink>
+              </li>
+
               {links.map((link) => (
                 <li key={link.to} data-drawer-item>
-                  <NavLink
-                    to={link.to}
-                    end={link.to === "/"}
-                    className={({ isActive }) =>
-                      cn(
-                        "flex min-h-12 items-center rounded-xl px-4 text-base",
-                        "transition-colors duration-200",
-                        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                        isActive
-                          ? "bg-brand-subtle font-semibold text-brand-text"
-                          : "font-medium text-ink-muted hover:bg-surface-hover hover:text-ink",
-                      )
-                    }
-                  >
+                  <NavLink to={link.to} end={link.end} className={drawerLinkClass}>
                     {t(link.label)}
                   </NavLink>
                 </li>
               ))}
 
-              {isLogged && (
-                <li data-drawer-item>
-                  <NavLink
-                    to="/settings"
-                    className={({ isActive }) =>
-                      cn(
-                        "flex min-h-12 items-center gap-3 rounded-xl px-4 text-base",
-                        "transition-colors duration-200",
-                        isActive
-                          ? "bg-brand-subtle font-semibold text-brand-text"
-                          : "font-medium text-ink-muted hover:bg-surface-hover hover:text-ink",
-                      )
-                    }
-                  >
-                    <SettingsIcon size={19} />
-                    Settings
-                  </NavLink>
-                </li>
-              )}
+              {isLogged &&
+                ACCOUNT_LINKS.filter(
+                  (item) => !links.some((link) => link.to === item.to),
+                ).map(({ to, label, icon: Icon }) => (
+                  <li key={to} data-drawer-item>
+                    <NavLink to={to} className={drawerLinkClass}>
+                      <Icon size={19} aria-hidden="true" />
+                      {t(label)}
+                    </NavLink>
+                  </li>
+                ))}
             </ul>
 
-            {!isLogged && (
+            <div className="flex items-center gap-2 border-t border-line px-4 py-3 sm:hidden">
+              <LanguageToggle />
+              <ThemeToggle />
+            </div>
+
+            {isLogged ? (
+              <div data-drawer-item className="border-t border-line p-4">
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className={cn(
+                    "flex min-h-12 w-full items-center gap-3 rounded-xl px-4 text-base font-medium",
+                    "text-danger-text transition-colors hover:bg-danger-subtle",
+                    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                  )}
+                >
+                  <LogOutIcon size={19} aria-hidden="true" />
+                  {t("common.logout")}
+                </button>
+              </div>
+            ) : (
               <div
                 data-drawer-item
                 className="flex flex-col gap-2 border-t border-line p-4"
@@ -456,7 +670,7 @@ const Navbar = () => {
             )}
 
             <p className="border-t border-line px-5 py-4 text-xs text-ink-subtle">
-              AlertUp © {new Date().getFullYear()}
+              {t("footer.builtIn", { year: new Date().getFullYear() })}
             </p>
           </div>
         </div>
