@@ -21,10 +21,12 @@ import {
   NodeLayer,
   PoiLayer,
   clampToSpace,
+  defaultOutlinePoints,
   eraseHitTest,
   isBoxShape,
   newShapeId,
-  pointSegmentDistance,
+  outlineOf,
+  OUTLINE_SHAPE_ID,
   rectFromPoints,
   screenToMap,
   shapeCenter,
@@ -52,7 +54,6 @@ import {
   ExitDoorIcon,
   LayersIcon,
   MapIcon,
-  MapPinIcon,
   PenIcon,
   PlusIcon,
   RefreshIcon,
@@ -65,6 +66,7 @@ import {
   MinimizeIcon,
   UndoIcon,
   RedoIcon,
+  ZapIcon,
 } from '../../../components/ui/icons';
 import SimpleQRCodeDisplay from '../../../components/simpleQRCodeDisplay';
 import { cn } from '../../../lib/cn';
@@ -73,6 +75,7 @@ import { errorMessage } from '../../../apis/http';
 import { getBuilding } from '../../../apis/building';
 import type { Node as LegacyNode } from '../../../apis/nodesApi';
 import {
+  autoConnectFloor,
   createEdge,
   createFloor,
   deleteEdge,
@@ -121,6 +124,8 @@ import { ICON_KIND_KEYS } from './labels';
 import { useEditorCollab, type EditorOp } from './useEditorCollab';
 import { PeerCursorsLayer, PresenceAvatars } from './collabUi';
 import { ToolMenu, type ToolMenuItem } from './toolMenu';
+import { EditorAiPanel } from './editorAiPanel';
+import { LinkFloorsDialog } from './linkFloorsDialog';
 import { ValidationPanel } from './validationPanel';
 
 /* ============================================================================
@@ -167,16 +172,17 @@ const MIN_BOX_SIZE = 8;
 const AUTO_CONNECT_RADIUS = 300;
 
 /**
- * Eraser hit tolerances, in map units. The eraser hit-tests geometry around
+ * Eraser hit slop, in map units. The eraser hit-tests shape geometry around
  * the tap instead of relying on the click landing on an exact SVG stroke —
- * a 6-unit wall or a 2-unit edge line is not a clickable target, and an
- * eraser that only works on dead-centre clicks reads as broken.
+ * a 6-unit wall is not a clickable target, and an eraser that only works on
+ * dead-centre clicks reads as broken.
  */
-const ERASE_NODE_RADIUS = 26;
-const ERASE_EDGE_DISTANCE = 16;
 const ERASE_SHAPE_SLOP = 8;
 
 const DESKTOP_QUERY = '(min-width: 64rem)';
+
+/** What the editor is editing: the plan, the routing graph, or the canvas. */
+type EditorMode = 'draw' | 'nodes' | 'floor';
 
 /** Select and pan belong to both modes — they edit nothing. */
 const COMMON_TOOLS: ToolMenuItem[] = [
@@ -188,7 +194,6 @@ const GRAPH_TOOLS: ToolMenuItem[] = [
   ...COMMON_TOOLS,
   { tool: 'place-node', labelKey: 'mapEditor.toolPlaceNode', Icon: PlusIcon, shortcut: 'N' },
   { tool: 'draw-edge', labelKey: 'mapEditor.toolDrawEdge', Icon: RouteIcon, shortcut: 'C' },
-  { tool: 'assign-poi', labelKey: 'mapEditor.toolAssignPoi', Icon: MapPinIcon, shortcut: 'P' },
   { tool: 'link-transit', labelKey: 'mapEditor.toolLinkTransit', Icon: LayersIcon, shortcut: 'T' },
   { tool: 'mark-exit', labelKey: 'mapEditor.toolMarkExit', Icon: ExitDoorIcon, shortcut: 'X' },
 ];
@@ -211,7 +216,6 @@ const TOOL_SHORTCUTS: Record<string, { tool: EditorTool; nodesMode?: boolean }> 
   h: { tool: 'pan' },
   n: { tool: 'place-node', nodesMode: true },
   c: { tool: 'draw-edge', nodesMode: true },
-  p: { tool: 'assign-poi', nodesMode: true },
   t: { tool: 'link-transit', nodesMode: true },
   x: { tool: 'mark-exit', nodesMode: true },
   w: { tool: 'draw-wall', nodesMode: false },
@@ -311,17 +315,31 @@ export const MapEditorPage = () => {
   // over the viewport with the toolbar floating over the canvas.
   const [fullscreen, setFullscreen] = useState(false);
 
+  // AI design assistant drawer.
+  const [aiOpen, setAiOpen] = useState(false);
+
+  // Link-floors dialog: the primary flow for cross-floor links. The map-tap
+  // gesture still works underneath for people who prefer pointing.
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linkSubmitting, setLinkSubmitting] = useState(false);
+
+
   /*
-   * Drawing and graph-wiring are separate modes, and drawing is the default.
+   * Three modes, one at a time: draw (the plan), nodes (the routing graph),
+   * floor (the canvas itself — drag its borders to resize the room).
    *
-   * Both used to be armed at once, which meant a stray click while sketching a
-   * shop could drop a routing node onto the plan — invisible work that then
-   * shows up as an orphan in validation days later. Nodes now have to be
-   * switched on deliberately.
+   * Draw and nodes used to be armed at once, which meant a stray click while
+   * sketching a shop could drop a routing node onto the plan — invisible work
+   * that then shows up as an orphan in validation days later.
    */
-  const [nodesMode, setNodesMode] = useState(false);
-  const nodesModeRef = useRef(nodesMode);
-  nodesModeRef.current = nodesMode;
+  const [editorMode, setEditorMode] = useState<EditorMode>('draw');
+  const nodesMode = editorMode === 'nodes';
+  const floorMode = editorMode === 'floor';
+  const editorModeRef = useRef(editorMode);
+  editorModeRef.current = editorMode;
+  const setNodesMode = useCallback((on: boolean) => {
+    setEditorMode(on ? 'nodes' : 'draw');
+  }, []);
 
   // Refs mirror state for the imperative paths (window listeners, timers, the
   // intent handler) so none of them can act on a stale graph.
@@ -383,12 +401,99 @@ export const MapEditorPage = () => {
 
   const createDefaultEdgeRef = useRef(createDefaultEdge);
   createDefaultEdgeRef.current = createDefaultEdge;
+  const createTransitLinkFromDialog = useCallback(
+    async (input: { sourceNodeId: string; targetNodeId: string; transitType: TransitType }) => {
+      setLinkSubmitting(true);
+      try {
+        const created = await mutate(() =>
+          createTransitLink({
+            nodeIds: [input.sourceNodeId, input.targetNodeId],
+            transitType: input.transitType,
+            buildingId,
+          }),
+        );
+        if (!created) return;
+        setGraph((g) => ({ ...g, edges: [...g.edges, created] }));
+        sendOpRef.current({ kind: 'edge:upsert', edge: created });
+        setLinkDialogOpen(false);
+        toast({ title: t('mapEditor.saved'), tone: 'success' });
+      } finally {
+        setLinkSubmitting(false);
+      }
+    },
+    [buildingId, mutate, t, toast],
+  );
 
   /** Auto-connect toggle (place-node tool). On by default: a node nobody
    *  connects is an orphan the validator flags later anyway. */
   const [autoConnect, setAutoConnect] = useState(true);
   const autoConnectRef = useRef(autoConnect);
   autoConnectRef.current = autoConnect;
+
+  /*
+   * Floor-size mode: dragging the canvas borders live-resizes the room.
+   * The draft is local while the pointer is down; release persists via the
+   * normal floor PATCH (which relays to collaborators like any floor edit).
+   */
+  const [canvasDraft, setCanvasDraft] = useState<{ width: number; height: number } | null>(null);
+  const canvasResizeRef = useRef<'x' | 'y' | 'both' | null>(null);
+  // Written synchronously on every drag frame: the release handler runs
+  // before React renders the final frame, and must not read a stale size.
+  const canvasDraftLiveRef = useRef<{ width: number; height: number } | null>(null);
+  const applyCanvasDraft = useCallback(
+    (
+      next:
+        | { width: number; height: number }
+        | null
+        | ((prev: { width: number; height: number } | null) => { width: number; height: number } | null),
+    ) => {
+      const value = typeof next === 'function' ? next(canvasDraftLiveRef.current) : next;
+      canvasDraftLiveRef.current = value;
+      setCanvasDraft(value);
+    },
+    [],
+  );
+
+  const beginCanvasResize = useCallback(
+    (axis: 'x' | 'y' | 'both', e: ReactPointerEvent<SVGElement>) => {
+      e.stopPropagation();
+      const floor = graphRef.current.floors.find(
+        (f) => f.id === editorRef.current.activeFloorId,
+      );
+      if (!floor) return;
+      canvasResizeRef.current = axis;
+      applyCanvasDraft({ width: floor.width || 1000, height: floor.height || 800 });
+    },
+    [],
+  );
+
+  /** One-click floor-wide wiring. Also exposed to the AI as an action. */
+  const [autoConnecting, setAutoConnecting] = useState(false);
+  const runAutoConnect = useCallback(async () => {
+    const floorId = editorRef.current.activeFloorId;
+    if (!floorId || autoConnecting) return;
+    setAutoConnecting(true);
+    try {
+      const created = await mutate(() => autoConnectFloor(floorId));
+      if (!created) return;
+      if (created.length === 0) {
+        toast({ title: t('mapEditor.autoConnectNone'), tone: 'info' });
+        return;
+      }
+      setGraph((g) => ({ ...g, edges: [...g.edges, ...created] }));
+      for (const edge of created) {
+        sendOpRef.current({ kind: 'edge:upsert', edge });
+      }
+      toast({
+        title: t('mapEditor.autoConnectDone', { count: created.length }),
+        tone: 'success',
+      });
+    } finally {
+      setAutoConnecting(false);
+    }
+  }, [autoConnecting, mutate, t, toast]);
+  const runAutoConnectRef = useRef(runAutoConnect);
+  runAutoConnectRef.current = runAutoConnect;
 
   /* --- drawing: mutate locally, persist on a debounce -------------------- */
 
@@ -482,14 +587,19 @@ export const MapEditorPage = () => {
           EMPTY_DRAWING;
         pushHistory(floorId, before);
       }
-      setGraph((g) => ({
+      const apply = (g: EditorGraph): EditorGraph => ({
         ...g,
         floors: g.floors.map((floor) =>
           floor.id === floorId
             ? { ...floor, drawing: mutator(floor.drawing ?? EMPTY_DRAWING) }
             : floor,
         ),
-      }));
+      });
+      // Eager ref update: release handlers (snap, outline normalize) run in
+      // the same tick as the final rAF flush, BEFORE React re-renders — they
+      // must see this edit, not the previous frame's graph.
+      graphRef.current = apply(graphRef.current);
+      setGraph(apply);
       scheduleDrawingSave(floorId);
     },
     [pushHistory, scheduleDrawingSave],
@@ -529,6 +639,174 @@ export const MapEditorPage = () => {
 
   const applyHistoryRef = useRef(applyHistory);
   applyHistoryRef.current = applyHistory;
+
+  /*
+   * Footprint editing: the floor outline is a polygon, and any PART of a
+   * border can move — drag a corner, or drag an edge midpoint to split that
+   * edge and pull just the new corner out. That is what turns a rectangle
+   * into an L-shape, a notch, a wing.
+   */
+  const outlineDragRef = useRef<number | null>(null);
+
+  /** Current outline points, or the full-canvas rectangle it starts from. */
+  const currentOutlinePoints = useCallback((): number[] => {
+    const floor = graphRef.current.floors.find(
+      (f) => f.id === editorRef.current.activeFloorId,
+    );
+    const existing = outlineOf(floor?.drawing);
+    if (existing) return existing.points;
+    return defaultOutlinePoints({
+      width: floor?.width || 1000,
+      height: floor?.height || 800,
+    });
+  }, []);
+
+  /** Upsert the outline shape (fixed id) with new points. */
+  const writeOutline = useCallback(
+    (points: number[], options: { history?: boolean } = {}) => {
+      editDrawing((drawing) => {
+        const others = drawing.shapes.filter((shape) => shape.kind !== 'outline');
+        return {
+          ...drawing,
+          shapes: [{ id: OUTLINE_SHAPE_ID, kind: 'outline', points }, ...others],
+        };
+      }, options);
+    },
+    [editDrawing],
+  );
+
+  const beginOutlineVertexDrag = useCallback(
+    (vertexIndex: number, e: ReactPointerEvent<SVGElement>) => {
+      e.stopPropagation();
+      const floorId = editorRef.current.activeFloorId;
+      const drawing = floorId
+        ? graphRef.current.floors.find((f) => f.id === floorId)?.drawing
+        : null;
+      if (floorId && drawing) pushHistoryRef.current(floorId, drawing);
+      // First touch materializes the default rectangle as a real outline.
+      if (!outlineOf(drawing)) writeOutline(currentOutlinePoints(), { history: false });
+      outlineDragRef.current = vertexIndex;
+    },
+    [currentOutlinePoints, writeOutline],
+  );
+
+  const beginOutlineMidpointDrag = useCallback(
+    (segmentIndex: number, e: ReactPointerEvent<SVGElement>) => {
+      e.stopPropagation();
+      const floorId = editorRef.current.activeFloorId;
+      const drawing = floorId
+        ? graphRef.current.floors.find((f) => f.id === floorId)?.drawing
+        : null;
+      if (floorId && drawing) pushHistoryRef.current(floorId, drawing);
+      // Split the edge at its midpoint; the new corner follows the pointer.
+      const points = [...currentOutlinePoints()];
+      const count = points.length / 2;
+      const ax = points[segmentIndex * 2];
+      const ay = points[segmentIndex * 2 + 1];
+      const bIndex = (segmentIndex + 1) % count;
+      const bx = points[bIndex * 2];
+      const by = points[bIndex * 2 + 1];
+      points.splice(segmentIndex * 2 + 2, 0, (ax + bx) / 2, (ay + by) / 2);
+      writeOutline(points, { history: false });
+      outlineDragRef.current = segmentIndex + 1;
+    },
+    [currentOutlinePoints, writeOutline],
+  );
+
+  /**
+   * After an outline gesture: make the canvas fit the footprint.
+   *
+   * Right/bottom growth is a plain size bump. Top/left growth is a SHIFT —
+   * the coordinate space has no negative side, so the whole plan (outline,
+   * shapes, and every routing node) slides by the overflow and the canvas
+   * grows by the same amount. Distances are unchanged by translation, so
+   * routing costs stay valid.
+   */
+  const normalizeOutlineRelease = useCallback(async () => {
+    const floorId = editorRef.current.activeFloorId;
+    const floor = graphRef.current.floors.find((f) => f.id === floorId);
+    if (!floorId || !floor) return;
+    const outline = outlineOf(floor.drawing);
+    if (!outline) return;
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (let i = 0; i + 1 < outline.points.length; i += 2) {
+      minX = Math.min(minX, outline.points[i]);
+      maxX = Math.max(maxX, outline.points[i]);
+      minY = Math.min(minY, outline.points[i + 1]);
+      maxY = Math.max(maxY, outline.points[i + 1]);
+    }
+
+    const snapUp = (v: number) => Math.ceil(v / SNAP_STEP) * SNAP_STEP;
+    const offsetX = minX < 0 ? snapUp(-minX) : 0;
+    const offsetY = minY < 0 ? snapUp(-minY) : 0;
+
+    if (offsetX > 0 || offsetY > 0) {
+      // Slide the whole drawing (footprint included) into positive space.
+      editDrawing(
+        (drawing) => ({
+          ...drawing,
+          shapes: drawing.shapes.map((shape) => translateShape(shape, offsetX, offsetY)),
+        }),
+        { history: false },
+      );
+      // And the routing graph with it — the plan and its nodes must not
+      // slide apart. Optimistic locally, persisted per node, relayed live.
+      const floorNodes = graphRef.current.nodes.filter((n) => n.floorId === floorId);
+      setGraph((g) => ({
+        ...g,
+        nodes: g.nodes.map((n) =>
+          n.floorId === floorId ? { ...n, x: n.x + offsetX, y: n.y + offsetY } : n,
+        ),
+      }));
+      await Promise.all(
+        floorNodes.map(async (node) => {
+          const updated = await mutate(() =>
+            updateNode(node.id, {
+              buildingId,
+              x: node.x + offsetX,
+              y: node.y + offsetY,
+            }),
+          );
+          if (updated) sendOpRef.current({ kind: 'node:upsert', node: updated });
+        }),
+      );
+    }
+
+    const clampSide = (v: number) => Math.min(Math.max(snapUp(v), 100), 20000);
+    const nextWidth = clampSide(Math.max(floor.width || 1000, maxX) + offsetX);
+    const nextHeight = clampSide(Math.max(floor.height || 800, maxY) + offsetY);
+    if (nextWidth !== (floor.width || 1000) || nextHeight !== (floor.height || 800)) {
+      await handleUpdateFloorRef.current(floorId, {
+        width: nextWidth,
+        height: nextHeight,
+      });
+    }
+    applyCanvasDraft(null);
+  }, [buildingId, editDrawing, mutate]);
+  const normalizeOutlineReleaseRef = useRef(normalizeOutlineRelease);
+  normalizeOutlineReleaseRef.current = normalizeOutlineRelease;
+  const applyCanvasDraftRef = useRef(applyCanvasDraft);
+  applyCanvasDraftRef.current = applyCanvasDraft;
+
+  const removeOutlineVertex = useCallback(
+    (vertexIndex: number) => {
+      const points = [...currentOutlinePoints()];
+      // A footprint needs at least three corners to stay a polygon.
+      if (points.length <= 6) return;
+      const floorId = editorRef.current.activeFloorId;
+      const drawing = floorId
+        ? graphRef.current.floors.find((f) => f.id === floorId)?.drawing
+        : null;
+      if (floorId && drawing) pushHistoryRef.current(floorId, drawing);
+      points.splice(vertexIndex * 2, 2);
+      writeOutline(points, { history: false });
+    },
+    [currentOutlinePoints, writeOutline],
+  );
 
   const addShape = useCallback(
     (shape: DrawingShape) => {
@@ -663,46 +941,14 @@ export const MapEditorPage = () => {
 
         case 'erase-at': {
           if (!floorId) return;
-          const point = { x: intent.x, y: intent.y };
-
-          // Nodes first: they render on top, so they win ties — same rule the
-          // eye applies. Then connections, then drawn shapes (topmost first).
-          let nearestNode: { id: string; distance: number } | null = null;
-          for (const node of current.nodes) {
-            if (node.floorId !== floorId) continue;
-            const distance = Math.hypot(node.x - point.x, node.y - point.y);
-            if (!nearestNode || distance < nearestNode.distance) {
-              nearestNode = { id: node.id, distance };
-            }
-          }
-          if (nearestNode && nearestNode.distance <= ERASE_NODE_RADIUS) {
-            await handleIntentRef.current({
-              type: 'delete-node',
-              nodeId: nearestNode.id,
-            });
-            return;
-          }
-
-          const nodesById = new Map(current.nodes.map((n) => [n.id, n]));
-          let nearestEdge: { id: string; distance: number } | null = null;
-          for (const edge of current.edges) {
-            const a = nodesById.get(edge.sourceNodeId);
-            const b = nodesById.get(edge.targetNodeId);
-            // Only edges drawn on this floor are clickable targets.
-            if (!a || !b || a.floorId !== floorId || b.floorId !== floorId) continue;
-            const distance = pointSegmentDistance(point.x, point.y, a.x, a.y, b.x, b.y);
-            if (!nearestEdge || distance < nearestEdge.distance) {
-              nearestEdge = { id: edge.id, distance };
-            }
-          }
-          if (nearestEdge && nearestEdge.distance <= ERASE_EDGE_DISTANCE) {
-            await deleteEdgeByIdRef.current(nearestEdge.id);
-            return;
-          }
-
+          // The eraser lives in Draw mode, where the routing graph is not
+          // rendered — so it touches only drawn shapes. Nodes and connections
+          // are deleted in Nodes mode (Delete key or inspector), where they
+          // are visible. Erasing what cannot be seen is how work disappears
+          // without anyone knowing why.
           const floor = current.floors.find((f) => f.id === floorId);
           const shape = floor
-            ? eraseHitTest(floor.drawing?.shapes ?? [], point, ERASE_SHAPE_SLOP)
+            ? eraseHitTest(floor.drawing?.shapes ?? [], { x: intent.x, y: intent.y }, ERASE_SHAPE_SLOP)
             : null;
           if (shape) removeShapeRef.current(shape.id);
           return;
@@ -1000,10 +1246,14 @@ export const MapEditorPage = () => {
 
   const space = useMemo<FloorSpace>(
     () => ({
-      width: activeFloor?.width && activeFloor.width > 0 ? activeFloor.width : 1000,
-      height: activeFloor?.height && activeFloor.height > 0 ? activeFloor.height : 800,
+      width:
+        canvasDraft?.width ??
+        (activeFloor?.width && activeFloor.width > 0 ? activeFloor.width : 1000),
+      height:
+        canvasDraft?.height ??
+        (activeFloor?.height && activeFloor.height > 0 ? activeFloor.height : 800),
     }),
-    [activeFloor],
+    [activeFloor, canvasDraft],
   );
 
   const visibleNodes = useMemo(
@@ -1137,8 +1387,12 @@ export const MapEditorPage = () => {
         // floor sliding away underneath the box being drawn.
         const tool = editorRef.current.tool;
         if (tool === 'draw-room') {
-          const point = snappedPointFromEvent(e.clientX, e.clientY);
-          if (point) {
+          const svg = svgRef.current;
+          const raw = svg
+            ? screenToMap(e.clientX, e.clientY, svg, cameraRef.current)
+            : null;
+          if (raw) {
+            const point = clampToSpace(raw, spaceRef.current);
             setBoxDraft({ start: point, current: point });
             return;
           }
@@ -1288,9 +1542,27 @@ export const MapEditorPage = () => {
   /** Corner resize of the selected box. */
   const resizeRef = useRef<{ shapeId: string; handle: ResizeHandle } | null>(null);
 
+  /** Vertex reshape of the selected wall. */
+  const wallVertexRef = useRef<{ shapeId: string; vertexIndex: number } | null>(null);
+
+  const handleWallVertexPointerDown = useCallback(
+    (shape: DrawingShape, vertexIndex: number, e: ReactPointerEvent<SVGCircleElement>) => {
+      if (shape.kind !== 'wall') return;
+      e.stopPropagation();
+      // One undo step per reshape gesture.
+      const floorId = editorRef.current.activeFloorId;
+      const drawing = floorId
+        ? graphRef.current.floors.find((f) => f.id === floorId)?.drawing
+        : null;
+      if (floorId && drawing) pushHistoryRef.current(floorId, drawing);
+      wallVertexRef.current = { shapeId: shape.id, vertexIndex };
+    },
+    [],
+  );
+
   const handleResizePointerDown = useCallback(
     (shape: DrawingShape, handle: ResizeHandle, e: ReactPointerEvent<SVGRectElement>) => {
-      if (!isBoxShape(shape)) return;
+      if (!isBoxShape(shape) && shape.kind !== 'icon') return;
       // Must beat both the shape drag and the camera pan to the event.
       e.stopPropagation();
       const floorId = editorRef.current.activeFloorId;
@@ -1310,11 +1582,36 @@ export const MapEditorPage = () => {
   snappedRef.current = snappedPointFromEvent;
 
   useEffect(() => {
-    const onMove = (e: PointerEvent) => {
-      const point = snappedRef.current(e.clientX, e.clientY);
-      if (!point) return;
+    /*
+     * SMOOTHNESS RULES, learned the hard way:
+     *
+     * 1. Pointer events outrun frames — mice report at 125–1000 Hz, and
+     *    rendering per event drops frames. Every move is coalesced through
+     *    requestAnimationFrame: many events, at most one state update per
+     *    painted frame. onUp flushes the pending move first, so tests (and
+     *    ultra-fast flicks) never lose the final position.
+     *
+     * 2. Dragging is FREE, snapping happens on RELEASE. Live grid-snapping
+     *    moved things in 25-unit jumps — visually chunky, "bad quality".
+     *    Now shapes glide with the pointer at full resolution and settle
+     *    onto the grid exactly once, when the finger lifts.
+     */
+    const SNAP = SNAP_STEP;
+    const snapValue = (v: number) => Math.round(v / SNAP) * SNAP;
 
-      // Rubber band for a room/shop being sized.
+    const rawPoint = (e: PointerEvent) => {
+      const svg = svgRef.current;
+      return svg ? screenToMap(e.clientX, e.clientY, svg, cameraRef.current) : null;
+    };
+
+    const applyMove = (e: PointerEvent) => {
+      const raw = rawPoint(e);
+      if (!raw) return;
+      // In-canvas gestures stay in the canvas; growth gestures (outline,
+      // canvas border) read the unclamped value themselves.
+      const point = clampToSpace(raw, spaceRef.current);
+
+      // Rubber band for a room being sized — free; the box snaps on commit.
       setBoxDraft((draft) => (draft ? { ...draft, current: point } : draft));
 
       // Ghost connection line chasing the pointer.
@@ -1325,6 +1622,68 @@ export const MapEditorPage = () => {
         setWallCursor(editorRef.current.wallPoints.length > 0 ? point : null);
       }
 
+      // A grabbed footprint corner follows the pointer — UNCLAMPED. Pulling
+      // a border past the canvas is how the floor grows; the canvas catches
+      // up live (right/bottom) and on release (top/left, via a shift).
+      const outlineVertex = outlineDragRef.current;
+      if (outlineVertex !== null) {
+        editDrawingRef.current((current) => ({
+          ...current,
+          shapes: current.shapes.map((shape) => {
+            if (shape.kind !== 'outline') return shape;
+            const points = [...shape.points];
+            points[outlineVertex * 2] = raw.x;
+            points[outlineVertex * 2 + 1] = raw.y;
+            return { ...shape, points };
+          }),
+        }), { history: false });
+        // Keep the dragged corner visible while it travels beyond the border.
+        const floor = graphRef.current.floors.find(
+          (f) => f.id === editorRef.current.activeFloorId,
+        );
+        const baseW = floor?.width || 1000;
+        const baseH = floor?.height || 800;
+        if (raw.x > baseW || raw.y > baseH) {
+          applyCanvasDraftRef.current((draft) => ({
+            width: Math.max(draft?.width ?? baseW, baseW, raw.x),
+            height: Math.max(draft?.height ?? baseH, baseH, raw.y),
+          }));
+        }
+        return;
+      }
+
+      // Floor-size mode: the grabbed border follows the pointer freely and
+      // settles onto the grid at release.
+      const canvasAxis = canvasResizeRef.current;
+      if (canvasAxis) {
+        const clampSide = (v: number) => Math.min(Math.max(v, 100), 20000);
+        applyCanvasDraftRef.current((draft) => {
+          if (!draft) return draft;
+          return {
+            width: canvasAxis === 'y' ? draft.width : clampSide(raw.x),
+            height: canvasAxis === 'x' ? draft.height : clampSide(raw.y),
+          };
+        });
+        return;
+      }
+
+      // A grabbed wall vertex follows the pointer — reshaping one corner of
+      // the run, not moving the whole line.
+      const vertexDrag = wallVertexRef.current;
+      if (vertexDrag) {
+        editDrawingRef.current((current) => ({
+          ...current,
+          shapes: current.shapes.map((shape) => {
+            if (shape.id !== vertexDrag.shapeId || shape.kind !== 'wall') return shape;
+            const points = [...shape.points];
+            points[vertexDrag.vertexIndex * 2] = point.x;
+            points[vertexDrag.vertexIndex * 2 + 1] = point.y;
+            return { ...shape, points };
+          }),
+        }), { history: false });
+        return;
+      }
+
       // Resize takes priority: its handles sit on top of the shape, so a press
       // that started on one is never also a move.
       const resize = resizeRef.current;
@@ -1332,7 +1691,20 @@ export const MapEditorPage = () => {
         editDrawingRef.current((current) => ({
           ...current,
           shapes: current.shapes.map((shape) => {
-            if (shape.id !== resize.shapeId || !isBoxShape(shape)) return shape;
+            if (shape.id !== resize.shapeId) return shape;
+            // Icons carry one size, scaled from their centre — the handle
+            // distance sets it, clamped to something tappable-but-sane.
+            if (shape.kind === 'icon') {
+              const size = Math.min(
+                Math.max(
+                  2 * Math.max(Math.abs(point.x - shape.x), Math.abs(point.y - shape.y)),
+                  12,
+                ),
+                200,
+              );
+              return { ...shape, size: Math.round(size) };
+            }
+            if (!isBoxShape(shape)) return shape;
             // Rebuild from the corner being dragged and the one opposite it,
             // so dragging a corner past its neighbour flips the box instead of
             // collapsing it to nothing.
@@ -1356,8 +1728,6 @@ export const MapEditorPage = () => {
       if (!drag) return;
       const dx = point.x - drag.last.x;
       const dy = point.y - drag.last.y;
-      // Snapping means most moves land on the same grid cell; skipping those
-      // keeps this from queuing a save for every pointer event.
       if (dx === 0 && dy === 0) return;
       drag.last = point;
       drag.moved = true;
@@ -1373,9 +1743,118 @@ export const MapEditorPage = () => {
       );
     };
 
+    // rAF coalescing: remember only the LATEST event, process once per frame.
+    let pending: PointerEvent | null = null;
+    let frame = 0;
+    const schedule =
+      typeof window.requestAnimationFrame === 'function'
+        ? window.requestAnimationFrame.bind(window)
+        : (cb: FrameRequestCallback) => window.setTimeout(() => cb(0), 16);
+    const cancel =
+      typeof window.cancelAnimationFrame === 'function'
+        ? window.cancelAnimationFrame.bind(window)
+        : window.clearTimeout.bind(window);
+
+    const processPending = () => {
+      frame = 0;
+      const event = pending;
+      pending = null;
+      if (event) applyMove(event);
+    };
+
+    const onMove = (e: PointerEvent) => {
+      pending = e;
+      if (!frame) frame = schedule(processPending) as unknown as number;
+    };
+
+    /** Settle a finished gesture's geometry onto the grid — the one and only
+     *  moment snapping happens. */
+    const snapOnRelease = () => {
+      const drag = shapeDragRef.current;
+      const resize = resizeRef.current;
+      const vertex = wallVertexRef.current;
+      const outlineVertex = outlineDragRef.current;
+      if (!drag?.moved && !resize && !vertex && outlineVertex === null) return;
+
+      editDrawingRef.current((current) => ({
+        ...current,
+        shapes: current.shapes.map((shape) => {
+          if (drag?.moved && shape.id === drag.shapeId) {
+            // Align by the shape's anchor; walls translate as a unit so the
+            // run keeps its exact drawn form.
+            if (shape.kind === 'wall' || shape.kind === 'outline') {
+              const ddx = snapValue(shape.points[0]) - shape.points[0];
+              const ddy = snapValue(shape.points[1]) - shape.points[1];
+              return translateShape(shape, ddx, ddy);
+            }
+            if ('x' in shape && 'y' in shape) {
+              return { ...shape, x: snapValue(shape.x), y: snapValue(shape.y) };
+            }
+          }
+          if (resize && shape.id === resize.shapeId && isBoxShape(shape)) {
+            const x1 = snapValue(shape.x);
+            const y1 = snapValue(shape.y);
+            const x2 = snapValue(shape.x + shape.width);
+            const y2 = snapValue(shape.y + shape.height);
+            return {
+              ...shape,
+              x: x1,
+              y: y1,
+              width: Math.max(x2 - x1, SNAP),
+              height: Math.max(y2 - y1, SNAP),
+            };
+          }
+          if (vertex && shape.id === vertex.shapeId && shape.kind === 'wall') {
+            const points = [...shape.points];
+            points[vertex.vertexIndex * 2] = snapValue(points[vertex.vertexIndex * 2]);
+            points[vertex.vertexIndex * 2 + 1] = snapValue(points[vertex.vertexIndex * 2 + 1]);
+            return { ...shape, points };
+          }
+          if (outlineVertex !== null && shape.kind === 'outline') {
+            const points = [...shape.points];
+            points[outlineVertex * 2] = snapValue(points[outlineVertex * 2]);
+            points[outlineVertex * 2 + 1] = snapValue(points[outlineVertex * 2 + 1]);
+            return { ...shape, points };
+          }
+          return shape;
+        }),
+      }), { history: false });
+    };
+
     const onUp = (e: PointerEvent) => {
+      // The final move must land before the gesture closes — regardless of
+      // whether the browser gave us another frame.
+      if (pending) {
+        if (frame) cancel(frame);
+        processPending();
+      }
+
+      snapOnRelease();
+
       shapeDragRef.current = null;
       resizeRef.current = null;
+      wallVertexRef.current = null;
+      if (outlineDragRef.current !== null) {
+        outlineDragRef.current = null;
+        void normalizeOutlineReleaseRef.current();
+      }
+
+      if (canvasResizeRef.current) {
+        canvasResizeRef.current = null;
+        const draft = canvasDraftLiveRef.current;
+        const floorId = editorRef.current.activeFloorId;
+        if (draft && floorId) {
+          // The size settles onto the grid here, not during the drag.
+          void handleUpdateFloorRef
+            .current(floorId, {
+              width: Math.min(Math.max(snapValue(draft.width), 100), 20000),
+              height: Math.min(Math.max(snapValue(draft.height), 100), 20000),
+            })
+            .finally(() => applyCanvasDraftRef.current(null));
+        } else {
+          applyCanvasDraftRef.current(null);
+        }
+      }
 
       const drag = edgeDragRef.current;
       if (drag) {
@@ -1396,6 +1875,7 @@ export const MapEditorPage = () => {
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', onUp);
     return () => {
+      if (frame) cancel(frame);
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
@@ -1410,11 +1890,21 @@ export const MapEditorPage = () => {
     if (!boxDraft) return;
 
     const commit = () => {
-      const rect = rectFromPoints(boxDraft.start, boxDraft.current);
+      const free = rectFromPoints(boxDraft.start, boxDraft.current);
       setBoxDraft(null);
       // A click that never moved is not a box — treat it as a mis-click rather
       // than dropping an invisible sliver onto the plan.
-      if (rect.width < MIN_BOX_SIZE || rect.height < MIN_BOX_SIZE) return;
+      if (free.width < MIN_BOX_SIZE || free.height < MIN_BOX_SIZE) return;
+      // The rubber band moves freely; the box settles onto the grid once.
+      const snapValue = (v: number) => Math.round(v / SNAP_STEP) * SNAP_STEP;
+      const x1 = snapValue(free.x);
+      const y1 = snapValue(free.y);
+      const rect = {
+        x: x1,
+        y: y1,
+        width: Math.max(snapValue(free.x + free.width) - x1, SNAP_STEP),
+        height: Math.max(snapValue(free.y + free.height) - y1, SNAP_STEP),
+      };
 
       const id = newShapeId();
       // Every box starts as a plain room; the inspector promotes it to a shop
@@ -1529,7 +2019,7 @@ export const MapEditorPage = () => {
       const shortcut = TOOL_SHORTCUTS[e.key.toLowerCase()];
       if (shortcut && !e.altKey) {
         e.preventDefault();
-        setNodesMode(shortcut.nodesMode ?? nodesModeRef.current);
+        setNodesMode(shortcut.nodesMode ?? editorModeRef.current === 'nodes');
         dispatch({ type: 'SET_TOOL', tool: shortcut.tool });
       }
     };
@@ -1603,6 +2093,8 @@ export const MapEditorPage = () => {
     },
     [mutate, t, toast],
   );
+  const handleUpdateFloorRef = useRef(handleUpdateFloor);
+  handleUpdateFloorRef.current = handleUpdateFloor;
 
   const handleDeleteFloor = useCallback(
     async (floorId: string) => {
@@ -1874,6 +2366,9 @@ export const MapEditorPage = () => {
     (nodeId: string) => {
       const node = graphRef.current.nodes.find((n) => n.id === nodeId);
       if (!node) return;
+      // Validation issues are about the graph; focusing one from Draw mode
+      // must flip to Nodes mode or the highlighted node would be invisible.
+      setNodesMode(true);
       if (node.floorId !== editorRef.current.activeFloorId) {
         dispatch({ type: 'SET_FLOOR', floorId: node.floorId });
       }
@@ -1903,6 +2398,11 @@ export const MapEditorPage = () => {
       }}
       onUploadLogo={handleUploadLogo}
       onCreateNode={() => handleCreateNodeForShape(selectedShape)}
+      onShowQr={() => {
+        const nodeId = 'nodeId' in selectedShape ? selectedShape.nodeId : undefined;
+        const node = nodeId ? graph.nodes.find((n) => n.id === nodeId) : undefined;
+        if (node) setQrNode(node);
+      }}
     />
   ) : selectedEdge ? (
     <EdgeInspector
@@ -1965,23 +2465,31 @@ export const MapEditorPage = () => {
     <>
       <div className="flex flex-wrap items-center gap-2">
         <ModeSwitch
-          nodesMode={nodesMode}
+          mode={editorMode}
           onChange={(next) => {
-            setNodesMode(next);
+            setEditorMode(next);
             // Leaving a mode disarms its tool, so the first click in the new
             // mode cannot complete a gesture belonging to the old one.
-            dispatch({ type: 'SET_TOOL', tool: 'select' });
+            dispatch({ type: 'SET_TOOL', tool: next === 'floor' ? 'pan' : 'select' });
           }}
           t={t}
         />
 
-        <ToolMenu
-          label={nodesMode ? t('mapEditor.tools') : t('mapEditor.drawTools')}
-          items={nodesMode ? GRAPH_TOOLS : DRAW_TOOLS}
-          activeTool={editor.tool}
-          onSelect={(tool) => dispatch({ type: 'SET_TOOL', tool })}
-          t={t}
-        />
+        {!floorMode && (
+          <ToolMenu
+            label={nodesMode ? t('mapEditor.tools') : t('mapEditor.drawTools')}
+            items={nodesMode ? GRAPH_TOOLS : DRAW_TOOLS}
+            activeTool={editor.tool}
+            onSelect={(tool) => {
+              dispatch({ type: 'SET_TOOL', tool });
+              // Linking floors is a pick-two-lists job, not a hunt across
+              // floor switches — the dialog fronts it the moment the tool
+              // is armed.
+              if (tool === 'link-transit') setLinkDialogOpen(true);
+            }}
+            t={t}
+          />
+        )}
 
         {editor.tool === 'place-node' && (
           <>
@@ -2020,6 +2528,18 @@ export const MapEditorPage = () => {
             }))}
           />
         )}
+        {nodesMode && (
+          <Button
+            variant="secondary"
+            size="sm"
+            loading={autoConnecting}
+            onClick={() => void runAutoConnect()}
+            title={t('mapEditor.autoConnectFloorHint')}
+          >
+            <RouteIcon size={16} />
+            {t('mapEditor.autoConnectFloor')}
+          </Button>
+        )}
         {editor.tool === 'draw-wall' && editor.wallPoints.length >= 4 && (
           <Button
             variant="secondary"
@@ -2033,7 +2553,16 @@ export const MapEditorPage = () => {
           </Button>
         )}
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setAiOpen(true)}
+            title={t('editorAi.title')}
+          >
+            <ZapIcon size={16} />
+            {t('editorAi.launcher')}
+          </Button>
           <PresenceAvatars peers={collab.peers} label={t('mapEditor.peersEditing')} />
           <Button
             variant="secondary"
@@ -2080,7 +2609,9 @@ export const MapEditorPage = () => {
         </div>
       </div>
 
-      {drawing && !pendingGesture && (
+      {floorMode && <Alert tone="info">{t('mapEditor.hintFloorMode')}</Alert>}
+
+      {drawing && !pendingGesture && !floorMode && (
         <Alert tone="info">{t(DRAW_TOOL_HINTS[editor.tool] ?? '')}</Alert>
       )}
 
@@ -2135,9 +2666,10 @@ export const MapEditorPage = () => {
         drawing={activeDrawing}
         scale={camera.scale}
         selectedShapeId={editor.selectedShapeId}
-        onShapeClick={handleShapeClick}
-        onShapePointerDown={handleShapePointerDown}
-        onResizePointerDown={handleResizePointerDown}
+        onShapeClick={floorMode ? undefined : handleShapeClick}
+        onShapePointerDown={floorMode ? undefined : handleShapePointerDown}
+        onResizePointerDown={floorMode ? undefined : handleResizePointerDown}
+        onWallVertexPointerDown={floorMode ? undefined : handleWallVertexPointerDown}
         shapeCursor={TOOL_CURSORS[editor.tool] ?? 'pointer'}
       />
       <DraftLayer
@@ -2154,41 +2686,66 @@ export const MapEditorPage = () => {
             : null
         }
       />
-      <EdgeLayer
-        edges={graph.edges}
-        nodesById={nodesById}
-        inaccessibleLabel={t('mapEditor.edgeAccessible')}
-        selectedEdgeId={editor.selectedEdgeId}
-        onEdgeClick={
-          editor.tool === 'select' || editor.tool === 'erase'
-            ? handleEdgeClick
-            : undefined
-        }
-      />
-      <PoiLayer
-        pois={visiblePois}
-        nodesById={nodesById}
-        scale={camera.scale}
-        selectedPoiId={selectedPoi?.id ?? null}
-        onPoiClick={(_, node) => handleNodeClick(node)}
-      />
-      <NodeLayer
-        nodes={visibleNodes}
-        selectedId={editor.selectedNodeId}
-        hoveredId={
-          editor.pendingEdgeSourceId ??
-          editor.transitLinkSourceId ??
-          editor.hoveredNodeId
-        }
-        scale={camera.scale}
-        onNodeClick={handleNodeClick}
-        onNodePointerDown={handleNodePointerDown}
-      />
+      {/* The routing graph renders only in Nodes mode. While drawing, the
+          wires and markers are someone else's layer of the problem — hiding
+          them keeps the plan readable and makes the mode split legible. */}
+      {nodesMode && (
+        <EdgeLayer
+          edges={graph.edges}
+          nodesById={nodesById}
+          inaccessibleLabel={t('mapEditor.edgeAccessible')}
+          selectedEdgeId={editor.selectedEdgeId}
+          onEdgeClick={editor.tool === 'select' ? handleEdgeClick : undefined}
+        />
+      )}
+      {nodesMode && (
+        <PoiLayer
+          pois={visiblePois}
+          nodesById={nodesById}
+          scale={camera.scale}
+          selectedPoiId={selectedPoi?.id ?? null}
+          onPoiClick={(_, node) => handleNodeClick(node)}
+        />
+      )}
+      {nodesMode && (
+        <NodeLayer
+          nodes={visibleNodes}
+          selectedId={editor.selectedNodeId}
+          hoveredId={
+            editor.pendingEdgeSourceId ??
+            editor.transitLinkSourceId ??
+            editor.hoveredNodeId
+          }
+          scale={camera.scale}
+          onNodeClick={handleNodeClick}
+          onNodePointerDown={handleNodePointerDown}
+        />
+      )}
       <PeerCursorsLayer
         cursors={collab.cursors}
         floorId={editor.activeFloorId}
         scale={camera.scale}
       />
+      {floorMode && (
+        <FloorResizeLayer
+          space={space}
+          scale={camera.scale}
+          outlinePoints={
+            outlineOf(activeDrawing)?.points ?? defaultOutlinePoints(space)
+          }
+          onVertexDown={beginOutlineVertexDrag}
+          onMidpointDown={beginOutlineMidpointDrag}
+          onVertexDoubleClick={removeOutlineVertex}
+          metersLabel={
+            activeFloor?.scalePixelsPerMeter
+              ? `${Math.round((space.width / activeFloor.scalePixelsPerMeter) * 10) / 10} × ${
+                  Math.round((space.height / activeFloor.scalePixelsPerMeter) * 10) / 10
+                } m`
+              : `${space.width} × ${space.height}`
+          }
+          onBegin={beginCanvasResize}
+        />
+      )}
     </MapCanvas>
   );
 
@@ -2295,6 +2852,43 @@ export const MapEditorPage = () => {
         />
       )}
 
+      <LinkFloorsDialog
+        open={linkDialogOpen}
+        onClose={() => setLinkDialogOpen(false)}
+        nodes={graph.nodes}
+        floors={graph.floors}
+        activeFloorId={editor.activeFloorId}
+        submitting={linkSubmitting}
+        onCreate={createTransitLinkFromDialog}
+      />
+
+      <EditorAiPanel
+        open={aiOpen}
+        onClose={() => setAiOpen(false)}
+        buildingId={buildingId}
+        floorId={editor.activeFloorId}
+        space={space}
+        onRunAction={(action) => {
+          if (action === 'auto-connect') {
+            setNodesMode(true);
+            void runAutoConnectRef.current();
+          }
+        }}
+        onAttachImage={async (file) => {
+          const floorId = editorRef.current.activeFloorId;
+          if (!floorId) return false;
+          // Through the same floor PATCH as the panel upload: the image lands
+          // as the plan underlay, ready to trace over or design around.
+          return handleUpdateFloorRef.current(floorId, { map: file });
+        }}
+        onApplyDrawing={(generated) => {
+          // Through the normal edit path: history snapshot (undo works),
+          // debounced save, live relay to collaborators.
+          editDrawing(() => generated);
+          toast({ title: t('editorAi.applied'), tone: 'success' });
+        }}
+      />
+
       {qrNode && (
         <SimpleQRCodeDisplay
           node={toLegacyNode(qrNode, activeFloor?.floorNumber ?? 1)}
@@ -2324,7 +2918,6 @@ const TOOL_CURSORS: Partial<Record<EditorTool, string>> = {
   pan: 'grab',
   'place-node': 'crosshair',
   'draw-edge': 'crosshair',
-  'assign-poi': 'crosshair',
   'link-transit': 'crosshair',
   'mark-exit': 'crosshair',
   'draw-wall': 'crosshair',
@@ -2345,19 +2938,25 @@ const DRAW_TOOL_HINTS: Partial<Record<EditorTool, string>> = {
 };
 
 /**
- * Draw / Nodes mode switch.
+ * Draw / Nodes / Floor mode switch.
  *
- * A segmented control rather than a checkbox: the two modes are peers, and the
- * user needs to see which one they are in without reading a label. Nodes mode
- * is tinted because it is the one with consequences for evacuation routing.
+ * A segmented control rather than checkboxes: the modes are peers and
+ * mutually exclusive, and the user needs to see which one they are in
+ * without reading a label.
  */
+const MODE_ORDER: { mode: EditorMode; labelKey: string; Icon: typeof MapIcon }[] = [
+  { mode: 'draw', labelKey: 'mapEditor.modeDraw', Icon: PenIcon },
+  { mode: 'nodes', labelKey: 'mapEditor.modeNodes', Icon: RouteIcon },
+  { mode: 'floor', labelKey: 'mapEditor.modeFloor', Icon: MaximizeIcon },
+];
+
 const ModeSwitch = ({
-  nodesMode,
+  mode,
   onChange,
   t,
 }: {
-  nodesMode: boolean;
-  onChange: (nodesMode: boolean) => void;
+  mode: EditorMode;
+  onChange: (mode: EditorMode) => void;
   t: (key: string) => string;
 }) => (
   <div
@@ -2365,15 +2964,15 @@ const ModeSwitch = ({
     aria-label={t('mapEditor.mode')}
     className="inline-flex rounded-full border border-line bg-surface-2 p-0.5"
   >
-    {[false, true].map((mode) => {
-      const active = nodesMode === mode;
+    {MODE_ORDER.map(({ mode: value, labelKey, Icon }) => {
+      const active = mode === value;
       return (
         <button
-          key={String(mode)}
+          key={value}
           type="button"
           role="radio"
           aria-checked={active}
-          onClick={() => onChange(mode)}
+          onClick={() => onChange(value)}
           className={cn(
             'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium',
             'transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
@@ -2382,8 +2981,8 @@ const ModeSwitch = ({
               : 'text-ink-muted hover:text-ink',
           )}
         >
-          {mode ? <RouteIcon size={15} /> : <PenIcon size={15} />}
-          {mode ? t('mapEditor.modeNodes') : t('mapEditor.modeDraw')}
+          <Icon size={15} />
+          {t(labelKey)}
         </button>
       );
     })}
@@ -2471,19 +3070,175 @@ const FullscreenEditor = ({
 
         {/* Floor picker floats bottom-left; the inspector floats right. Both
             sit over the canvas so it keeps the full width underneath. */}
-        <div className="pointer-events-none absolute inset-x-6 bottom-6 flex justify-start">
+        <div className="pointer-events-none absolute inset-x-3 bottom-3 flex justify-start sm:inset-x-6 sm:bottom-6">
           <div className="pointer-events-auto rounded-xl border border-line bg-surface/95 p-2 shadow-lg backdrop-blur">
             {floors}
           </div>
         </div>
 
         {inspector && (
-          <aside className="absolute right-6 top-6 max-h-[calc(100%-3rem)] w-80 overflow-y-auto rounded-2xl border border-line bg-surface/95 p-4 shadow-xl backdrop-blur">
+          <aside className="absolute right-3 top-3 max-h-[calc(100%-1.5rem)] w-[min(20rem,calc(100vw-1.5rem))] overflow-y-auto rounded-2xl border border-line bg-surface/95 p-4 shadow-xl backdrop-blur sm:right-6 sm:top-6 sm:max-h-[calc(100%-3rem)]">
             {inspector}
           </aside>
         )}
       </div>
     </div>
+  );
+};
+
+/**
+ * Floor-size mode's affordances: a highlighted canvas border with grab
+ * handles on the right edge, bottom edge and corner, plus a live size chip.
+ * The canvas grows from its fixed origin, so only those three sides drag.
+ */
+const FloorResizeLayer = ({
+  space,
+  scale,
+  metersLabel,
+  outlinePoints,
+  onBegin,
+  onVertexDown,
+  onMidpointDown,
+  onVertexDoubleClick,
+}: {
+  space: FloorSpace;
+  scale: number;
+  metersLabel: string;
+  outlinePoints: number[];
+  onBegin: (axis: 'x' | 'y' | 'both', e: ReactPointerEvent<SVGElement>) => void;
+  onVertexDown: (vertexIndex: number, e: ReactPointerEvent<SVGElement>) => void;
+  onMidpointDown: (segmentIndex: number, e: ReactPointerEvent<SVGElement>) => void;
+  onVertexDoubleClick: (vertexIndex: number) => void;
+}) => {
+  const k = 1 / Math.max(scale, 0.4);
+  const grip = 14 * k;
+  const half = grip / 2;
+  const corners = Math.floor(outlinePoints.length / 2);
+  return (
+    <g data-testid="floor-resize-layer">
+      <rect
+        x={0}
+        y={0}
+        width={space.width}
+        height={space.height}
+        fill="none"
+        stroke="var(--brand)"
+        strokeWidth={2.5 * k}
+        strokeDasharray={`${8 * k} ${5 * k}`}
+        style={{ pointerEvents: 'none' }}
+      />
+      {/* Fat invisible strips make the whole edge grabbable, not just the
+          visible grip squares. */}
+      <rect
+        data-canvas-handle="x"
+        x={space.width - half}
+        y={0}
+        width={grip}
+        height={space.height}
+        fill="transparent"
+        style={{ cursor: 'ew-resize' }}
+        onPointerDown={(e) => onBegin('x', e)}
+      />
+      <rect
+        data-canvas-handle="y"
+        x={0}
+        y={space.height - half}
+        width={space.width}
+        height={grip}
+        fill="transparent"
+        style={{ cursor: 'ns-resize' }}
+        onPointerDown={(e) => onBegin('y', e)}
+      />
+      <rect
+        data-canvas-handle="both"
+        x={space.width - grip}
+        y={space.height - grip}
+        width={grip * 2}
+        height={grip * 2}
+        fill="transparent"
+        style={{ cursor: 'nwse-resize' }}
+        onPointerDown={(e) => onBegin('both', e)}
+      />
+      {/* Visible grips over the hit strips. */}
+      {(
+        [
+          [space.width, space.height / 2],
+          [space.width / 2, space.height],
+          [space.width, space.height],
+        ] as const
+      ).map(([cx, cy], i) => (
+        <rect
+          key={i}
+          x={cx - half}
+          y={cy - half}
+          width={grip}
+          height={grip}
+          rx={3 * k}
+          fill="var(--surface)"
+          stroke="var(--brand)"
+          strokeWidth={2 * k}
+          style={{ pointerEvents: 'none' }}
+        />
+      ))}
+      {/* The footprint being edited. */}
+      <polygon
+        points={Array.from({ length: corners }, (_, i) =>
+          `${outlinePoints[i * 2]},${outlinePoints[i * 2 + 1]}`,
+        ).join(' ')}
+        fill="none"
+        stroke="var(--brand)"
+        strokeWidth={2 * k}
+        style={{ pointerEvents: 'none' }}
+      />
+      {/* Midpoint splitters: dragging one splits that edge and pulls the new
+          corner — how HALF a border moves while the rest stays put. */}
+      {Array.from({ length: corners }, (_, i) => {
+        const nx = (i + 1) % corners;
+        const mx = (outlinePoints[i * 2] + outlinePoints[nx * 2]) / 2;
+        const my = (outlinePoints[i * 2 + 1] + outlinePoints[nx * 2 + 1]) / 2;
+        return (
+          <rect
+            key={`m${i}`}
+            data-outline-mid={i}
+            x={mx - 5 * k}
+            y={my - 5 * k}
+            width={10 * k}
+            height={10 * k}
+            transform={`rotate(45 ${mx} ${my})`}
+            fill="var(--surface)"
+            stroke="var(--brand)"
+            strokeWidth={1.5 * k}
+            style={{ cursor: 'copy' }}
+            onPointerDown={(e) => onMidpointDown(i, e)}
+          />
+        );
+      })}
+      {/* Corner handles: drag to move, double-tap to remove. */}
+      {Array.from({ length: corners }, (_, i) => (
+        <circle
+          key={`v${i}`}
+          data-outline-vertex={i}
+          cx={outlinePoints[i * 2]}
+          cy={outlinePoints[i * 2 + 1]}
+          r={6.5 * k}
+          fill="var(--surface)"
+          stroke="var(--brand)"
+          strokeWidth={2 * k}
+          style={{ cursor: 'move' }}
+          onPointerDown={(e) => onVertexDown(i, e)}
+          onDoubleClick={() => onVertexDoubleClick(i)}
+        />
+      ))}
+      {/* Live size, pinned to the corner being dragged. */}
+      <g
+        transform={`translate(${space.width - 8 * k} ${space.height - 14 * k}) scale(${k})`}
+        style={{ pointerEvents: 'none' }}
+      >
+        <text textAnchor="end" fontSize={14} fontWeight={700} fill="var(--brand)">
+          {metersLabel}
+        </text>
+      </g>
+    </g>
   );
 };
 

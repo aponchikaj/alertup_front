@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { MapCanvas } from "../map/MapCanvas";
 import { useMapCamera } from "../map/useMapCamera";
 import { FloorImageLayer } from "../map/layers/FloorImageLayer";
@@ -71,6 +71,24 @@ export interface WayfindingPanelProps {
   originFloorNumber?: number;
   /** Opens the page's QR scanner so the user can re-anchor mid-route. */
   onRescan?: () => void;
+  /**
+   * Destination pushed in from outside the search box — the scan page routes
+   * "tap a marker on the map" and the emergency overlay's "show exit route"
+   * through here. The token distinguishes repeat requests for the same
+   * destination (tapping "nearest exit" twice must re-route twice).
+   */
+  externalSelection?: (DestinationSelection & { token: number }) | null;
+  /**
+   * Rendered in the map slot while no route is active, so the page shows one
+   * continuous map experience: the overview map sits here until a destination
+   * replaces it with the route view.
+   */
+  idleContent?: ReactNode;
+  /** Fires when a route appears/disappears — lets the page swap chrome. */
+  onRouteActive?: (active: boolean) => void;
+  /** Hide the built-in search box — for hosts with their own picker (the scan
+   *  page's directory) that push choices via externalSelection. */
+  hideSearch?: boolean;
   className?: string;
 }
 
@@ -79,6 +97,10 @@ export const WayfindingPanel = ({
   originNodeId,
   originFloorNumber,
   onRescan,
+  externalSelection,
+  idleContent,
+  onRouteActive,
+  hideSearch = false,
   className,
 }: WayfindingPanelProps) => {
   const { t } = useI18n();
@@ -138,6 +160,28 @@ export const WayfindingPanel = ({
     writeStoredDestination(buildingId, null);
   }, [buildingId]);
 
+  // External selections (marker taps, the emergency overlay) run through the
+  // exact same loadRoute path as the search box — one code path, one behaviour.
+  const lastExternalTokenRef = useRef(0);
+  useEffect(() => {
+    if (!externalSelection) return;
+    if (externalSelection.token === lastExternalTokenRef.current) return;
+    lastExternalTokenRef.current = externalSelection.token;
+    void loadRoute({
+      kind: externalSelection.kind,
+      poiId: externalSelection.poiId,
+      nodeId: externalSelection.nodeId,
+      name: externalSelection.name,
+    });
+  }, [externalSelection, loadRoute]);
+
+  const routeActive = Boolean(route && !loading);
+  const onRouteActiveRef = useRef(onRouteActive);
+  onRouteActiveRef.current = onRouteActive;
+  useEffect(() => {
+    onRouteActiveRef.current?.(routeActive);
+  }, [routeActive]);
+
   // Floors the route actually crosses, in walking order.
   const floors = useMemo<FloorSummary[]>(() => {
     if (!route) return [];
@@ -188,10 +232,12 @@ export const WayfindingPanel = ({
 
   return (
     <section className={cn("space-y-4", className)} data-testid="wayfinding-panel">
-      <div className="flex flex-col gap-2">
-        <h2 className="text-lg font-semibold text-ink">{t("wayfinding.whereTo")}</h2>
-        <DestinationSearch buildingId={buildingId} onSelect={loadRoute} />
-      </div>
+      {!hideSearch && (
+        <div className="flex flex-col gap-2">
+          <h2 className="text-lg font-semibold text-ink">{t("wayfinding.whereTo")}</h2>
+          <DestinationSearch buildingId={buildingId} onSelect={loadRoute} />
+        </div>
+      )}
 
       {loading ? (
         <div
@@ -243,7 +289,7 @@ export const WayfindingPanel = ({
             isDragging={isDragging}
             interactive
             ariaLabel={t("wayfinding.routeTo", { name: destinationName ?? "" })}
-            className="h-[52vh] min-h-72"
+            className="h-[55dvh] min-h-72 sm:h-[52vh]"
           >
             <FloorImageLayer
               floor={displayedFloor}
@@ -266,7 +312,9 @@ export const WayfindingPanel = ({
 
           <RouteStepper progress={progress} onRescan={onRescan} />
         </div>
-      ) : null}
+      ) : (
+        !loading && idleContent
+      )}
     </section>
   );
 };

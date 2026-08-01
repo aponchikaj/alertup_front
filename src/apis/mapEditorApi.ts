@@ -337,6 +337,20 @@ export const deleteFloor = async (floorId: string): Promise<void> => {
   await del<Envelope<unknown>>(`/api/map-editor/floors/${encodeURIComponent(floorId)}`);
 };
 
+/**
+ * Wire every node on a floor into one walkable graph (MST + shortcuts,
+ * drawn walls block). Idempotent; returns only the newly created edges.
+ */
+export const autoConnectFloor = async (floorId: string): Promise<EditorEdge[]> => {
+  const data = unwrap(
+    await post<Envelope<{ edges?: RawEdge[] }>>(
+      `/api/map-editor/floors/${encodeURIComponent(floorId)}/auto-connect`,
+      {},
+    ),
+  );
+  return asArray(data.edges).map(toEditorEdge);
+};
+
 /** Store a shop logo and get back the URL to write into the shape. */
 export const uploadShopLogo = async (
   buildingId: string,

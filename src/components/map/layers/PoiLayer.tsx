@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { NODE_GLYPH_PATHS, NODE_THEME } from '../mapTheme';
 import type { MapNode, Poi } from '../types';
 
@@ -23,7 +24,7 @@ export interface PoiLayerProps {
 
 const PIN_SCALE = 0.9;
 
-export const PoiLayer = ({
+const PoiLayerImpl = ({
   pois,
   nodesById,
   scale = 1,
@@ -94,5 +95,8 @@ export const PoiLayer = ({
     </g>
   );
 };
+
+/** Memoized: drag frames update one layer's props; the others must not pay. */
+export const PoiLayer = memo(PoiLayerImpl);
 
 export default PoiLayer;

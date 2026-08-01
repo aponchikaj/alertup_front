@@ -4,7 +4,7 @@ import { ConfirmDialog } from '../../../components/ui/confirmDialog';
 import { TextField } from '../../../components/ui/field';
 import { Select } from '../../../components/ui/select';
 import { Badge } from '../../../components/ui/feedback';
-import { TrashIcon } from '../../../components/ui/icons';
+import { QrCodeIcon, TrashIcon } from '../../../components/ui/icons';
 import { cn } from '../../../lib/cn';
 import { useI18n } from '../../../i18n/LanguageProvider';
 import {
@@ -50,6 +50,8 @@ export interface ShapeInspectorProps {
   onCreateNode: () => Promise<void>;
   /** True once the shape's `nodeId` resolves to a node that still exists. */
   nodeLinked: boolean;
+  /** Opens the printable QR dialog for the linked node. */
+  onShowQr?: () => void;
 }
 
 export const ShapeInspector = ({
@@ -59,6 +61,7 @@ export const ShapeInspector = ({
   onUploadLogo,
   onCreateNode,
   nodeLinked,
+  onShowQr,
 }: ShapeInspectorProps) => {
   const { t } = useI18n();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -299,7 +302,15 @@ export const ShapeInspector = ({
         </div>
       )}
 
-      <div className="border-t border-line pt-4">
+      <div className="flex flex-wrap gap-2 border-t border-line pt-4">
+        {/* Every routable place has a printable identity; the shape is just
+            its picture, so the QR lives here too — no mode switch required. */}
+        {nodeLinked && onShowQr && (
+          <Button size="sm" variant="secondary" onClick={onShowQr}>
+            <QrCodeIcon size={16} />
+            {t('mapEditor.generateQr')}
+          </Button>
+        )}
         <Button size="sm" variant="danger" onClick={() => setConfirmDelete(true)}>
           <TrashIcon size={16} />
           {t('mapEditor.deleteShape')}

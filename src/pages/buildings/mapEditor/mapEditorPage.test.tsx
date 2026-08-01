@@ -168,6 +168,8 @@ describe('MapEditorPage — loading and floors', () => {
   test('switches floors by id, not by array position', async () => {
     const { container } = renderPage();
     await screen.findByText('Ground floor');
+    // Markers render in Nodes mode only.
+    fireEvent.click(screen.getByRole('radio', { name: en.mapEditor.modeNodes }));
 
     // Floor 1 is active on load: only its nodes are drawn.
     expect(container.querySelector('[data-node-id="n1"]')).toBeInTheDocument();
@@ -281,6 +283,7 @@ describe('MapEditorPage — drawing edges', () => {
 
     const { container } = renderPage();
     await screen.findByText('Ground floor');
+    fireEvent.click(screen.getByRole('radio', { name: en.mapEditor.modeNodes }));
 
     // The clickable element is the fat invisible hit line inside the edge group.
     const edgeGroup = container.querySelector('[data-edge-id="e9"]') as Element;
@@ -554,7 +557,7 @@ describe('MapEditorPage — drawing, undo and delete', () => {
   });
 });
 
-describe('MapEditorPage — eraser', () => {
+describe('MapEditorPage — eraser and mode visibility', () => {
   /** Tap the map at the mocked screenToMap point (321, 123). */
   const tapMap = () => {
     const svg = mapSvg();
@@ -562,61 +565,55 @@ describe('MapEditorPage — eraser', () => {
     fireEvent.pointerUp(svg, { pointerId: 9, clientX: 50, clientY: 50 });
   };
 
-  test('a tap near a node deletes it — no dead-centre click required', async () => {
+  test('the routing graph renders only in Nodes mode', async () => {
     api.getBuildingGraph.mockResolvedValue({
       ...graph,
-      nodes: [...graph.nodes, node('near', 'f1', 325, 125)],
-    });
-    api.deleteNode.mockResolvedValue(undefined);
-
-    const { container } = renderPage();
-    await screen.findByText('Ground floor');
-
-    selectTool(en.mapEditor.toolErase);
-    tapMap();
-
-    // (321, 123) is ~4.5 units from the node at (325, 125) — well inside the
-    // eraser's radius even though the click missed the marker element.
-    await waitFor(() => expect(api.deleteNode).toHaveBeenCalledWith('near'));
-    await waitFor(() =>
-      expect(container.querySelector('[data-node-id="near"]')).toBeNull(),
-    );
-  });
-
-  test('a tap on a connection deletes it when no node is nearer', async () => {
-    api.getBuildingGraph.mockResolvedValue({
-      ...graph,
-      nodes: [node('a', 'f1', 321, 50), node('b', 'f1', 321, 200)],
       edges: [
         {
-          id: 'e-target',
-          sourceNodeId: 'a',
-          targetNodeId: 'b',
+          id: 'e1',
+          sourceNodeId: 'n1',
+          targetNodeId: 'n2',
           buildingId: 'b1',
           transitType: 'WALKWAY',
           accessible: true,
         },
       ],
     });
-    api.deleteEdge.mockResolvedValue(undefined);
-
     const { container } = renderPage();
+    await screen.findByText('Ground floor');
+
+    // Draw mode is the default: no markers, no wires — the plan stands alone.
+    expect(container.querySelector('[data-node-id]')).toBeNull();
+    expect(container.querySelector('[data-edge-id]')).toBeNull();
+
+    fireEvent.click(screen.getByRole('radio', { name: en.mapEditor.modeNodes }));
+    expect(container.querySelector('[data-node-id="n1"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-edge-id="e1"]')).toBeInTheDocument();
+
+    // And back off again when leaving the mode.
+    fireEvent.click(screen.getByRole('radio', { name: en.mapEditor.modeDraw }));
+    expect(container.querySelector('[data-node-id]')).toBeNull();
+  });
+
+  test('the eraser touches only drawings, never the invisible routing graph', async () => {
+    api.getBuildingGraph.mockResolvedValue({
+      ...graph,
+      nodes: [...graph.nodes, node('near', 'f1', 325, 125)],
+    });
+    renderPage();
     await screen.findByText('Ground floor');
 
     selectTool(en.mapEditor.toolErase);
     tapMap();
 
-    // The tap sits ON the a—b segment but 70+ units from either endpoint:
-    // too far for the node radius, dead-on for the edge.
-    await waitFor(() => expect(api.deleteEdge).toHaveBeenCalledWith('e-target'));
+    // (321, 123) sits ~4.5 units from a node — but in Draw mode that node is
+    // not on screen, and deleting what cannot be seen is silent data loss.
+    await new Promise((resolve) => setTimeout(resolve, 100));
     expect(api.deleteNode).not.toHaveBeenCalled();
-    await waitFor(() =>
-      expect(container.querySelector('[data-edge-id="e-target"]')).toBeNull(),
-    );
+    expect(api.deleteEdge).not.toHaveBeenCalled();
   });
 
   test('a tap near a drawn shape deletes it', async () => {
-    // No nodes at all, so nothing outranks the shape.
     api.getBuildingGraph.mockResolvedValue({ ...graph, nodes: [], edges: [] });
     renderPage();
     await screen.findByText('Ground floor');
@@ -634,5 +631,334 @@ describe('MapEditorPage — eraser', () => {
     await waitFor(() =>
       expect(screen.queryByTestId('drawing-layer')).toBeNull(),
     );
+  });
+});
+
+describe('MapEditorPage — auto-connect floor', () => {
+  test('one click wires the floor and paints the new connections', async () => {
+    api.autoConnectFloor.mockResolvedValue([
+      {
+        id: 'e-ac',
+        sourceNodeId: 'n1',
+        targetNodeId: 'n2',
+        buildingId: 'b1',
+        transitType: 'WALKWAY',
+        accessible: true,
+      },
+    ]);
+    const { container } = renderPage();
+    await screen.findByText('Ground floor');
+
+    // The button lives in Nodes mode — wiring is graph work.
+    expect(
+      screen.queryByRole('button', { name: new RegExp(en.mapEditor.autoConnectFloor) }),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole('radio', { name: en.mapEditor.modeNodes }));
+
+    fireEvent.click(
+      screen.getByRole('button', { name: new RegExp(en.mapEditor.autoConnectFloor) }),
+    );
+
+    await waitFor(() => expect(api.autoConnectFloor).toHaveBeenCalledWith('f1'));
+    await waitFor(() =>
+      expect(container.querySelector('[data-edge-id="e-ac"]')).toBeInTheDocument(),
+    );
+  });
+});
+
+describe('MapEditorPage — reshaping the background drawing', () => {
+  test('a selected wall exposes vertex handles and dragging one reshapes it', async () => {
+    api.getBuildingGraph.mockResolvedValue({ ...graph, nodes: [], edges: [] });
+    const { container } = renderPage();
+    await screen.findByText('Ground floor');
+
+    // Draw a wall: two taps at the mocked point (snapped to 325,125), Enter.
+    selectTool(en.mapEditor.toolDrawWall);
+    const svg = mapSvg();
+    fireEvent.pointerDown(svg, { pointerId: 3, clientX: 30, clientY: 30 });
+    fireEvent.pointerUp(svg, { pointerId: 3, clientX: 30, clientY: 30 });
+    fireEvent.pointerDown(svg, { pointerId: 4, clientX: 90, clientY: 90 });
+    fireEvent.pointerUp(svg, { pointerId: 4, clientX: 90, clientY: 90 });
+    fireEvent.keyDown(window, { key: 'Enter' });
+    await screen.findByTestId('drawing-layer');
+
+    // Select it: vertex handles appear, one per point.
+    selectTool(en.mapEditor.toolSelect);
+    fireEvent.click(container.querySelector('[data-shape-id]') as Element);
+    const handles = container.querySelectorAll('[data-wall-vertex]');
+    expect(handles.length).toBe(2);
+
+    // Drag vertex 0 to a NEW point (retarget the hit-test mock mid-test so
+    // the reshape is provable, not a no-op back onto the same coordinates).
+    const mapSpaceMock = jest.requireMock('../../../components/map/mapSpace') as {
+      screenToMap: jest.Mock;
+    };
+    mapSpaceMock.screenToMap.mockReturnValue({ x: 500, y: 400 });
+    fireEvent.pointerDown(handles[0], { pointerId: 5, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(window, { pointerId: 5, clientX: 200, clientY: 200 });
+    fireEvent.pointerUp(window, { pointerId: 5, clientX: 200, clientY: 200 });
+    mapSpaceMock.screenToMap.mockReturnValue({ x: 321, y: 123 });
+
+    // Vertex 0 moved to the new snapped point; vertex 1 stayed — the wall
+    // changed SHAPE rather than translating.
+    const polyline = container.querySelector('[data-shape-id] polyline');
+    expect(polyline?.getAttribute('points')).toBe('500,400 325,125');
+  });
+});
+
+describe('MapEditorPage — floor-size mode', () => {
+  test('dragging the corner resizes the canvas and persists on release', async () => {
+    api.updateFloor.mockResolvedValue({
+      ...floor('f1', 1, 'Ground floor'),
+      width: 1200,
+      height: 900,
+    });
+    const { container } = renderPage();
+    await screen.findByText('Ground floor');
+
+    fireEvent.click(screen.getByRole('radio', { name: en.mapEditor.modeFloor }));
+    const corner = container.querySelector('[data-canvas-handle="both"]') as Element;
+    expect(corner).toBeInTheDocument();
+
+    // Retarget the hit-test mock so the drag lands on a bigger size.
+    const mapSpaceMock = jest.requireMock('../../../components/map/mapSpace') as {
+      screenToMap: jest.Mock;
+    };
+    mapSpaceMock.screenToMap.mockReturnValue({ x: 1195, y: 903 });
+    fireEvent.pointerDown(corner, { pointerId: 8, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(window, { pointerId: 8, clientX: 300, clientY: 300 });
+    fireEvent.pointerUp(window, { pointerId: 8, clientX: 300, clientY: 300 });
+    mapSpaceMock.screenToMap.mockReturnValue({ x: 321, y: 123 });
+
+    // Snapped to the 25-unit grid and persisted through the floor PATCH.
+    await waitFor(() =>
+      expect(api.updateFloor).toHaveBeenCalledWith('f1', { width: 1200, height: 900 }),
+    );
+  });
+
+  test('floor mode disarms drawing — shapes are not clickable there', async () => {
+    renderPage();
+    await screen.findByText('Ground floor');
+    fireEvent.click(screen.getByRole('radio', { name: en.mapEditor.modeFloor }));
+    // The tool menu is gone; the mode owns the canvas.
+    expect(document.querySelector('[aria-haspopup="menu"]')).toBeNull();
+  });
+});
+
+describe('MapEditorPage — link floors dialog', () => {
+  test('arming the tool opens the dialog; two picks and a type create the link', async () => {
+    api.createTransitLink.mockResolvedValue({
+      id: 'tl1',
+      sourceNodeId: 'n1',
+      targetNodeId: 'n3',
+      buildingId: 'b1',
+      transitType: 'ELEVATOR',
+      accessible: true,
+    });
+    const { container } = renderPage();
+    await screen.findByText('Ground floor');
+
+    selectTool(en.mapEditor.toolLinkTransit);
+    expect(await screen.findByText(en.mapEditor.linkFloorsLead)).toBeInTheDocument();
+
+    // From this floor (n1/n2), to another floor (n3) — no floor switching.
+    const selects = screen.getAllByRole('combobox');
+    fireEvent.change(selects[0], { target: { value: 'n1' } });
+    fireEvent.change(selects[1], { target: { value: 'n3' } });
+    fireEvent.click(screen.getByRole('button', { name: en.mapEditor.linkCreate }));
+
+    await waitFor(() =>
+      expect(api.createTransitLink).toHaveBeenCalledWith({
+        nodeIds: ['n1', 'n3'],
+        transitType: 'ELEVATOR',
+        buildingId: 'b1',
+      }),
+    );
+    // The link lands and the dialog folds away. (The edge itself spans two
+    // floors, so it deliberately does not render on a single-floor canvas.)
+    await waitFor(() =>
+      expect(screen.queryByText(en.mapEditor.linkFloorsLead)).toBeNull(),
+    );
+    void container;
+  });
+
+  test('the Add shop tool is gone — shops are drawn or made via the node form', async () => {
+    renderPage();
+    await screen.findByText('Ground floor');
+    fireEvent.click(screen.getByRole('radio', { name: en.mapEditor.modeNodes }));
+    const trigger = document.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]');
+    fireEvent.click(trigger as HTMLButtonElement);
+    expect(
+      screen.queryByRole('menuitemradio', { name: new RegExp(en.mapEditor.toolAssignPoi) }),
+    ).toBeNull();
+  });
+});
+
+describe('MapEditorPage — flexible floor outline', () => {
+  test('dragging an edge midpoint splits the border and moves only that part', async () => {
+    api.updateFloor.mockResolvedValue(floor('f1', 1, 'Ground floor'));
+    const { container } = renderPage();
+    await screen.findByText('Ground floor');
+
+    fireEvent.click(screen.getByRole('radio', { name: en.mapEditor.modeFloor }));
+
+    // The default footprint is the full 1000x800 rectangle: 4 corners,
+    // 4 midpoint splitters.
+    expect(container.querySelectorAll('[data-outline-vertex]').length).toBe(4);
+    const mids = container.querySelectorAll('[data-outline-mid]');
+    expect(mids.length).toBe(4);
+
+    // Grab the BOTTOM edge's midpoint (segment 2: corner 2 -> corner 3) and
+    // pull it down-left — the user's "only half the bottom moves" gesture.
+    const mapSpaceMock = jest.requireMock('../../../components/map/mapSpace') as {
+      screenToMap: jest.Mock;
+    };
+    mapSpaceMock.screenToMap.mockReturnValue({ x: 500, y: 700 });
+    fireEvent.pointerDown(mids[2], { pointerId: 11, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(window, { pointerId: 11, clientX: 60, clientY: 60 });
+    fireEvent.pointerUp(window, { pointerId: 11, clientX: 60, clientY: 60 });
+    mapSpaceMock.screenToMap.mockReturnValue({ x: 321, y: 123 });
+
+    // Five corners now: the bottom edge gained one, dragged to (500, 700),
+    // while the original bottom corners never moved.
+    const polygon = container.querySelector(
+      '[data-testid="floor-resize-layer"] polygon',
+    );
+    expect(polygon?.getAttribute('points')).toBe(
+      '0,0 1000,0 1000,800 500,700 0,800',
+    );
+    expect(container.querySelectorAll('[data-outline-vertex]').length).toBe(5);
+
+    // And it persisted as a real drawing shape, so the scan page renders the
+    // same footprint (drawing PATCHes are debounced).
+    await waitFor(
+      () =>
+        expect(api.updateFloor).toHaveBeenCalledWith(
+          'f1',
+          expect.objectContaining({
+            drawing: expect.objectContaining({
+              shapes: expect.arrayContaining([
+                expect.objectContaining({ kind: 'outline' }),
+              ]),
+            }),
+          }),
+        ),
+      { timeout: 2500 },
+    );
+  });
+
+  test('double-tapping a corner removes it, but a triangle is the floor', async () => {
+    const { container } = renderPage();
+    await screen.findByText('Ground floor');
+    fireEvent.click(screen.getByRole('radio', { name: en.mapEditor.modeFloor }));
+
+    // 4 -> 3 corners.
+    fireEvent.doubleClick(
+      container.querySelectorAll('[data-outline-vertex]')[0] as Element,
+    );
+    expect(container.querySelectorAll('[data-outline-vertex]').length).toBe(3);
+
+    // 3 corners is the minimum polygon — a further delete is refused.
+    fireEvent.doubleClick(
+      container.querySelectorAll('[data-outline-vertex]')[0] as Element,
+    );
+    expect(container.querySelectorAll('[data-outline-vertex]').length).toBe(3);
+  });
+});
+
+describe('MapEditorPage — the floor grows with its outline', () => {
+  const enterFloorMode = async () => {
+    await screen.findByText('Ground floor');
+    fireEvent.click(screen.getByRole('radio', { name: en.mapEditor.modeFloor }));
+  };
+
+  const dragOutlineHandle = (
+    handle: Element,
+    to: { x: number; y: number },
+  ) => {
+    const mapSpaceMock = jest.requireMock('../../../components/map/mapSpace') as {
+      screenToMap: jest.Mock;
+    };
+    mapSpaceMock.screenToMap.mockReturnValue(to);
+    fireEvent.pointerDown(handle, { pointerId: 12, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(window, { pointerId: 12, clientX: 80, clientY: 80 });
+    fireEvent.pointerUp(window, { pointerId: 12, clientX: 80, clientY: 80 });
+    mapSpaceMock.screenToMap.mockReturnValue({ x: 321, y: 123 });
+  };
+
+  test('pulling a border past the canvas grows the floor bigger and bigger', async () => {
+    api.updateFloor.mockResolvedValue({
+      ...floor('f1', 1, 'Ground floor'),
+      width: 1400,
+      height: 1000,
+    });
+    const { container } = renderPage();
+    await enterFloorMode();
+
+    // Drag the bottom-right corner way outside the 1000x800 canvas.
+    dragOutlineHandle(
+      container.querySelectorAll('[data-outline-vertex]')[2] as Element,
+      { x: 1400, y: 1000 },
+    );
+
+    // The corner kept its position (no clamp) and the canvas grew to fit.
+    await waitFor(() =>
+      expect(api.updateFloor).toHaveBeenCalledWith(
+        'f1',
+        expect.objectContaining({ width: 1400, height: 1000 }),
+      ),
+    );
+  });
+
+  test('pulling the TOP border up shifts the plan and its nodes down into view', async () => {
+    api.updateFloor.mockResolvedValue({
+      ...floor('f1', 1, 'Ground floor'),
+      height: 900,
+    });
+    api.updateNode.mockImplementation(async (nodeId: string, patch: { x?: number; y?: number }) =>
+      ({ ...node(nodeId, 'f1', patch.x ?? 0, patch.y ?? 0), ...patch }) as never,
+    );
+    const { container } = renderPage();
+    await enterFloorMode();
+
+    // Drag corner 0 (top-left) upward past the origin.
+    dragOutlineHandle(
+      container.querySelectorAll('[data-outline-vertex]')[0] as Element,
+      { x: 0, y: -100 },
+    );
+
+    // Negative space does not exist: everything slid down 100 and the canvas
+    // grew by the same amount — the plan and graph never drift apart.
+    await waitFor(() =>
+      expect(api.updateFloor).toHaveBeenCalledWith(
+        'f1',
+        expect.objectContaining({ height: 900 }),
+      ),
+    );
+    await waitFor(() =>
+      expect(api.updateNode).toHaveBeenCalledWith(
+        'n1',
+        expect.objectContaining({ y: 200 }), // was 100, shifted +100
+      ),
+    );
+  });
+});
+
+describe('MapEditorPage — floor mode hit order', () => {
+  test('outline handles paint ABOVE the whole-canvas strips, so border parts stay grabbable', async () => {
+    const { container } = renderPage();
+    await screen.findByText('Ground floor');
+    fireEvent.click(screen.getByRole('radio', { name: en.mapEditor.modeFloor }));
+
+    // SVG hit-tests topmost-first in document order. The full-width canvas
+    // strips share the border with the footprint handles; if the handles come
+    // first in the DOM they are unreachable in a real browser (jsdom fires on
+    // whatever you target, which is how this bug slipped past the tests).
+    const strip = container.querySelector('[data-canvas-handle="y"]') as Element;
+    const bottomMid = container.querySelectorAll('[data-outline-mid]')[2] as Element;
+    expect(
+      // eslint-disable-next-line no-bitwise
+      strip.compareDocumentPosition(bottomMid) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 });

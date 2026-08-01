@@ -21,6 +21,10 @@ import {
 } from "../../components/ui/icons";
 import { useAuth } from "../../auth/useAuth";
 import { useI18n } from "../../i18n/LanguageProvider";
+import {
+  EmergencyChallengeDialog,
+  type EmergencyChallenge,
+} from "../../components/emergency/EmergencyChallengeDialog";
 
 const Building = () => {
   const rootRef = usePageAnimations();
@@ -39,23 +43,38 @@ const Building = () => {
   const [isOwner, setIsOwner] = useState<boolean>(false);
 
   const [emergencyMode,setEmergencyMode] = useState("off")
-  const EmergencyModeFunction = async()=>{
+
+  // The switch is armed behind a human check: the button opens the challenge
+  // dialog, and only a solved challenge sends the actual toggle.
+  const [challengeOpen, setChallengeOpen] = useState(false)
+  const [challengeError, setChallengeError] = useState<string | null>(null)
+  const [toggling, setToggling] = useState(false)
+
+  const EmergencyModeFunction = async(challenge: EmergencyChallenge)=>{
+    setToggling(true)
+    setChallengeError(null)
     try{
-      const res = await EMERGENCY_MODE_FUNCTION(buildingData._id)
+      const res = await EMERGENCY_MODE_FUNCTION(buildingData._id, challenge)
       // Each branch returns. Without the returns, a falsy `res` fell through to
       // res.Success on the next line and threw.
       if(!res){
-        setServerError(t("common.error"))
+        setChallengeError(t("common.error"))
         return
       }
       if(res.Success==false){
-        setServerError(res.Message)
+        setChallengeError(
+          res.Message === 'CHALLENGE_FAILED'
+            ? t('emergencyChallenge.wrongAnswer')
+            : res.Message,
+        )
         return
       }
 
       window.location.reload()
     }catch{
-      setServerError(t("common.error"))
+      setChallengeError(t("common.error"))
+    }finally{
+      setToggling(false)
     }
   }
 
@@ -188,6 +207,47 @@ const Building = () => {
         )}
 
         {/* Content */}
+        {buildingData && emergencyMode === "on" && (
+          <div className="pt-8">
+            <Card className="border-danger-border bg-danger-subtle p-5">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="relative grid h-11 w-11 flex-none place-items-center rounded-full bg-danger text-white">
+                    <AlertTriangleIcon size={22} />
+                    <span
+                      aria-hidden
+                      className="absolute inset-0 animate-ping rounded-full bg-danger opacity-40 motion-reduce:hidden"
+                    />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-danger-text">
+                      {t("emergency.activeTitle")}
+                    </p>
+                    <p className="truncate text-sm text-ink-muted">
+                      {buildingData.emergencyMessage || t("emergency.activeLead")}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-none flex-wrap items-center gap-2">
+                  <ButtonLink
+                    to={`/building/${buildingData._id}/logs`}
+                    variant="secondary"
+                    size="sm"
+                  >
+                    <FileTextIcon size={16} />
+                    {t("buildings.logs")}
+                  </ButtonLink>
+                  {isOwner && (
+                    <Button size="sm" onClick={() => setChallengeOpen(true)}>
+                      {t("emergency.resolve")}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
+
         {buildingData && (
           <section
             data-reveal-group
@@ -211,18 +271,20 @@ const Building = () => {
                 <Stat label={t("buildings.mapsUploaded")} value={buildingData.maps ? buildingData.maps.length : null} />
               </div>
 
-              {isOwner && (
-                <Button
-                  variant="danger"
-                  fullWidth
-                  className="mt-6"
-                  onClick={EmergencyModeFunction}
-                >
-                  <AlertTriangleIcon size={18} />
-                  {emergencyMode === "on"
-                    ? t("emergency.resolve")
-                    : t("emergency.trigger")}
-                </Button>
+              {isOwner && emergencyMode !== "on" && (
+                <div className="mt-6 flex flex-col gap-1.5">
+                  <Button
+                    variant="danger"
+                    fullWidth
+                    onClick={() => setChallengeOpen(true)}
+                  >
+                    <AlertTriangleIcon size={18} />
+                    {t("emergency.trigger")}
+                  </Button>
+                  <p className="text-xs leading-relaxed text-ink-subtle">
+                    {t("emergency.triggerHint")}
+                  </p>
+                </div>
               )}
             </Card>
 
@@ -349,7 +411,18 @@ const Building = () => {
             </Card>
           </section>
         )}
-      </PageShell>
+        <EmergencyChallengeDialog
+        open={challengeOpen}
+        activating={emergencyMode !== "on"}
+        serverError={challengeError}
+        submitting={toggling}
+        onConfirm={(challenge) => void EmergencyModeFunction(challenge)}
+        onClose={() => {
+          setChallengeOpen(false)
+          setChallengeError(null)
+        }}
+      />
+    </PageShell>
     </div>
   );
 };

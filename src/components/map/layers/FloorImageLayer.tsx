@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { memo, useId } from 'react';
 import { sanitizeSvg } from '../../../lib/sanitizeSvg';
 import { GRID_MAJOR_EVERY, GRID_STEP } from '../drawing';
 import type { FloorSpace } from '../mapSpace';
@@ -23,7 +23,7 @@ export interface FloorImageLayerProps {
   placeholderLabel?: string | null;
 }
 
-export const FloorImageLayer = ({
+const FloorImageLayerImpl = ({
   floor,
   space,
   placeholderLabel = 'No floor map available',
@@ -134,5 +134,8 @@ export const FloorImageLayer = ({
     </g>
   );
 };
+
+/** Memoized: drag frames update one layer's props; the others must not pay. */
+export const FloorImageLayer = memo(FloorImageLayerImpl);
 
 export default FloorImageLayer;

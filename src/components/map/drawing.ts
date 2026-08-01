@@ -132,7 +132,25 @@ export interface TextShape extends ShapeBase {
   fontSize: number;
 }
 
-export type DrawingShape = WallShape | RoomShape | ShopShape | IconShape | TextShape;
+/**
+ * The floor's footprint — a closed polygon (flat [x, y, ...], implicitly
+ * closed). Real buildings are rarely rectangles; pulling half an edge out
+ * makes an L-shape, a notch, a wing. At most one per drawing, always
+ * rendered underneath everything, and never hit-tested like a shape: it is
+ * the paper, not a drawing on it.
+ */
+export interface OutlineShape extends ShapeBase {
+  kind: 'outline';
+  points: number[];
+}
+
+export type DrawingShape =
+  | WallShape
+  | RoomShape
+  | ShopShape
+  | IconShape
+  | TextShape
+  | OutlineShape;
 
 export type ShapeKind = DrawingShape['kind'];
 
@@ -145,6 +163,20 @@ export interface FloorDrawing {
 }
 
 export const EMPTY_DRAWING: FloorDrawing = { version: DRAWING_VERSION, shapes: [] };
+
+/** The one outline per floor lives under a fixed id, so edits upsert. */
+export const OUTLINE_SHAPE_ID = 'floor-outline';
+
+export const outlineOf = (drawing: FloorDrawing | null | undefined): OutlineShape | null =>
+  (drawing?.shapes.find((s) => s.kind === 'outline') as OutlineShape | undefined) ?? null;
+
+/** Full-canvas rectangle — the outline every floor starts from. */
+export const defaultOutlinePoints = (space: { width: number; height: number }): number[] => [
+  0, 0,
+  space.width, 0,
+  space.width, space.height,
+  0, space.height,
+];
 
 /* --- scale --------------------------------------------------------------- */
 
@@ -241,7 +273,7 @@ export const shapeCenter = (shape: DrawingShape): { x: number; y: number } => {
   if (isBoxShape(shape)) {
     return { x: shape.x + shape.width / 2, y: shape.y + shape.height / 2 };
   }
-  if (shape.kind === 'wall') {
+  if (shape.kind === 'wall' || shape.kind === 'outline') {
     const { points } = shape;
     let sx = 0;
     let sy = 0;
@@ -261,8 +293,9 @@ export const shapeBounds = (shape: DrawingShape): Rect => {
     return { x: shape.x, y: shape.y, width: shape.width, height: shape.height };
   }
 
-  if (shape.kind === 'wall') {
-    const { points, thickness } = shape;
+  if (shape.kind === 'wall' || shape.kind === 'outline') {
+    const points = shape.points;
+    const thickness = shape.kind === 'wall' ? shape.thickness : 0;
     if (points.length < 2) return { x: 0, y: 0, width: 0, height: 0 };
     let minX = Infinity;
     let minY = Infinity;
@@ -338,6 +371,7 @@ export const eraseHitTest = (
   slop: number,
 ): DrawingShape | null => {
   for (let i = shapes.length - 1; i >= 0; i -= 1) {
+    if (shapes[i].kind === 'outline') continue; // erased via Floor-size mode only
     const bounds = shapeBounds(shapes[i]);
     const inflated: Rect = {
       x: bounds.x - slop,
@@ -361,6 +395,7 @@ export const hitTest = (
   point: { x: number; y: number },
 ): DrawingShape | null => {
   for (let i = shapes.length - 1; i >= 0; i -= 1) {
+    if (shapes[i].kind === 'outline') continue; // the paper, not a shape
     if (rectContains(shapeBounds(shapes[i]), point)) return shapes[i];
   }
   return null;
@@ -368,7 +403,7 @@ export const hitTest = (
 
 /** Move a shape by a delta, whatever its kind. */
 export const translateShape = <T extends DrawingShape>(shape: T, dx: number, dy: number): T => {
-  if (shape.kind === 'wall') {
+  if (shape.kind === 'wall' || shape.kind === 'outline') {
     return {
       ...shape,
       points: shape.points.map((value, i) => (i % 2 === 0 ? value + dx : value + dy)),
@@ -494,6 +529,17 @@ export const parseDrawing = (raw: unknown): FloorDrawing => {
           ...(typeof shape.label === 'string' ? { label: shape.label } : {}),
           ...(typeof shape.nodeId === 'string' ? { nodeId: shape.nodeId } : {}),
         });
+        break;
+      }
+
+      case 'outline': {
+        const points = Array.isArray(shape.points)
+          ? shape.points.filter(isFiniteNumber)
+          : [];
+        // A polygon needs three corners; drop degenerate outlines.
+        if (points.length < 6) continue;
+        if (points.length % 2 !== 0) points.pop();
+        shapes.push({ id, kind: 'outline', points });
         break;
       }
 

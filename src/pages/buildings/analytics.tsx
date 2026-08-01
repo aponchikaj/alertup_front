@@ -14,10 +14,15 @@ import { TextField } from "../../components/ui/field"
 import {
     AlertTriangleIcon,
     ChartIcon,
+    CheckCircleIcon,
     ChevronRightIcon,
     ClockIcon,
     RefreshIcon,
+    ScanIcon,
+    UsersIcon,
 } from "../../components/ui/icons"
+import { Badge } from "../../components/ui/feedback"
+import { BarChart, StatCard } from "../../components/ui/charts"
 import { useI18n } from "../../i18n/LanguageProvider"
 
 interface EMERGENCY_SCHEMA {
@@ -183,6 +188,73 @@ export default function AnalyticsPage(){
                                 )
                             }
 
+                            {EMERGENCIES.length > 0 && (
+                                <>
+                                    {/* The range at a glance, before the case-by-case list. */}
+                                    <div
+                                        data-reveal-group
+                                        className="grid grid-cols-2 gap-4 pt-6 lg:grid-cols-4"
+                                    >
+                                        <div data-reveal-item>
+                                            <StatCard
+                                                icon={AlertTriangleIcon}
+                                                label={t("buildings.statEmergencies")}
+                                                value={String(EMERGENCIES.length)}
+                                            />
+                                        </div>
+                                        <div data-reveal-item>
+                                            <StatCard
+                                                icon={ScanIcon}
+                                                label={t("buildings.statScans")}
+                                                value={String(
+                                                    EMERGENCIES.reduce((sum, e) => sum + (e.scanned || 0), 0),
+                                                )}
+                                            />
+                                        </div>
+                                        <div data-reveal-item>
+                                            <StatCard
+                                                icon={UsersIcon}
+                                                label={t("buildings.statEvacuated")}
+                                                value={String(
+                                                    EMERGENCIES.reduce((sum, e) => sum + (e.evacuated || 0), 0),
+                                                )}
+                                            />
+                                        </div>
+                                        <div data-reveal-item>
+                                            <StatCard
+                                                icon={ClockIcon}
+                                                label={t("buildings.statAvgDuration")}
+                                                value={avgDurationLabel(EMERGENCIES)}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {EMERGENCIES.length > 1 && (
+                                        <div className="pt-6" data-reveal-item>
+                                            <Card className="p-6">
+                                                <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-ink">
+                                                    <ChartIcon size={18} className="text-brand-text" />
+                                                    {t("buildings.evacuationTrend")}
+                                                </h2>
+                                                <BarChart
+                                                    ariaLabel={t("buildings.evacuationTrend")}
+                                                    data={[...EMERGENCIES]
+                                                        .sort(
+                                                            (a, b) =>
+                                                                new Date(a.startedAt).getTime() -
+                                                                new Date(b.startedAt).getTime(),
+                                                        )
+                                                        .map((e) => ({
+                                                            label: new Date(e.startedAt).toLocaleDateString(),
+                                                            value: e.evacuated || 0,
+                                                        }))}
+                                                />
+                                            </Card>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+
                             <ul
                                 data-reveal-group
                                 className="grid list-none grid-cols-1 gap-5 pt-6 sm:grid-cols-2 lg:grid-cols-3"
@@ -203,18 +275,50 @@ export default function AnalyticsPage(){
                                                         className="text-ink-subtle transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-brand-text"
                                                     />
                                                 </div>
-                                                <h3 className="text-lg font-semibold text-ink group-hover:text-brand-text">
-                                                    {t("buildings.emergency")}
-                                                </h3>
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <h3 className="text-lg font-semibold text-ink group-hover:text-brand-text">
+                                                        {t("buildings.emergency")}
+                                                    </h3>
+                                                    <Badge tone={e.isFinished ? "success" : "danger"}>
+                                                        {e.isFinished ? (
+                                                            <CheckCircleIcon size={13} />
+                                                        ) : (
+                                                            <AlertTriangleIcon size={13} />
+                                                        )}
+                                                        {e.isFinished
+                                                            ? t("buildings.statusResolved")
+                                                            : t("buildings.statusActive")}
+                                                    </Badge>
+                                                </div>
                                                 <div className="flex flex-col gap-1 text-sm text-ink-muted">
                                                     <span className="flex items-center gap-2">
                                                         <ClockIcon size={15} className="text-ink-subtle" />
-                                                        {new Date(e.startedAt).toLocaleDateString()}
+                                                        {new Date(e.startedAt).toLocaleString()}
                                                     </span>
-                                                    <span className="pl-[23px]">
-                                                        {new Date(e.startedAt).toLocaleTimeString()}
-                                                    </span>
+                                                    {durationLabel(e) && (
+                                                        <span className="pl-[23px] text-xs text-ink-subtle">
+                                                            {durationLabel(e)}
+                                                        </span>
+                                                    )}
                                                 </div>
+                                                {/* The numbers that matter, on the card — opening
+                                                    each event to compare them was the old flow. */}
+                                                <dl className="mt-auto grid grid-cols-3 gap-2 border-t border-line pt-3 text-center">
+                                                    {[
+                                                        [t("buildings.statScans"), e.scanned || 0],
+                                                        [t("buildings.statEvacuated"), e.evacuated || 0],
+                                                        [t("buildings.statCalled"), e.calledEmergency || 0],
+                                                    ].map(([label, value]) => (
+                                                        <div key={String(label)}>
+                                                            <dt className="text-[11px] uppercase tracking-wide text-ink-subtle">
+                                                                {label}
+                                                            </dt>
+                                                            <dd className="text-lg font-bold text-ink">
+                                                                {value}
+                                                            </dd>
+                                                        </div>
+                                                    ))}
+                                                </dl>
                                             </Link>
                                         </Card>
                                     </li>
@@ -226,4 +330,26 @@ export default function AnalyticsPage(){
             </div>
         )
     }
+}
+
+/** "12 min" / "1.5 h" for a finished event; null while it is still open. */
+function durationLabel(e: EMERGENCY_SCHEMA): string | null {
+    if (!e.endedAt) return null;
+    const ms = new Date(e.endedAt).getTime() - new Date(e.startedAt).getTime();
+    if (!Number.isFinite(ms) || ms <= 0) return null;
+    const minutes = Math.round(ms / 60000);
+    if (minutes < 60) return `${minutes} min`;
+    return `${Math.round((minutes / 60) * 10) / 10} h`;
+}
+
+function avgDurationLabel(events: EMERGENCY_SCHEMA[]): string {
+    const done = events.filter((e) => e.endedAt);
+    if (done.length === 0) return "—";
+    const total = done.reduce(
+        (sum, e) => sum + (new Date(e.endedAt).getTime() - new Date(e.startedAt).getTime()),
+        0,
+    );
+    const minutes = Math.round(total / done.length / 60000);
+    if (minutes < 60) return `${minutes} min`;
+    return `${Math.round((minutes / 60) * 10) / 10} h`;
 }

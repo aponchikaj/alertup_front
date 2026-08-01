@@ -44,6 +44,31 @@ export async function searchPois(
   return res.data?.pois ?? [];
 }
 
+/** One row of the building directory: a POI, a named drawn room, or a
+ *  labeled node. */
+export interface DirectoryEntry {
+  kind: 'poi' | 'node' | 'shape';
+  poiId: string | null;
+  nodeId: string;
+  name: string;
+  category: string | null;
+  nodeType: string;
+  floorId: string | null;
+  floorNumber: number | null;
+  floorName: string | null;
+}
+
+/**
+ * The building's full directory — every destination a visitor can name.
+ * Fetched once per scan and filtered client-side, so search feels instant.
+ */
+export async function fetchDirectory(buildingId: string): Promise<DirectoryEntry[]> {
+  const res = await get<Envelope<{ entries?: DirectoryEntry[] }>>(
+    `/api/wayfinding/buildings/${encodeURIComponent(buildingId)}/directory`,
+  );
+  return Array.isArray(res.data?.entries) ? res.data.entries : [];
+}
+
 export interface RouteRequest {
   fromNodeId: string;
   /** A node id, or a POI id which the server resolves to its node. */

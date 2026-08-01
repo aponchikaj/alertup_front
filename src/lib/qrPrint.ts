@@ -26,7 +26,9 @@ export type PrintLayout = 'card' | 'poster' | 'sheet';
 
 export interface QrPrintDetails {
   /** Sanitized <svg> markup of the code itself, with no baked-in text. */
-  svgContent: string;
+  svgContent?: string | null;
+  /** Raster fallback when only a stored PNG exists (legacy floor QRs). */
+  imageUrl?: string | null;
   /** The URL encoded in the code, printed as a fallback line. */
   scanUrl: string;
   buildingName: string;
@@ -236,7 +238,11 @@ export const buildPrintDocument = (
   details: QrPrintDetails,
   { layout, copies, strings }: PrintOptions,
 ): string => {
-  const qr = sanitizeSvg(details.svgContent);
+  const qr = details.svgContent
+    ? sanitizeSvg(details.svgContent)
+    : details.imageUrl
+      ? `<img src="${escapeHtml(details.imageUrl)}" alt="" />`
+      : '';
 
   let body: string;
   if (layout === 'poster') {

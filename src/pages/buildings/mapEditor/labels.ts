@@ -14,6 +14,7 @@ export const SHAPE_KIND_KEYS: Record<DrawingShape['kind'], string> = {
   shop: 'mapEditor.shapeShop',
   icon: 'mapEditor.shapeIcon',
   text: 'mapEditor.shapeText',
+  outline: 'mapEditor.modeFloor',
 };
 
 export const ICON_KIND_KEYS: Record<IconKind, string> = {

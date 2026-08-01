@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { memo, Fragment } from 'react';
 import {
   DRAWING_DEFAULTS,
   DRAWING_ICON_COLORS,
@@ -35,11 +35,18 @@ export interface DrawingLayerProps {
     shape: DrawingShape,
     e: React.PointerEvent<SVGGElement>,
   ) => void;
-  /** Editor only: press on a corner handle of the selected box. */
+  /** Editor only: press on a corner handle of the selected box or icon. */
   onResizePointerDown?: (
     shape: DrawingShape,
     handle: ResizeHandle,
     e: React.PointerEvent<SVGRectElement>,
+  ) => void;
+  /** Editor only: press on a vertex handle of the selected wall — dragging
+   *  it reshapes the run instead of moving the whole line. */
+  onWallVertexPointerDown?: (
+    shape: DrawingShape,
+    vertexIndex: number,
+    e: React.PointerEvent<SVGCircleElement>,
   ) => void;
   /** Current camera scale, so labels and outlines stay legible when zoomed. */
   scale?: number;
@@ -299,6 +306,37 @@ const ShapeView = ({ shape, scale }: { shape: DrawingShape; scale: number }) => 
         </text>
       );
 
+    case 'outline': {
+      // The floor's footprint. Inverted fill: the INSIDE stays untouched so
+      // the gridded canvas shows through (that grid is the drawing surface,
+      // not decoration), while everything OUTSIDE the polygon is masked to
+      // the page background — an even-odd path of a huge rect minus the
+      // footprint. Never interactive here; reshaping is Floor-size mode's
+      // job.
+      let d = 'M -100000 -100000 H 200000 V 200000 H -100000 Z M';
+      for (let i = 0; i + 1 < shape.points.length; i += 2) {
+        d += ` ${shape.points[i]} ${shape.points[i + 1]}`;
+      }
+      d += ' Z';
+      const pts: string[] = [];
+      for (let i = 0; i + 1 < shape.points.length; i += 2) {
+        pts.push(`${shape.points[i]},${shape.points[i + 1]}`);
+      }
+      return (
+        <>
+          <path d={d} fillRule="evenodd" fill="var(--canvas)" fillOpacity={0.92} />
+          <polygon
+            points={pts.join(' ')}
+            fill="none"
+            stroke="var(--ink)"
+            strokeOpacity={0.7}
+            strokeWidth={2.5}
+            strokeLinejoin="round"
+          />
+        </>
+      );
+    }
+
     default: {
       // Exhaustiveness guard: a new shape kind must be handled above, not
       // silently dropped at runtime.
@@ -308,12 +346,13 @@ const ShapeView = ({ shape, scale }: { shape: DrawingShape; scale: number }) => 
   }
 };
 
-export const DrawingLayer = ({
+const DrawingLayerImpl = ({
   drawing,
   selectedShapeId = null,
   onShapeClick,
   onShapePointerDown,
   onResizePointerDown,
+  onWallVertexPointerDown,
   scale = 1,
   shapeCursor = 'pointer',
 }: DrawingLayerProps) => {
@@ -328,7 +367,16 @@ export const DrawingLayer = ({
       // aimed at a node underneath.
       style={interactive ? undefined : { pointerEvents: 'none' }}
     >
-      {drawing.shapes.map((shape) => {
+      {/* The footprint underlays every shape regardless of array order, and
+          takes no pointer events — it is the paper. */}
+      {drawing.shapes
+        .filter((shape) => shape.kind === 'outline')
+        .map((shape) => (
+          <g key={shape.id} style={{ pointerEvents: 'none' }}>
+            <ShapeView shape={shape} scale={scale} />
+          </g>
+        ))}
+      {drawing.shapes.filter((shape) => shape.kind !== 'outline').map((shape) => {
         const selected = shape.id === selectedShapeId;
         return (
           <Fragment key={shape.id}>
@@ -347,6 +395,7 @@ export const DrawingLayer = ({
                 shape={shape}
                 scale={scale}
                 onResizePointerDown={onResizePointerDown}
+                onWallVertexPointerDown={onWallVertexPointerDown}
               />
             )}
           </Fragment>
@@ -370,17 +419,21 @@ const SelectionOutline = ({
   shape,
   scale,
   onResizePointerDown,
+  onWallVertexPointerDown,
 }: {
   shape: DrawingShape;
   scale: number;
   onResizePointerDown?: DrawingLayerProps['onResizePointerDown'];
+  onWallVertexPointerDown?: DrawingLayerProps['onWallVertexPointerDown'];
 }) => {
   const bounds = shapeBounds(shape);
   const k = counterScale(scale);
   const pad = 4 * k;
-  // Only boxes resize. A wall is reshaped by its points and an icon by its
-  // size field, so handles on those would promise something they cannot do.
-  const resizable = isBoxShape(shape) && Boolean(onResizePointerDown);
+  // Boxes resize from all four corners; icons scale from their south-east
+  // corner (one size, not a free rectangle); walls reshape vertex by vertex.
+  const resizable =
+    (isBoxShape(shape) || shape.kind === 'icon') && Boolean(onResizePointerDown);
+  const handles: ResizeHandle[] = isBoxShape(shape) ? [...RESIZE_HANDLES] : ['se'];
   const handleSize = 9 * k;
 
   const corners: Record<ResizeHandle, { x: number; y: number }> = {
@@ -404,8 +457,24 @@ const SelectionOutline = ({
         rx={4}
         style={{ pointerEvents: 'none' }}
       />
+      {shape.kind === 'wall' &&
+        onWallVertexPointerDown &&
+        Array.from({ length: Math.floor(shape.points.length / 2) }, (_, index) => (
+          <circle
+            key={`v${index}`}
+            data-wall-vertex={index}
+            cx={shape.points[index * 2]}
+            cy={shape.points[index * 2 + 1]}
+            r={5.5 * k}
+            fill="var(--surface)"
+            stroke={DRAWING_DEFAULTS.selectionColor}
+            strokeWidth={2 * k}
+            style={{ cursor: 'move' }}
+            onPointerDown={(e) => onWallVertexPointerDown(shape, index, e)}
+          />
+        ))}
       {resizable &&
-        RESIZE_HANDLES.map((handle) => (
+        handles.map((handle) => (
           <rect
             key={handle}
             data-resize-handle={handle}
@@ -424,5 +493,8 @@ const SelectionOutline = ({
     </g>
   );
 };
+
+/** Memoized: drag frames update one layer's props; the others must not pay. */
+export const DrawingLayer = memo(DrawingLayerImpl);
 
 export default DrawingLayer;

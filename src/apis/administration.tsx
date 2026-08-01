@@ -21,9 +21,12 @@ export const CLEARBUILDINGLOGS = async (buildingId: string) => {
     }
 }
 
-export const EMERGENCY_MODE_FUNCTION = async (buildingID: string) => {
+export const EMERGENCY_MODE_FUNCTION = async (
+    buildingID: string,
+    challenge?: { token: string; answer: number },
+) => {
     try {
-        const res = await post<ApiResponse>(APIS.administration.emergencyMode, { buildingID });
+        const res = await post<ApiResponse>(APIS.administration.emergencyMode, { buildingID, challenge });
         if (!res) return { Success: false, Message: "Something went wrong." };
         return res;
     } catch (err) {

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { CURRENT_LOCATION_COLOR } from '../mapTheme';
 import type { MapPoint } from '../mapSpace';
 
@@ -18,7 +19,7 @@ export interface UserDotLayerProps {
   animated?: boolean;
 }
 
-export const UserDotLayer = ({
+const UserDotLayerImpl = ({
   position,
   label,
   animated = true,
@@ -66,5 +67,8 @@ export const UserDotLayer = ({
     </g>
   );
 };
+
+/** Memoized: drag frames update one layer's props; the others must not pay. */
+export const UserDotLayer = memo(UserDotLayerImpl);
 
 export default UserDotLayer;

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { NODE_GLYPH_PATHS, NODE_THEME } from '../mapTheme';
 import type { MapNode } from '../types';
@@ -30,7 +31,7 @@ export interface NodeLayerProps {
 const HIT_RADIUS = 16;
 const GLYPH_SCALE = 0.42;
 
-export const NodeLayer = ({
+const NodeLayerImpl = ({
   nodes,
   selectedId = null,
   hoveredId = null,
@@ -137,5 +138,8 @@ export const NodeLayer = ({
     </g>
   );
 };
+
+/** Memoized: drag frames update one layer's props; the others must not pay. */
+export const NodeLayer = memo(NodeLayerImpl);
 
 export default NodeLayer;

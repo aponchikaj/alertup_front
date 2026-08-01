@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { ROUTE_TONES, type RouteTone } from '../mapTheme';
 import type { RouteSegment } from '../types';
 
@@ -24,7 +24,7 @@ export interface RouteLayerProps {
   animated?: boolean;
 }
 
-export const RouteLayer = ({
+const RouteLayerImpl = ({
   segment,
   tone = 'brand',
   strokeWidth = 5,
@@ -95,5 +95,8 @@ export const RouteLayer = ({
     </g>
   );
 };
+
+/** Memoized: drag frames update one layer's props; the others must not pay. */
+export const RouteLayer = memo(RouteLayerImpl);
 
 export default RouteLayer;

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { TRANSIT_GLYPH_PATHS } from '../mapTheme';
 import type { MapEdge, MapNode, TransitType } from '../types';
 
@@ -32,7 +33,7 @@ const isTransit = (t: TransitType): t is Exclude<TransitType, 'WALKWAY'> =>
 /** Glyph render scale: 24-grid paths drawn at ~11px on the map. */
 const GLYPH_SCALE = 0.45;
 
-export const EdgeLayer = ({
+const EdgeLayerImpl = ({
   edges,
   nodesById,
   showAccessibility = true,
@@ -114,5 +115,8 @@ export const EdgeLayer = ({
     })}
   </g>
 );
+
+/** Memoized: drag frames update one layer's props; the others must not pay. */
+export const EdgeLayer = memo(EdgeLayerImpl);
 
 export default EdgeLayer;
