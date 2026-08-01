@@ -6,7 +6,16 @@
  * here lets the test config swap this single module for a plain stub, instead
  * of forcing the whole suite into ESM mode where `jest.mock()` does not work.
  */
+const PROD_API = 'https://alertup-backend.onrender.com';
+const STAGE_API = 'https://alertup-backend-stage.onrender.com';
+
+// stage.alertup.world and pre-prod.alertup.world talk to the stage backend
+// (which uses the stage database), so testing there never touches prod data.
+const STAGE_HOSTS = new Set(['stage.alertup.world', 'pre-prod.alertup.world']);
+
 export const getApiBaseUrl = (): string => {
   const configured = import.meta.env?.VITE_API_URL as string | undefined;
-  return (configured || 'https://alertup-backend.onrender.com').replace(/\/+$/, '');
+  if (configured) return configured.replace(/\/+$/, '');
+  const host = typeof window !== 'undefined' ? window.location.hostname : '';
+  return STAGE_HOSTS.has(host) ? STAGE_API : PROD_API;
 };
