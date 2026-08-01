@@ -4,8 +4,10 @@ import { API_URL } from "./http";
 // backend URL is configured in one place instead of being hardcoded here and
 // separately re-derived in half a dozen other modules.
 //
-// Local dev:  VITE_API_URL=http://localhost:3001
-// Production: VITE_API_URL=https://alertup-backend.onrender.com
+// Local dev:            VITE_API_URL=http://localhost:3001 (from .env, not committed)
+// stage / pre-prod:     https://alertup-backend-stage.onrender.com (stage database)
+// Production (default): https://alertup-backend.onrender.com (production database)
+// When VITE_API_URL is unset the origin is picked by hostname — see env.ts.
 export const MAIN_API_URL: string = `${API_URL}/`;
 
 export const APIS = {

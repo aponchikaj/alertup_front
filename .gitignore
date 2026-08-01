@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Env files (secrets / machine-specific — never commit; Vercel env vars are the source of truth in deploys)
+.env
+.env.local
+.env.*.local
