@@ -20,4 +20,24 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // The map3d "pure" modules are unit-tested in jsdom, which has no WebGL —
+    // they must stay three-free. Type-only imports are still allowed.
+    files: [
+      'src/components/map3d/sceneBuilder.ts',
+      'src/components/map3d/geometry3d.ts',
+      'src/components/map3d/theme3d.ts',
+      'src/components/map3d/picking.ts',
+      'src/components/map3d/routeScene.ts',
+    ],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: [{ name: 'three', message: 'Pure map3d modules must not import three (jsdom tests).', allowTypeImports: true }],
+          patterns: [{ group: ['three/*'], message: 'Pure map3d modules must not import three (jsdom tests).', allowTypeImports: true }],
+        },
+      ],
+    },
+  },
 ])

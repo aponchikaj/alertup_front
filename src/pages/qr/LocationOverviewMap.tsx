@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import {
   DrawingLayer,
   isBoxShape,
@@ -69,6 +69,20 @@ export interface LocationOverviewMapProps {
   onRouteTo: (target: { nodeId: string; name: string }) => void;
 }
 
+/** Phase A dev switch: `?map3d=1` renders the 3D surface instead of SVG.
+ *  Becomes a real user-facing toggle in Phase B; the lazy import keeps the
+ *  three.js chunk out of everyone else's bundle either way. */
+const Map3DLazy = lazy(() => import('../../components/map3d'));
+
+const map3dRequested = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  try {
+    return new URLSearchParams(window.location.search).get('map3d') === '1';
+  } catch {
+    return false;
+  }
+};
+
 export const LocationOverviewMap = ({
   floor,
   drawing,
@@ -79,6 +93,7 @@ export const LocationOverviewMap = ({
 }: LocationOverviewMapProps) => {
   const { t } = useI18n();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [want3d, setWant3d] = useState(map3dRequested);
 
   const space = useMemo(
     () => ({
@@ -168,6 +183,37 @@ export const LocationOverviewMap = ({
 
   return (
     <div className="relative">
+      {want3d && floor ? (
+        <div className="h-[55dvh] min-h-72 sm:h-[52vh]">
+          {/* 2D stays mounted underneath the Suspense fallback conceptually:
+              if WebGL refuses or the chunk fails, we flip back to SVG — a
+              blank map is impossible. */}
+          <Suspense fallback={<div className="h-full w-full animate-pulse rounded-xl border border-line bg-surface-2" />}>
+            <Map3DLazy
+              floor={{
+                id: floor.id,
+                floorNumber: floor.floorNumber,
+                width: floor.width,
+                height: floor.height,
+                scalePixelsPerMeter: floor.scalePixelsPerMeter,
+              }}
+              drawing={drawing}
+              nodes={mapNodes}
+              edges={edges}
+              routeSegment={evacSegment}
+              routeTone="danger"
+              userDot={current ? { x: current.x, y: current.y } : null}
+              selectedNodeId={selectedId}
+              onNodeClick={(node) =>
+                setSelectedId((id) => (id === node.id ? null : node.id))
+              }
+              onMapTap={() => setSelectedId(null)}
+              onUnavailable={() => setWant3d(false)}
+              ariaLabel={t('route.exitMapTitle')}
+            />
+          </Suspense>
+        </div>
+      ) : (
       <MapCanvas
         space={space}
         camera={camera}
@@ -201,9 +247,12 @@ export const LocationOverviewMap = ({
           label={t('wayfinding.yourLocation')}
         />
       </MapCanvas>
+      )}
 
       {/* Zoom cluster. Overlaid, not in a toolbar row: on a phone at arm's
-          length the map needs every vertical pixel the card can give it. */}
+          length the map needs every vertical pixel the card can give it.
+          Hidden in 3D — pinch and wheel drive the orbit camera there. */}
+      {!want3d && (
       <div className="absolute right-3 top-3 flex flex-col gap-1.5">
         <Button
           variant="secondary"
@@ -224,6 +273,7 @@ export const LocationOverviewMap = ({
           −
         </Button>
       </div>
+      )}
 
       {/* Marker callout — the map as destination picker. */}
       {selected && (
