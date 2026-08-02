@@ -2868,6 +2868,7 @@ export const MapEditorPage = () => {
         buildingId={buildingId}
         floorId={editor.activeFloorId}
         space={space}
+        drawing={activeDrawing}
         onRunAction={(action) => {
           if (action === 'auto-connect') {
             setNodesMode(true);

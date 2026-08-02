@@ -1,6 +1,7 @@
 import { useEffect, useState, type ComponentType, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import Scanner from "../components/scanner";
+import ProductAiWidget from "../components/ai/ProductAiWidget";
 import Sponsors from "../components/sponsors";
 import Reviews from "../components/reviews";
 import { ContactAPI } from "../apis/contact";
@@ -186,6 +187,9 @@ const Home = () => {
       {/* The FAQ and HowTo nodes are only valid because both are rendered
           as visible content further down this page. */}
       <Seo jsonLd={[faqJsonLd(), howToJsonLd()]} />
+
+      {/* Visitors can talk to the product before signing up. */}
+      <ProductAiWidget />
 
       {/* ================= HERO =================
           Follows the theme. Light rays are emitted light — they only read as
