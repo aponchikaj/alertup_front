@@ -2,6 +2,7 @@ import { useEffect, useState, type ComponentType, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import Scanner from "../components/scanner";
 import ProductAiWidget from "../components/ai/ProductAiWidget";
+import AiDemo from "../components/aiDemo";
 import Sponsors from "../components/sponsors";
 import Reviews from "../components/reviews";
 import { ContactAPI } from "../apis/contact";
@@ -485,6 +486,10 @@ const Home = () => {
           </ol>
         </Container>
       </Section>
+
+      {/* ================= AI DESIGNER DEMO ================= */}
+      {/* The real floor designer, playable without an account. */}
+      <AiDemo />
 
       {/* ================= PRICING TEASER ================= */}
       {/* Deliberately thin — /pricing does the selling. */}

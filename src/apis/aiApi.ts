@@ -7,7 +7,26 @@
 //   POST /api/ai/chat — the in-building Wayfinder concierge (scan pages)
 //   POST /api/ai/ask  — the public product assistant (home/pricing/help)
 
-import { API_BASE_URL } from "./http";
+import { API_BASE_URL, post } from "./http";
+import type { FloorDrawing } from "../components/map";
+
+/** One-shot design demo on the home page: prompt in, validated drawing out. */
+export interface DemoDesignResult {
+  reply: string;
+  drawing: FloorDrawing | null;
+  canvas?: { width: number; height: number };
+}
+
+export const demoDesign = async (
+  prompt: string,
+  locale: "en" | "ka",
+): Promise<DemoDesignResult> => {
+  const res = await post<{ success: boolean; data: DemoDesignResult }>(
+    "/api/ai/demo-design",
+    { prompt, locale },
+  );
+  return res.data;
+};
 
 export interface AiChatMessage {
   role: "user" | "assistant";

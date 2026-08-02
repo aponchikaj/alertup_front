@@ -493,7 +493,23 @@ export const en = {
     chipPricing: "What do the plans include?",
     unavailableTitle: "The assistant is unavailable",
     unavailableBody: "Try again in a moment, or see the Help page for how AlertUp works.",
+    retry: "Try again",
     disclaimer: "AI answers can be imperfect — the Help and Pricing pages have the exact details.",
+
+    // Home-page map creator simulator
+    demoEyebrow: "Try it live",
+    demoTitle: "Watch AI design a floor plan",
+    demoLead: "Describe any floor and the same AI that powers our map editor designs it in seconds — rooms, exits and all.",
+    demoPlaceholder: "e.g. a clinic with 4 exam rooms, a lab and a waiting area",
+    demoGenerate: "Design it",
+    demoGenerating: "Designing…",
+    demoChip1: "A mall floor with 6 shops and a food court",
+    demoChip2: "An office floor with 5 offices and a meeting room",
+    demoChip3: "A school floor with 4 classrooms and a library",
+    demoEmpty: "Your floor plan will appear here — describe it above and hit Design.",
+    demoFailed: "That one didn't come out usable — try a simpler description.",
+    demoCtaLead: "Like it? Design your real building the same way — free to start.",
+    demoCta: "Create your building",
   },
 
   emergency: {

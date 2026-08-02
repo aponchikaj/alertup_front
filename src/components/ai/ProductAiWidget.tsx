@@ -35,7 +35,7 @@ export const ProductAiWidget = ({ className }: { className?: string }) => {
     () => ({ buildingId: null, locale: lang, product: true }),
     [lang],
   );
-  const { messages, streaming, unavailable, send, stop } = useAiChat(context);
+  const { messages, streaming, unavailable, send, stop, reset } = useAiChat(context);
 
   // Follow the stream as it grows.
   useEffect(() => {
@@ -118,6 +118,11 @@ export const ProductAiWidget = ({ className }: { className?: string }) => {
             {unavailable ? (
               <Alert tone="warning" title={t("homeAi.unavailableTitle")}>
                 <p>{t("homeAi.unavailableBody")}</p>
+                {/* One transient failure must not kill the widget until a page
+                    reload — reset clears the dead state and re-arms the chat. */}
+                <Button variant="secondary" size="sm" className="mt-3" onClick={reset}>
+                  {t("homeAi.retry")}
+                </Button>
               </Alert>
             ) : null}
           </div>
