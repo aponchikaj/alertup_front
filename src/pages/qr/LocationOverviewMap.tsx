@@ -20,6 +20,13 @@ import {
 import { Button } from '../../components/ui/button';
 import { CloseIcon, RouteIcon } from '../../components/ui/icons';
 import { useI18n } from '../../i18n/LanguageProvider';
+import { MapViewToggle } from '../../components/map/MapViewToggle';
+import {
+  readMapViewPreference,
+  writeMapViewPreference,
+  type MapViewMode,
+} from '../../components/map/viewPreference';
+import { useMap3dSupport } from '../../components/map3d/useMap3dSupport';
 
 /* ============================================================================
    LocationOverviewMap — "you are here", before any destination is chosen.
@@ -69,12 +76,11 @@ export interface LocationOverviewMapProps {
   onRouteTo: (target: { nodeId: string; name: string }) => void;
 }
 
-/** Phase A dev switch: `?map3d=1` renders the 3D surface instead of SVG.
- *  Becomes a real user-facing toggle in Phase B; the lazy import keeps the
- *  three.js chunk out of everyone else's bundle either way. */
+/** The 3D surface — three.js stays in its lazy chunk. */
 const Map3DLazy = lazy(() => import('../../components/map3d'));
 
-const map3dRequested = (): boolean => {
+/** Dev override (`?map3d=1`) forces 3D on for quick phone testing. */
+const map3dForced = (): boolean => {
   if (typeof window === 'undefined') return false;
   try {
     return new URLSearchParams(window.location.search).get('map3d') === '1';
@@ -93,7 +99,16 @@ export const LocationOverviewMap = ({
 }: LocationOverviewMapProps) => {
   const { t } = useI18n();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [want3d, setWant3d] = useState(map3dRequested);
+  const supports3d = useMap3dSupport();
+  const [viewMode, setViewMode] = useState<MapViewMode>(() =>
+    map3dForced() ? '3d' : readMapViewPreference(),
+  );
+  const want3d = supports3d && viewMode === '3d';
+
+  const changeView = (mode: MapViewMode) => {
+    setViewMode(mode);
+    writeMapViewPreference(mode);
+  };
 
   const space = useMemo(
     () => ({
@@ -208,7 +223,7 @@ export const LocationOverviewMap = ({
                 setSelectedId((id) => (id === node.id ? null : node.id))
               }
               onMapTap={() => setSelectedId(null)}
-              onUnavailable={() => setWant3d(false)}
+              onUnavailable={() => changeView('2d')}
               ariaLabel={t('route.exitMapTitle')}
             />
           </Suspense>
@@ -247,6 +262,18 @@ export const LocationOverviewMap = ({
           label={t('wayfinding.yourLocation')}
         />
       </MapCanvas>
+      )}
+
+      {/* 2D/3D pill. Top-left so it never collides with the zoom cluster,
+          and outside the mode branch so it stays put when the view flips.
+          Only rendered once WebGL probed true — an option that cannot work
+          is not an option. */}
+      {supports3d && (
+        <MapViewToggle
+          mode={viewMode}
+          onChange={changeView}
+          className="absolute left-3 top-3 z-10"
+        />
       )}
 
       {/* Zoom cluster. Overlaid, not in a toolbar row: on a phone at arm's

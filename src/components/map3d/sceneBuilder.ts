@@ -152,14 +152,31 @@ export interface FloorSpec {
   labels: LabelSpec[];
   nodes: NodeSpec[];
   edges: EdgeSpec[];
-  route: RouteSpec | null;
+  routes: RouteSpec[];
   userDot: UserDotSpec | null;
   grid: GridSpec | null;
+}
+
+/** A vertical transit connector between two stacked floors. */
+export interface ConnectorSpec {
+  key: string;
+  fromX: number;
+  fromY: number;
+  fromElevation: number;
+  toX: number;
+  toY: number;
+  toElevation: number;
+  direction: 'up' | 'down' | 'same';
+  colorToken: string;
+  /** The connector for the current transit step pulses/brightens. */
+  active: boolean;
 }
 
 /** The whole 3D scene: one or more floors (stacked by elevation). */
 export interface SceneSpec {
   floors: FloorSpec[];
+  /** Vertical transit connectors between stacked floors (route views). */
+  connectors?: ConnectorSpec[];
 }
 
 /* -------------------------------- builder --------------------------------- */
@@ -322,14 +339,16 @@ export function buildFloorSpec(input: BuildFloorSpecInput): FloorSpec {
     });
   }
 
-  const route: RouteSpec | null =
+  const routes: RouteSpec[] =
     routeSegment && routeSegment.nodes.length >= 2
-      ? {
-          points: routeSegment.nodes.map((n) => ({ x: n.x, y: n.y })),
-          colorToken: ROUTE_TONES[routeTone],
-          animated: routeAnimated,
-        }
-      : null;
+      ? [
+          {
+            points: routeSegment.nodes.map((n) => ({ x: n.x, y: n.y })),
+            colorToken: ROUTE_TONES[routeTone],
+            animated: routeAnimated,
+          },
+        ]
+      : [];
 
   return {
     floorId,
@@ -349,7 +368,7 @@ export function buildFloorSpec(input: BuildFloorSpecInput): FloorSpec {
     labels,
     nodes: nodeSpecs,
     edges: edgeSpecs,
-    route,
+    routes,
     userDot: userDot ? { ...userDot, colorToken: CURRENT_LOCATION_COLOR } : null,
     grid: showGrid
       ? {

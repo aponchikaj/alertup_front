@@ -165,6 +165,50 @@ export class MapScene {
     this.needsRender = true;
   }
 
+  private tween: {
+    fromTarget: THREE.Vector3;
+    toTarget: THREE.Vector3;
+    start: number;
+    duration: number;
+  } | null = null;
+
+  /**
+   * Glide the orbit target (camera follows, keeping its offset) to a world
+   * point — how the route view chases the active step. Under reduced motion
+   * the move is an instant cut.
+   */
+  flyTo(point: { x: number; y: number; z: number }, duration = 700): void {
+    const to = new THREE.Vector3(point.x, point.y, point.z);
+    if (!this.animationsEnabled || duration <= 0) {
+      const offset = this.rig.camera.position.clone().sub(this.rig.controls.target);
+      this.rig.controls.target.copy(to);
+      this.rig.camera.position.copy(to).add(offset);
+      this.rig.controls.update();
+      this.invalidate();
+      return;
+    }
+    this.tween = {
+      fromTarget: this.rig.controls.target.clone(),
+      toTarget: to,
+      start: performance.now(),
+      duration,
+    };
+    this.invalidate();
+  }
+
+  private advanceTween(): boolean {
+    if (!this.tween) return false;
+    const { fromTarget, toTarget, start, duration } = this.tween;
+    const raw = Math.min((performance.now() - start) / duration, 1);
+    const eased = raw < 0.5 ? 4 * raw ** 3 : 1 - (-2 * raw + 2) ** 3 / 2;
+    const offset = this.rig.camera.position.clone().sub(this.rig.controls.target);
+    this.rig.controls.target.copy(fromTarget.clone().lerp(toTarget, eased));
+    this.rig.camera.position.copy(this.rig.controls.target).add(offset);
+    this.rig.controls.update();
+    if (raw >= 1) this.tween = null;
+    return true;
+  }
+
   private setClearColor(): void {
     // Transparent canvas — the container's themed background shows through,
     // matching the 2D map's surface styling for free.
@@ -188,11 +232,12 @@ export class MapScene {
 
   private loop = () => {
     if (this.disposed || !this.renderer) return;
+    const tweening = this.advanceTween();
     const damping = this.rig.update();
     if (this.hasAnimations) {
       this.built?.tick((performance.now() - this.startTime) / 1000);
     }
-    if (this.needsRender || damping || this.hasAnimations) {
+    if (this.needsRender || damping || this.hasAnimations || tweening) {
       this.needsRender = false;
       this.renderer.render(this.scene, this.rig.camera);
     }

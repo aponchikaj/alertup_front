@@ -108,14 +108,14 @@ describe('buildFloorSpec', () => {
       distanceMeters: null,
     };
     const spec = buildFloorSpec({ ...baseInput, routeSegment: segment, routeTone: 'danger' });
-    expect(spec.route?.points).toHaveLength(2);
-    expect(spec.route?.colorToken).toBe('var(--danger)');
+    expect(spec.routes[0]?.points).toHaveLength(2);
+    expect(spec.routes[0]?.colorToken).toBe('var(--danger)');
 
     const empty = buildFloorSpec({
       ...baseInput,
       routeSegment: { ...segment, nodes: segment.nodes.slice(0, 1) },
     });
-    expect(empty.route).toBeNull();
+    expect(empty.routes).toHaveLength(0);
   });
 
   test('grid appears only when asked (editor mode)', () => {

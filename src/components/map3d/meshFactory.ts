@@ -322,9 +322,9 @@ function buildFloor(spec: FloorSpec, read: CssVarReader | undefined, res: Resour
     floor.add(hit);
   }
 
-  /* Route — elevated line; dashed layer marches when animated. */
-  if (spec.route) {
-    const points = spec.route.points.map((p) => new THREE.Vector3(p.x, ROUTE_LIFT, p.y));
+  /* Routes — elevated lines; dashed layers march when animated. */
+  for (const route of spec.routes) {
+    const points = route.points.map((p) => new THREE.Vector3(p.x, ROUTE_LIFT, p.y));
     const casing = new THREE.Line(
       res.geo(new THREE.BufferGeometry().setFromPoints(points)),
       res.mat(
@@ -338,7 +338,7 @@ function buildFloor(spec: FloorSpec, read: CssVarReader | undefined, res: Resour
     );
     floor.add(casing);
     const material = res.mat(
-      new THREE.LineDashedMaterial({ color: color(spec.route.colorToken), dashSize: 10, gapSize: 6 }),
+      new THREE.LineDashedMaterial({ color: color(route.colorToken), dashSize: 10, gapSize: 6 }),
     );
     const line = new THREE.Line(
       res.geo(new THREE.BufferGeometry().setFromPoints(points)),
@@ -349,7 +349,7 @@ function buildFloor(spec: FloorSpec, read: CssVarReader | undefined, res: Resour
     // End caps.
     const start = points[0];
     const end = points[points.length - 1];
-    const capMaterial = res.mat(new THREE.MeshBasicMaterial({ color: color(spec.route.colorToken) }));
+    const capMaterial = res.mat(new THREE.MeshBasicMaterial({ color: color(route.colorToken) }));
     const startCap = new THREE.Mesh(res.geo(new THREE.SphereGeometry(5, 12, 12)), capMaterial);
     startCap.position.copy(start);
     floor.add(startCap);
@@ -358,7 +358,7 @@ function buildFloor(spec: FloorSpec, read: CssVarReader | undefined, res: Resour
     floor.add(endCap);
     // March animation: LineDashedMaterial has no dashOffset — shifting the
     // computed line-distance attribute each tick gives the same crawl.
-    if (spec.route.animated) {
+    if (route.animated) {
       const attribute = line.geometry.getAttribute('lineDistance') as THREE.BufferAttribute;
       const base = Array.from(attribute.array as Float32Array);
       const cycle = 16; // dashSize + gapSize
@@ -424,6 +424,45 @@ export function buildScene(spec: SceneSpec, read?: CssVarReader): BuiltScene {
     animations.push(...(floor.userData.animations as Array<(elapsed: number) => void>));
     group.add(floor);
   }
+
+  /* Vertical transit connectors between stacked floors: a tube from the
+     departure node up/down to the arrival node, capped with a direction cone.
+     This is what turns "take the stairs to floor 3" from a sentence into
+     something the eye can follow. */
+  for (const connector of spec.connectors ?? []) {
+    const colorValue = resolveColor(connector.colorToken, read);
+    const from = new THREE.Vector3(connector.fromX, connector.fromElevation, connector.fromY);
+    const to = new THREE.Vector3(connector.toX, connector.toElevation, connector.toY);
+    const axis = to.clone().sub(from);
+    const length = axis.length();
+    if (length <= 0) continue;
+    const material = res.mat(
+      new THREE.MeshLambertMaterial({
+        color: colorValue,
+        transparent: true,
+        opacity: connector.active ? 0.85 : 0.35,
+      }),
+    );
+    const tube = new THREE.Mesh(res.geo(new THREE.CylinderGeometry(9, 9, length, 14)), material);
+    tube.position.copy(from).add(to).multiplyScalar(0.5);
+    tube.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis.clone().normalize());
+    group.add(tube);
+
+    if (connector.direction !== 'same') {
+      const cone = new THREE.Mesh(res.geo(new THREE.ConeGeometry(15, 26, 16)), material);
+      const tip = connector.direction === 'up' ? to : from;
+      cone.position.copy(tip);
+      if (connector.direction === 'down') cone.rotation.x = Math.PI;
+      group.add(cone);
+    }
+
+    if (connector.active) {
+      animations.push((elapsed) => {
+        material.opacity = 0.6 + 0.25 * Math.sin(elapsed * 4);
+      });
+    }
+  }
+
   return {
     group,
     dispose: () => res.dispose(),

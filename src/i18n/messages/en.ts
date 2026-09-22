@@ -623,6 +623,13 @@ export const en = {
     printNeedsSvg: "The QR code is still loading.",
   },
 
+  // Shared 2D/3D map chrome — used on every surface that renders a floor.
+  map: {
+    viewToggle: "Map view",
+    view2d: "2D",
+    view3d: "3D",
+  },
+
   mapEditor: {
     title: "Map editor",
     floors: "Floors",

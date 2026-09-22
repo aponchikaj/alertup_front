@@ -624,6 +624,12 @@ export const ka: Messages = {
     printNeedsSvg: "QR კოდი ჯერ იტვირთება.",
   },
 
+  map: {
+    viewToggle: "რუკის ხედი",
+    view2d: "2D",
+    view3d: "3D",
+  },
+
   mapEditor: {
     title: "რუკის რედაქტორი",
     floors: "სართულები",

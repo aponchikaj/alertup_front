@@ -1,5 +1,5 @@
-/* eslint-disable react-hooks/set-state-in-effect */
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
+ 
 import { useEffect, useState } from "react"
 import { useParams } from "react-router-dom"
 import { GET_EMERGENCY_DATA } from "../../apis/administration"

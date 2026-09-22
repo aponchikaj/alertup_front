@@ -12,5 +12,7 @@
 
 export { Map3D, default } from './Map3D';
 export type { Map3DProps, Map3DFloorInput } from './Map3D';
+export { Map3DRoute } from './Map3DRoute';
+export type { Map3DRouteProps } from './Map3DRoute';
 export { buildFloorSpec } from './sceneBuilder';
 export type { SceneSpec, FloorSpec } from './sceneBuilder';
