@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
-import { Container } from "./ui/layout";
-import { Logo } from "./ui/logo";
-import Sponsors from "./sponsors";
-import { useI18n } from "../i18n/LanguageProvider";
+import { Container } from "../ui/layout";
+import { Logo } from "../ui/logo";
+import Sponsors from "../marketing/Sponsors";
+import { useI18n } from "../../i18n/LanguageProvider";
 
 const footerLinkClass =
   "inline-block py-1.5 text-sm text-ink-muted transition-colors hover:text-brand-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring rounded-sm";

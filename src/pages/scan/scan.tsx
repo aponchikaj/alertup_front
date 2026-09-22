@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import Scanner from "../../components/scanner";
+import Scanner from "../../components/qr/Scanner";
 import Seo from "../../seo/Seo";
 import { breadcrumbJsonLd } from "../../seo/structuredData";
 import { usePageAnimations } from "../../lib/animations";

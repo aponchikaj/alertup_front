@@ -15,14 +15,14 @@ import {
   stagger,
   type Scope,
 } from "animejs";
-import { useAuth } from "../auth/useAuth";
-import { logoutFromAccount } from "../apis/settings";
-import { cn } from "../lib/cn";
-import { reducedMotion } from "../lib/animations";
-import { Logo } from "./ui/logo";
-import { ThemeToggle } from "./ui/themeToggle";
-import { ButtonLink } from "./ui/button";
-import { buttonStyles } from "./ui/styles";
+import { useAuth } from "../../auth/useAuth";
+import { logoutFromAccount } from "../../apis/settings";
+import { cn } from "../../lib/cn";
+import { reducedMotion } from "../../lib/animations";
+import { Logo } from "../ui/logo";
+import { ThemeToggle } from "../ui/themeToggle";
+import { ButtonLink } from "../ui/button";
+import { buttonStyles } from "../ui/styles";
 import {
   BuildingIcon,
   ChartIcon,
@@ -32,8 +32,8 @@ import {
   PlusIcon,
   ScanIcon,
   SettingsIcon,
-} from "./ui/icons";
-import { useI18n } from "../i18n/LanguageProvider";
+} from "../ui/icons";
+import { useI18n } from "../../i18n/LanguageProvider";
 
 /* ============================================================================
    Navbar

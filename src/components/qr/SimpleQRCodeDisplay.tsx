@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { generateQRCode, downloadQRCodeAsFile, type QRCodeRequest } from '../apis/qrApi';
-import { buildScanUrl, type Node } from '../apis/nodesApi';
-import { sanitizeSvg } from '../lib/sanitizeSvg';
-import { cn } from '../lib/cn';
+import { generateQRCode, downloadQRCodeAsFile, type QRCodeRequest } from '../../apis/qrApi';
+import { buildScanUrl, type Node } from '../../apis/nodesApi';
+import { sanitizeSvg } from '../../lib/sanitizeSvg';
+import { cn } from '../../lib/cn';
 import {
   buildPrintDocument,
   clampCopies,
@@ -10,10 +10,10 @@ import {
   CARD_SIZE_MM,
   SHEET_CAPACITY,
   type PrintLayout,
-} from '../lib/qrPrint';
-import { Card } from './ui/card';
-import { Button } from './ui/button';
-import { Alert, Skeleton } from './ui/feedback';
+} from '../../lib/qrPrint';
+import { Card } from '../ui/card';
+import { Button } from '../ui/button';
+import { Alert, Skeleton } from '../ui/feedback';
 import {
   CheckIcon,
   CloseIcon,
@@ -22,8 +22,8 @@ import {
   LayersIcon,
   PrinterIcon,
   SmartphoneIcon,
-} from './ui/icons';
-import { useI18n } from '../i18n/LanguageProvider';
+} from '../ui/icons';
+import { useI18n } from '../../i18n/LanguageProvider';
 
 /* ============================================================================
    QR code dialog — preview, then print.

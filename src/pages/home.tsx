@@ -1,10 +1,10 @@
 import { useEffect, useState, type ComponentType, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import Scanner from "../components/scanner";
+import Scanner from "../components/qr/Scanner";
 import ProductAiWidget from "../components/ai/ProductAiWidget";
-import AiDemo from "../components/aiDemo";
-import Sponsors from "../components/sponsors";
-import Reviews from "../components/reviews";
+import AiDemo from "../components/ai/AiDemo";
+import Sponsors from "../components/marketing/Sponsors";
+import Reviews from "../components/marketing/Reviews";
 import { ContactAPI } from "../apis/contact";
 import { getMe } from "../apis/me";
 import Seo from "../seo/Seo";

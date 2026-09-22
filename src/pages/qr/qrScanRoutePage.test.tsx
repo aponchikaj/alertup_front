@@ -4,7 +4,7 @@ import { LanguageProvider } from '../../i18n/LanguageProvider';
 import { en } from '../../i18n/messages/en';
 import * as http from '../../apis/http';
 import * as wayfindingApi from '../../apis/wayfindingApi';
-import QRScanRoutePage from './qrScanRoutePageFixed';
+import QRScanRoutePage from './qrScanRoutePage';
 
 /* ============================================================================
    Scan page — the view behind every printed QR code.
