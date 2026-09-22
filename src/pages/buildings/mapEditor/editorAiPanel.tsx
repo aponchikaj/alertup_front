@@ -60,7 +60,12 @@ export interface EditorAiPanelProps {
   onAttachImage?: (file: File) => Promise<boolean>;
   /** Active floor canvas — sketches scale into these coordinates. */
   space: SketchSize;
+  /** Current floor drawing — the sketch board shows it as a faint underlay. */
+  drawing?: FloorDrawing | null;
 }
+
+/** Underlay uploads beyond this are almost always a mistake (raw photos). */
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
 /** The server keeps the last few turns; older context costs more than it adds. */
 const MAX_SENT_MESSAGES = 6;
@@ -74,6 +79,7 @@ export const EditorAiPanel = ({
   onRunAction,
   onAttachImage,
   space,
+  drawing,
 }: EditorAiPanelProps) => {
   const { t, lang } = useI18n();
   const [messages, setMessages] = useState<AiMessage[]>([]);
@@ -98,16 +104,26 @@ export const EditorAiPanel = ({
 
   const attach = async (file: File) => {
     if (!onAttachImage) return;
+    // Cheap client-side guardrails: a clear message here beats a failed
+    // upload after a 20 MB photo crawled to the server.
+    if (file.size > MAX_IMAGE_BYTES) {
+      setError(t('editorAi.imageTooLarge'));
+      return;
+    }
+    setError(null);
     setAttaching(true);
     try {
       const okUpload = await onAttachImage(file);
       if (okUpload) {
         // The assistant sees this note in the next turn's history, so it can
-        // plan around the underlay the user just added.
+        // plan around the underlay the user just added — and the server's
+        // vision pass reads the image itself on the next message.
         setMessages((current) => [
           ...current,
           { role: 'assistant', content: t('editorAi.imageAdded') },
         ]);
+      } else {
+        setError(t('editorAi.imageFailed'));
       }
     } finally {
       setAttaching(false);
@@ -360,6 +376,7 @@ export const EditorAiPanel = ({
         open={sketchOpen}
         onClose={() => setSketchOpen(false)}
         space={space}
+        underlay={drawing}
         onSubmit={submitSketch}
       />
     </Sheet>

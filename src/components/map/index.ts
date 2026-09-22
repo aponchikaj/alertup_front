@@ -27,6 +27,12 @@ export {
 } from './mapSpace';
 export type { Camera, FloorSpace, MapPoint, ScaleBounds } from './mapSpace';
 
+export type {
+  MapPointerTarget,
+  MapSurfaceApi,
+  SurfacePointerEvent,
+} from './interaction';
+
 export {
   NODE_THEME,
   NODE_GLYPH_PATHS,

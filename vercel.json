@@ -26,7 +26,7 @@
       ]
     },
     {
-      "source": "/(favicon.svg|icon-512.png|apple-touch-icon.png|og-image.png|og-image.svg)",
+      "source": "/(favicon.ico|favicon.svg|icon-192.png|icon-512.png|apple-touch-icon.png|og-image.png|og-image.svg)",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=604800" }
       ]

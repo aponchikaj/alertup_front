@@ -31,6 +31,11 @@ export default {
     ],
   },
   moduleNameMapper: {
+    // jsdom has no WebGL: the map3d pure modules (sceneBuilder, geometry3d,
+    // theme3d, picking, routeScene) must never import three. This stub makes
+    // an accidental transitive import fail loudly in tests instead of weirdly.
+    '^three$': '<rootDir>/src/__mocks__/threeMock.cjs',
+    '^three/(.*)$': '<rootDir>/src/__mocks__/threeMock.cjs',
     // `import.meta` cannot be compiled to CommonJS — see src/apis/env.ts.
     '^\\./env$': '<rootDir>/src/__mocks__/envMock.cjs',
     '^\\.\\./apis/env$': '<rootDir>/src/__mocks__/envMock.cjs',

@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import ProductAiWidget from "../../components/ai/ProductAiWidget";
 import { useI18n } from "../../i18n/LanguageProvider";
 import { usePageAnimations } from "../../lib/animations";
 import { cn } from "../../lib/cn";
@@ -112,6 +113,9 @@ const Pricing = () => {
 
   return (
     <div ref={rootRef}>
+      {/* Plan questions are exactly what the assistant answers best. */}
+      <ProductAiWidget />
+
       {/* ================= HERO ================= */}
       <section className="relative overflow-hidden bg-canvas-subtle">
         <Container className="relative flex flex-col items-center gap-4 pb-14 pt-28 text-center sm:pt-32 lg:pb-16 lg:pt-36">

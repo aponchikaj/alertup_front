@@ -5,8 +5,12 @@
    pretending to "see" pixels, we keep the strokes as vectors, classify them
    geometrically, and describe them in floor coordinates:
 
-     closed-ish loop  → "region x y w h"   (a room/shop the user gestured)
-     open stroke      → "path x1 y1 x2 y2…" (a wall or corridor line)
+     area stroke (or closed-ish loop)  → "region x y w h"    (a room/shop)
+     line stroke (or open stroke)      → "path x1 y1 x2 y2…" (wall/corridor)
+
+   The board's pen modes stamp intent onto each stroke (`kind`), so the
+   summary no longer has to guess whether a wobbly loop was meant as a room —
+   auto-classification remains only as the fallback for unlabeled strokes.
 
    The model receives real geometry it can genuinely plan around, and the
    whole block stays well inside the chat's per-message budget.
@@ -15,6 +19,8 @@
 export interface SketchStroke {
   /** Flat [x, y, ...] in board coordinates. */
   points: number[];
+  /** Pen mode the stroke was drawn with; absent strokes are auto-classified. */
+  kind?: 'area' | 'line';
 }
 
 export interface SketchSize {
@@ -86,17 +92,20 @@ export function summarizeSketch(
       ys.push(simplified[i + 1]);
     }
 
-    const closed =
-      simplified.length >= 8 &&
-      dist(
-        simplified[0],
-        simplified[1],
-        simplified[simplified.length - 2],
-        simplified[simplified.length - 1],
-      ) <=
-        diag * CLOSE_FRACTION;
+    // Pen intent wins; geometry only decides for unlabeled strokes.
+    const isRegion =
+      stroke.kind === 'area' ||
+      (stroke.kind === undefined &&
+        simplified.length >= 8 &&
+        dist(
+          simplified[0],
+          simplified[1],
+          simplified[simplified.length - 2],
+          simplified[simplified.length - 1],
+        ) <=
+          diag * CLOSE_FRACTION);
 
-    if (closed) {
+    if (isRegion) {
       const minX = Math.min(...xs);
       const maxX = Math.max(...xs);
       const minY = Math.min(...ys);

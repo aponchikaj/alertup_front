@@ -1,6 +1,6 @@
 import { getAuthState } from "./me";
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 
 /**
  * Regression cover for "I press log in and the site just refreshes".

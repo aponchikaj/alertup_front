@@ -65,6 +65,11 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="format-detection" content="telephone=no" />
 
+    <!-- The .ico must come first: Google's favicon crawler and older browsers
+         take the first supported rel=icon, and /favicon.ico is also fetched by
+         convention — it must exist as a real file or the SPA rewrite serves
+         HTML for it and Google keeps whatever icon it cached last. -->
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="alternate icon" type="image/png" sizes="512x512" href="/icon-512.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />

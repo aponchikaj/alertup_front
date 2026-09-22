@@ -37,7 +37,7 @@ const Building = () => {
 
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const [buildingData, setBuildingData] = useState<any>(null);
   const [ownerData,setOwnerData] = useState<any>(null)
   const [isOwner, setIsOwner] = useState<boolean>(false);
@@ -427,7 +427,7 @@ const Building = () => {
   );
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 const Stat = ({ label, value }: { label: string; value: any }) => (
   <div className="rounded-xl border border-line bg-surface-2 p-4 text-center">
     <p className="text-sm text-ink-subtle">{label}</p>

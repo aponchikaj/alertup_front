@@ -1,8 +1,10 @@
 import { useEffect, useState, type ComponentType, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import Scanner from "../components/scanner";
-import Sponsors from "../components/sponsors";
-import Reviews from "../components/reviews";
+import Scanner from "../components/qr/Scanner";
+import ProductAiWidget from "../components/ai/ProductAiWidget";
+import AiDemo from "../components/ai/AiDemo";
+import Sponsors from "../components/marketing/Sponsors";
+import Reviews from "../components/marketing/Reviews";
 import { ContactAPI } from "../apis/contact";
 import { getMe } from "../apis/me";
 import Seo from "../seo/Seo";
@@ -186,6 +188,9 @@ const Home = () => {
       {/* The FAQ and HowTo nodes are only valid because both are rendered
           as visible content further down this page. */}
       <Seo jsonLd={[faqJsonLd(), howToJsonLd()]} />
+
+      {/* Visitors can talk to the product before signing up. */}
+      <ProductAiWidget />
 
       {/* ================= HERO =================
           Follows the theme. Light rays are emitted light — they only read as
@@ -481,6 +486,10 @@ const Home = () => {
           </ol>
         </Container>
       </Section>
+
+      {/* ================= AI DESIGNER DEMO ================= */}
+      {/* The real floor designer, playable without an account. */}
+      <AiDemo />
 
       {/* ================= PRICING TEASER ================= */}
       {/* Deliberately thin — /pricing does the selling. */}

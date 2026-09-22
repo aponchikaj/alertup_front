@@ -60,7 +60,7 @@ const Reset = () => {
       }
 
       setStep(2);
-    } catch (err: any) {
+    } catch {
       setServerError("Failed to send reset code");
     } finally {
       setLoading(false);
@@ -87,7 +87,7 @@ const Reset = () => {
       }
 
       setStep(3);
-    } catch (err: any) {
+    } catch {
       setServerError("Invalid or expired code");
     } finally {
       setLoading(false);
@@ -123,7 +123,7 @@ const Reset = () => {
       }
 
       navigate('/login')
-    } catch (err: any) {
+    } catch {
       setServerError("Failed to reset password");
     } finally {
       setLoading(false);

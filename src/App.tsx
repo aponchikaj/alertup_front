@@ -1,7 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate, useParams } from "react-router-dom";
-import Navbar from "./components/navbar";
-import Footer from "./components/footer";
+import Navbar from "./components/layout/Navbar";
+import Footer from "./components/layout/Footer";
 import GuestGuard from "./guards/guestguard";
 import AuthGuard from "./guards/authguard";
 import BuildingOwnerGuard from "./guards/buildingOwnerGuard";
@@ -17,7 +17,7 @@ import EmergencyAnalytics from "./pages/buildings/emergencyAnalytics";
 // Lazy-loaded pages
 const Home = lazy(() => import("./pages/home"));
 const Scan = lazy(() => import("./pages/scan/scan"));
-const QRScanRoutePage = lazy(() => import("./pages/qr/qrScanRoutePageFixed"));
+const QRScanRoutePage = lazy(() => import("./pages/qr/qrScanRoutePage"));
 const Contact = lazy(() => import("./pages/contact/contact"));
 const Register = lazy(() => import("./pages/auth/register"));
 const Login = lazy(() => import("./pages/auth/login"));

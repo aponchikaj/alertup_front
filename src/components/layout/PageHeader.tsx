@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowLeftIcon } from "./ui/icons";
+import { ArrowLeftIcon } from "../ui/icons";
 
 /**
  * Legacy centered page header, restyled on the token system. New screens

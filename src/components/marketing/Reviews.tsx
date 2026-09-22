@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { checkUserReviewAvailability, sendFeedbackReview } from "../apis/reviews";
-import { cn } from "../lib/cn";
-import { Button } from "./ui/button";
-import { Alert } from "./ui/feedback";
-import { Card } from "./ui/card";
-import { CheckCircleIcon, StarIcon } from "./ui/icons";
-import { TextAreaField } from "./ui/field";
-import { useI18n } from "../i18n/LanguageProvider";
+import { checkUserReviewAvailability, sendFeedbackReview } from "../../apis/reviews";
+import { cn } from "../../lib/cn";
+import { Button } from "../ui/button";
+import { Alert } from "../ui/feedback";
+import { Card } from "../ui/card";
+import { CheckCircleIcon, StarIcon } from "../ui/icons";
+import { TextAreaField } from "../ui/field";
+import { useI18n } from "../../i18n/LanguageProvider";
 
 const MAX_COMMENT = 300;
 
