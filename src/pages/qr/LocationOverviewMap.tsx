@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import {
   DrawingLayer,
   isBoxShape,
@@ -20,6 +20,13 @@ import {
 import { Button } from '../../components/ui/button';
 import { CloseIcon, RouteIcon } from '../../components/ui/icons';
 import { useI18n } from '../../i18n/LanguageProvider';
+import { MapViewToggle } from '../../components/map/MapViewToggle';
+import {
+  readMapViewPreference,
+  writeMapViewPreference,
+  type MapViewMode,
+} from '../../components/map/viewPreference';
+import { useMap3dSupport } from '../../components/map3d/useMap3dSupport';
 
 /* ============================================================================
    LocationOverviewMap — "you are here", before any destination is chosen.
@@ -69,6 +76,19 @@ export interface LocationOverviewMapProps {
   onRouteTo: (target: { nodeId: string; name: string }) => void;
 }
 
+/** The 3D surface — three.js stays in its lazy chunk. */
+const Map3DLazy = lazy(() => import('../../components/map3d'));
+
+/** Dev override (`?map3d=1`) forces 3D on for quick phone testing. */
+const map3dForced = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  try {
+    return new URLSearchParams(window.location.search).get('map3d') === '1';
+  } catch {
+    return false;
+  }
+};
+
 export const LocationOverviewMap = ({
   floor,
   drawing,
@@ -79,6 +99,16 @@ export const LocationOverviewMap = ({
 }: LocationOverviewMapProps) => {
   const { t } = useI18n();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const supports3d = useMap3dSupport();
+  const [viewMode, setViewMode] = useState<MapViewMode>(() =>
+    map3dForced() ? '3d' : readMapViewPreference(),
+  );
+  const want3d = supports3d && viewMode === '3d';
+
+  const changeView = (mode: MapViewMode) => {
+    setViewMode(mode);
+    writeMapViewPreference(mode);
+  };
 
   const space = useMemo(
     () => ({
@@ -168,6 +198,37 @@ export const LocationOverviewMap = ({
 
   return (
     <div className="relative">
+      {want3d && floor ? (
+        <div className="h-[55dvh] min-h-72 sm:h-[52vh]">
+          {/* 2D stays mounted underneath the Suspense fallback conceptually:
+              if WebGL refuses or the chunk fails, we flip back to SVG — a
+              blank map is impossible. */}
+          <Suspense fallback={<div className="h-full w-full animate-pulse rounded-xl border border-line bg-surface-2" />}>
+            <Map3DLazy
+              floor={{
+                id: floor.id,
+                floorNumber: floor.floorNumber,
+                width: floor.width,
+                height: floor.height,
+                scalePixelsPerMeter: floor.scalePixelsPerMeter,
+              }}
+              drawing={drawing}
+              nodes={mapNodes}
+              edges={edges}
+              routeSegment={evacSegment}
+              routeTone="danger"
+              userDot={current ? { x: current.x, y: current.y } : null}
+              selectedNodeId={selectedId}
+              onNodeClick={(node) =>
+                setSelectedId((id) => (id === node.id ? null : node.id))
+              }
+              onMapTap={() => setSelectedId(null)}
+              onUnavailable={() => changeView('2d')}
+              ariaLabel={t('route.exitMapTitle')}
+            />
+          </Suspense>
+        </div>
+      ) : (
       <MapCanvas
         space={space}
         camera={camera}
@@ -201,9 +262,24 @@ export const LocationOverviewMap = ({
           label={t('wayfinding.yourLocation')}
         />
       </MapCanvas>
+      )}
+
+      {/* 2D/3D pill. Top-left so it never collides with the zoom cluster,
+          and outside the mode branch so it stays put when the view flips.
+          Only rendered once WebGL probed true — an option that cannot work
+          is not an option. */}
+      {supports3d && (
+        <MapViewToggle
+          mode={viewMode}
+          onChange={changeView}
+          className="absolute left-3 top-3 z-10"
+        />
+      )}
 
       {/* Zoom cluster. Overlaid, not in a toolbar row: on a phone at arm's
-          length the map needs every vertical pixel the card can give it. */}
+          length the map needs every vertical pixel the card can give it.
+          Hidden in 3D — pinch and wheel drive the orbit camera there. */}
+      {!want3d && (
       <div className="absolute right-3 top-3 flex flex-col gap-1.5">
         <Button
           variant="secondary"
@@ -224,6 +300,7 @@ export const LocationOverviewMap = ({
           −
         </Button>
       </div>
+      )}
 
       {/* Marker callout — the map as destination picker. */}
       {selected && (

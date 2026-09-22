@@ -1,6 +1,6 @@
-import { cn } from "../lib/cn";
-import { useI18n } from "../i18n/LanguageProvider";
-import IllusionImage from "../assets/images/sponsors/illusion.png";
+import { cn } from "../../lib/cn";
+import { useI18n } from "../../i18n/LanguageProvider";
+import IllusionImage from "../../assets/images/sponsors/illusion.png";
 
 const SPONSORS = [
   {

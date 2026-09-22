@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { MapCanvas } from "../map/MapCanvas";
 import { useMapCamera } from "../map/useMapCamera";
 import { FloorImageLayer } from "../map/layers/FloorImageLayer";
@@ -7,6 +16,13 @@ import { parseDrawing, isDrawingEmpty } from "../map/drawing";
 import { RouteLayer } from "../map/layers/RouteLayer";
 import { NodeLayer } from "../map/layers/NodeLayer";
 import { UserDotLayer } from "../map/layers/UserDotLayer";
+import { MapViewToggle } from "../map/MapViewToggle";
+import {
+  readMapViewPreference,
+  writeMapViewPreference,
+  type MapViewMode,
+} from "../map/viewPreference";
+import { useMap3dSupport } from "../map3d/useMap3dSupport";
 import { DestinationSearch, type DestinationSelection } from "./DestinationSearch";
 import { FloorSwitcher } from "./FloorSwitcher";
 import { RouteStepper } from "./RouteStepper";
@@ -33,6 +49,11 @@ import type { AssembledRoute, FloorSummary, MapNode } from "../map/types";
    ========================================================================= */
 
 const DESTINATION_STORAGE_PREFIX = "alertup-route-dest:";
+
+/** The 3D route view — three.js stays in its lazy chunk. */
+const Map3DRouteLazy = lazy(() =>
+  import("../map3d").then((m) => ({ default: m.Map3DRoute })),
+);
 
 export interface StoredDestination {
   kind: DestinationSelection["kind"];
@@ -108,6 +129,14 @@ export const WayfindingPanel = ({
   const [destinationName, setDestinationName] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const supports3d = useMap3dSupport();
+  const [viewMode, setViewMode] = useState<MapViewMode>(readMapViewPreference);
+  const view3d = supports3d && viewMode === "3d";
+
+  const changeView = useCallback((mode: MapViewMode) => {
+    setViewMode(mode);
+    writeMapViewPreference(mode);
+  }, []);
 
   const progress = useRouteProgress(route);
   const { camera, svgRef, handlers, isDragging } = useMapCamera({
@@ -271,13 +300,50 @@ export const WayfindingPanel = ({
             </Button>
           </div>
 
-          <FloorSwitcher
-            floors={floors}
-            activeFloorId={progress.displayFloorId}
-            currentFloorId={progress.activeSegment?.floor?.id ?? null}
-            onSelect={progress.previewFloor}
-          />
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            {/* In 3D every floor is on screen at once, stacked — switching
+                floors to peek is a 2D-only need. */}
+            {!view3d ? (
+              <FloorSwitcher
+                floors={floors}
+                activeFloorId={progress.displayFloorId}
+                currentFloorId={progress.activeSegment?.floor?.id ?? null}
+                onSelect={progress.previewFloor}
+              />
+            ) : (
+              <span />
+            )}
+            {supports3d && <MapViewToggle mode={viewMode} onChange={changeView} />}
+          </div>
 
+          {view3d ? (
+            <div className="h-[55dvh] min-h-72 sm:h-[52vh]">
+              <Suspense
+                fallback={
+                  <div className="h-full w-full animate-pulse rounded-xl border border-line bg-surface-2" />
+                }
+              >
+                <Map3DRouteLazy
+                  route={route}
+                  activeStepIndex={progress.activeIndex}
+                  tone={route.mode === "EVACUATION" ? "danger" : "brand"}
+                  userDot={
+                    !progress.isPreviewing &&
+                    progress.activeSegment?.nodes[0] &&
+                    progress.activeSegment.floor
+                      ? {
+                          x: progress.activeSegment.nodes[0].x,
+                          y: progress.activeSegment.nodes[0].y,
+                          floorId: progress.activeSegment.floor.id,
+                        }
+                      : null
+                  }
+                  onUnavailable={() => changeView("2d")}
+                  ariaLabel={t("wayfinding.routeTo", { name: destinationName ?? "" })}
+                />
+              </Suspense>
+            </div>
+          ) : (
           <MapCanvas
             space={{
               width: displayedFloor?.width ?? 1000,
@@ -309,6 +375,7 @@ export const WayfindingPanel = ({
             <NodeLayer nodes={displayedNodes} scale={camera.scale} />
             <UserDotLayer position={userPosition} label={t("wayfinding.yourLocation")} />
           </MapCanvas>
+          )}
 
           <RouteStepper progress={progress} onRescan={onRescan} />
         </div>

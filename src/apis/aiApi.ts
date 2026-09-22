@@ -1,9 +1,32 @@
-// Streaming client for POST /api/ai/chat. The one API module that bypasses
+// Streaming client for the AI endpoints. The one API module that bypasses
 // the shared request() wrapper: it consumes the SSE-over-fetch body via
 // ReadableStream. The frame parser is isolated here so the backend contract
 // can evolve without touching UI code.
+//
+// Two endpoints share the exact same frame contract:
+//   POST /api/ai/chat — the in-building Wayfinder concierge (scan pages)
+//   POST /api/ai/ask  — the public product assistant (home/pricing/help)
 
-import { API_BASE_URL } from "./http";
+import { API_BASE_URL, post } from "./http";
+import type { FloorDrawing } from "../components/map";
+
+/** One-shot design demo on the home page: prompt in, validated drawing out. */
+export interface DemoDesignResult {
+  reply: string;
+  drawing: FloorDrawing | null;
+  canvas?: { width: number; height: number };
+}
+
+export const demoDesign = async (
+  prompt: string,
+  locale: "en" | "ka",
+): Promise<DemoDesignResult> => {
+  const res = await post<{ success: boolean; data: DemoDesignResult }>(
+    "/api/ai/demo-design",
+    { prompt, locale },
+  );
+  return res.data;
+};
 
 export interface AiChatMessage {
   role: "user" | "assistant";
@@ -15,6 +38,8 @@ export interface AiContext {
   nodeId?: string | null;
   destinationNodeId?: string | null;
   locale: "en" | "ka";
+  /** True routes to the public product assistant instead of the concierge. */
+  product?: boolean;
 }
 
 export interface StreamCallbacks {
@@ -33,27 +58,34 @@ export function streamChat(
   callbacks: StreamCallbacks,
   signal?: AbortSignal
 ): void {
+  const url = context.product ? `${API_BASE_URL}/api/ai/ask` : `${API_BASE_URL}/api/ai/chat`;
+  const body = context.product
+    ? { messages, locale: context.locale }
+    : {
+        messages,
+        buildingId: context.buildingId,
+        nodeId: context.nodeId ?? null,
+        destinationNodeId: context.destinationNodeId ?? null,
+        locale: context.locale,
+      };
+
   void (async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/ai/chat`, {
+      const res = await fetch(url, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages,
-          buildingId: context.buildingId,
-          nodeId: context.nodeId ?? null,
-          destinationNodeId: context.destinationNodeId ?? null,
-          locale: context.locale,
-        }),
+        body: JSON.stringify(body),
         signal,
       });
 
       if (!res.ok || !res.body) {
         let message = `Assistant error (${res.status})`;
         try {
-          const body = await res.json();
-          if (body?.message || body?.Message) message = body.message || body.Message;
+          const errorBody = await res.json();
+          if (errorBody?.message || errorBody?.Message) {
+            message = errorBody.message || errorBody.Message;
+          }
         } catch {
           // non-JSON error body
         }

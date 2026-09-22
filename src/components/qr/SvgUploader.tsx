@@ -1,14 +1,14 @@
 import { useState } from "react";
-import { uploadSVG, convertToSVG, updateFloorMap, type UploadResponse } from "../apis/uploadApi";
-import { cn } from "../lib/cn";
-import { Alert } from "./ui/feedback";
-import { buttonStyles } from "./ui/styles";
+import { uploadSVG, convertToSVG, updateFloorMap, type UploadResponse } from "../../apis/uploadApi";
+import { cn } from "../../lib/cn";
+import { Alert } from "../ui/feedback";
+import { buttonStyles } from "../ui/styles";
 import {
   CheckCircleIcon,
   FileTextIcon,
   ShieldCheckIcon,
   SpinnerIcon,
-} from "./ui/icons";
+} from "../ui/icons";
 
 const SECURITY_FEATURES = [
   "SVG file validation",

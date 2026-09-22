@@ -957,7 +957,7 @@ describe('MapEditorPage — floor mode hit order', () => {
     const strip = container.querySelector('[data-canvas-handle="y"]') as Element;
     const bottomMid = container.querySelectorAll('[data-outline-mid]')[2] as Element;
     expect(
-      // eslint-disable-next-line no-bitwise
+       
       strip.compareDocumentPosition(bottomMid) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });

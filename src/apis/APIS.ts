@@ -5,8 +5,8 @@ import { API_URL } from "./http";
 // separately re-derived in half a dozen other modules.
 //
 // Local dev:            VITE_API_URL=http://localhost:3001 (from .env, not committed)
-// stage / pre-prod:     https://alertup-backend-stage.onrender.com (stage database)
-// Production (default): https://alertup-backend.onrender.com (production database)
+// stage / pre-prod:     https://alertup-backend-stage.fly.dev (stage database)
+// Production (default): https://alertup-backend.fly.dev (production database)
 // When VITE_API_URL is unset the origin is picked by hostname — see env.ts.
 export const MAIN_API_URL: string = `${API_URL}/`;
 

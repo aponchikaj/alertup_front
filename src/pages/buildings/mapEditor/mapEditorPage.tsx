@@ -68,7 +68,7 @@ import {
   RedoIcon,
   ZapIcon,
 } from '../../../components/ui/icons';
-import SimpleQRCodeDisplay from '../../../components/simpleQRCodeDisplay';
+import SimpleQRCodeDisplay from '../../../components/qr/SimpleQRCodeDisplay';
 import { cn } from '../../../lib/cn';
 import { useI18n } from '../../../i18n/LanguageProvider';
 import { errorMessage } from '../../../apis/http';
@@ -2868,6 +2868,7 @@ export const MapEditorPage = () => {
         buildingId={buildingId}
         floorId={editor.activeFloorId}
         space={space}
+        drawing={activeDrawing}
         onRunAction={(action) => {
           if (action === 'auto-connect') {
             setNodesMode(true);
