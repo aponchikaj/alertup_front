@@ -93,7 +93,7 @@ export const Modal = ({
           aria-describedby={description ? descriptionId : undefined}
           className={cn(
             "relative flex w-full flex-col overflow-hidden",
-            "max-h-[85dvh] rounded-2xl border border-line bg-surface shadow-xl",
+            "max-h-[85dvh] rounded-xl border border-line bg-surface shadow-xl",
             MODAL_SIZES[size],
             className,
           )}

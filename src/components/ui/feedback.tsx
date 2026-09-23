@@ -68,7 +68,7 @@ export const Alert = ({
       role={tone === "danger" ? "alert" : "status"}
       aria-live={tone === "danger" ? "assertive" : "polite"}
       className={cn(
-        "flex items-start gap-3 rounded-xl border px-4 py-3 text-sm",
+        "flex items-start gap-3 rounded-lg border px-4 py-3 text-sm",
         wrap,
         className,
       )}
@@ -112,7 +112,7 @@ export const EmptyState = ({
 }: EmptyStateProps) => (
   <div
     className={cn(
-      "flex flex-col items-center justify-center gap-3 rounded-2xl",
+      "flex flex-col items-center justify-center gap-3 rounded-lg",
       "border border-dashed border-line bg-surface-2 px-6 py-14 text-center",
       className,
     )}

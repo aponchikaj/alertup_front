@@ -49,7 +49,7 @@ export const StatCard = ({ icon: StatIcon, label, value, hint, className }: Stat
   return (
     <div
       className={cn(
-        "flex flex-col gap-3 rounded-2xl border border-line bg-surface p-5 shadow-sm",
+        "flex flex-col gap-3 rounded-lg border border-line bg-surface p-5 shadow-sm",
         "transition-[transform,box-shadow,border-color] duration-200 ease-out",
         "hover:-translate-y-0.5 hover:border-brand-border hover:shadow-md",
         className,

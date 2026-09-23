@@ -12,12 +12,15 @@ export type ButtonVariant =
   | "ghost"
   | "danger"
   | "subtle"
-  | "link";
-export type ButtonSize = "sm" | "md" | "lg" | "icon" | "icon-sm";
+  | "link"
+  | "emergency";
+export type ButtonSize = "sm" | "md" | "lg" | "xl" | "icon" | "icon-sm";
 
 const BUTTON_BASE = cn(
   "relative inline-flex items-center justify-center gap-2 whitespace-nowrap",
-  "font-medium rounded-full select-none",
+  // 10px, not a pill. Pills read consumer/marketing; this is software a fire
+  // marshal has to trust.
+  "font-medium rounded-md select-none",
   "transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out",
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
   "disabled:opacity-50 disabled:pointer-events-none disabled:cursor-not-allowed",
@@ -39,6 +42,14 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   subtle: cn("bg-brand-subtle text-brand-text border border-brand-border", "hover:bg-brand-100"),
   ghost: cn("text-ink-muted", "hover:bg-surface-hover hover:text-ink"),
   danger: cn("bg-danger text-danger-ink shadow-sm", "hover:brightness-110"),
+  /* The EMERGENCY register's only button, and the only control in the product
+     allowed to wear High-Vis Safety Red as a fill. Deliberately unmistakable:
+     taller and wider than anything near it, so it cannot be mis-tapped by
+     someone moving fast. */
+  emergency: cn(
+    "bg-danger text-danger-ink shadow-md font-semibold tracking-wide",
+    "hover:brightness-110 focus-visible:outline-danger",
+  ),
   link: cn(
     "text-brand-text underline underline-offset-4 decoration-brand-border rounded-sm",
     "hover:decoration-current",
@@ -46,10 +57,13 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
 };
 
 const BUTTON_SIZES: Record<ButtonSize, string> = {
-  // 44px min height — the platform touch-target floor.
+  // md is 44px — Apple's touch-target guidance, and the default for that
+  // reason. sm is 36px: past the WCAG 2.2 SC 2.5.8 floor of 24x24, but meant
+  // for dense toolbars, not primary actions.
   sm: "h-9 min-h-9 px-3.5 text-sm",
   md: "h-11 min-h-11 px-5 text-[0.9375rem]",
-  lg: "h-13 min-h-13 px-7 text-base",
+  lg: "h-12 min-h-12 px-7 text-base",
+  xl: "h-14 min-h-14 px-8 text-base",
   icon: "h-11 w-11 min-h-11 p-0",
   "icon-sm": "h-9 w-9 min-h-9 p-0",
 };
@@ -70,6 +84,8 @@ export const buttonStyles = ({
     BUTTON_VARIANTS[variant],
     BUTTON_SIZES[size],
     variant === "link" && "h-auto min-h-0 px-0",
+    // A half-width evacuate button is a bug, not a layout choice.
+    variant === "emergency" && "w-full",
     fullWidth && "w-full",
     className,
   );
@@ -81,7 +97,7 @@ export const cardStyles = ({
   className = "",
 }: { interactive?: boolean; className?: string } = {}) =>
   cn(
-    "rounded-2xl border border-line bg-surface shadow-sm",
+    "rounded-lg border border-line bg-surface shadow-sm",
     interactive &&
       cn(
         "transition-[transform,box-shadow,border-color] duration-200 ease-out",
@@ -98,7 +114,7 @@ export const inputStyles = ({
   className = "",
 }: { invalid?: boolean; className?: string } = {}) =>
   cn(
-    "w-full rounded-xl border bg-surface-2 px-4 py-3 text-ink",
+    "w-full rounded-md border bg-surface-2 px-4 py-3 text-ink",
     // 16px min on mobile, otherwise iOS zooms the viewport on focus.
     "text-base min-h-11",
     "transition-[border-color,box-shadow,background-color] duration-200 ease-out",
@@ -108,7 +124,9 @@ export const inputStyles = ({
     "read-only:bg-canvas-subtle",
     invalid
       ? "border-danger focus:border-danger focus:ring-danger/30"
-      : "border-line focus:border-brand",
+      // --line is 1.32:1 against the canvas. Fine for a decorative rule, never
+      // legal as the boundary of a control (WCAG 1.4.11 wants 3:1).
+      : "border-line-control focus:border-brand",
     className,
   );
 
