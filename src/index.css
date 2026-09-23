@@ -1,129 +1,116 @@
 @import "tailwindcss";
 
-/* ============================================================================
-   Fonts — self-hosted variable faces, so no external CDN request and no CSP
-   question. Inter carries Latin, Noto Sans Georgian carries Mkhedruli, both
-   with REAL weights. That last part is the point: the previous stack had no
-   Georgian coverage, so Windows fell through to Sylfaen — which ships no bold —
-   and faux-bolded every Georgian heading in a product that is half Georgian.
-   ========================================================================= */
-@import "@fontsource-variable/inter";
-@import "@fontsource-variable/noto-sans-georgian";
-
 @import "./styles/tokens.css";
+@import "./styles/typography.css";
 
-/* Theme is driven by an explicit attribute on <html>, not the OS query, so the
-   in-app toggle can override the system preference. `system` mode writes the
-   resolved value onto the attribute. */
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
-
-/* The one remaining custom face: a Georgian-designed display cut, used for
-   headings and brand moments only. Body and UI text never touch it. */
-@font-face {
-  font-family: "GL Tatishvili Metal";
-  src: url("./assets/fonts/GLTatishviliMetal-Bold.ttf") format("truetype");
-  font-weight: 400 800;
-  font-display: swap;
-}
+/* Emergency mode is an explicit attribute on <html>, not an OS query — the app
+   declares it, the operating system has no opinion about it. */
+@custom-variant emergency (&:where([data-mode="emergency"], [data-mode="emergency"] *));
 
 /* ============================================================================
-   Tailwind theme mapping
-   `inline` keeps `var(--canvas)` in the generated utility, so the value is
-   resolved in the element's own context and re-resolves when the theme flips.
+   Tailwind v4 theme mapping.
+
+   NOTE ON THE BRIEF: it asks for `tailwind.config.ts` with `theme.extend`.
+   This project is on Tailwind 4.1.18, which removed the JS config in favour of
+   `@theme` in CSS — there is no tailwind.config.* in the repo and adding one
+   would be ignored. This block IS the config; every token below generates the
+   same utilities `theme.extend` would have (`bg-canvas`, `text-ink-2`,
+   `rounded-lg`, `duration-base`, and so on).
+
+   `inline` keeps `var(--bg)` in the generated utility rather than resolving it
+   at build time, so a single attribute flip on <html> re-themes every component
+   at once. That is what makes the emergency switch instant.
    ========================================================================= */
 @theme inline {
-  --font-sans: "Inter Variable", "Noto Sans Georgian Variable", ui-sans-serif,
-    system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-display: "GL Tatishvili Metal", "Noto Sans Georgian Variable",
-    "Inter Variable", system-ui, sans-serif;
-  --font-mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, monospace;
+  /* --- Fonts --- */
+  --font-display: var(--font-display);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
 
-  /* --- Weight ------------------------------------------------------------
-     Three weights, deliberately. Indirected through tokens.css so dark mode
-     can drop a half-step: light-on-dark renders optically heavier. */
-  --font-weight-body: var(--weight-body);
-  --font-weight-ui: var(--weight-ui);
-  --font-weight-heading: var(--weight-heading);
+  /* --- Semantic surfaces (these flip in emergency mode) --- */
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-bg-subtle: var(--bg-subtle);
+  --color-fg: var(--fg);
+  --color-fg-body: var(--fg-body);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-disabled: var(--fg-disabled);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-line-control: var(--line-control);
 
-  /* --- Measure -----------------------------------------------------------
-     In ch, so the cap scales with the font size instead of fighting it. No
-     paragraph in the product exceeds --measure-prose. The single most common
-     responsive failure is scaling images and nav carefully while letting body
-     text run edge to edge. */
-  --measure-prose: 68ch;
-  --measure-text: 60ch;
-  --measure-tight: 44ch;
+  /* --- Accent --- */
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-press: var(--accent-press);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-text: var(--accent-text);
+  --color-accent-subtle: var(--accent-subtle);
 
-  /* --- Type scale --------------------------------------------------------
-     Each step carries its own leading and tracking: large text gets tighter
-     both, small text gets looser. Body never drops below 16px — anything
-     smaller makes iOS zoom the viewport on input focus. */
-  --text-display: 3rem;
-  --text-display--line-height: 1.05;
-  --text-display--letter-spacing: -0.02em;
-  --text-h1: 2rem;
-  --text-h1--line-height: 1.15;
-  --text-h1--letter-spacing: -0.015em;
-  --text-h2: 1.5rem;
-  --text-h2--line-height: 1.25;
-  --text-h2--letter-spacing: -0.01em;
-  --text-h3: 1.1875rem;
-  --text-h3--line-height: 1.35;
-  --text-body: 1rem;
-  --text-body--line-height: 1.55;
+  /* --- Routes, safety, alarm --- */
+  --color-route: var(--route);
+  --color-route-exit: var(--route-exit);
+  --color-safe: var(--safe);
+  --color-safe-ink: var(--safe-ink);
+  --color-safe-text: var(--safe-text);
+  --color-safe-subtle: var(--safe-subtle);
+  --color-alarm: var(--alarm);
+  --color-alarm-ink: var(--alarm-ink);
+  --color-alarm-text: var(--alarm-text);
+  --color-alarm-subtle: var(--alarm-subtle);
+  --color-destructive: var(--destructive);
+  --color-destructive-ink: var(--destructive-ink);
+  --color-destructive-text: var(--destructive-text);
 
-  /* Surfaces */
+  --color-ring: var(--ring);
+  --color-scrim: var(--scrim);
+
+  /* --- Raw ramps, for charts and the rare place a step is needed --- */
   --color-canvas: var(--canvas);
-  --color-canvas-subtle: var(--canvas-subtle);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
-  --color-surface-hover: var(--surface-hover);
-
-  /* Foregrounds */
   --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-300: var(--brand-300);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-900: var(--brand-900);
+  --color-exit-50: var(--exit-50);
+  --color-exit-300: var(--exit-300);
+  --color-exit-500: var(--exit-500);
+  --color-exit-600: var(--exit-600);
+  --color-exit-700: var(--exit-700);
+  --color-signal-100: var(--signal-100);
+  --color-signal-500: var(--signal-500);
+  --color-signal-700: var(--signal-700);
+  --color-signal-800: var(--signal-800);
+  --color-danger-500: var(--danger-500);
+  --color-danger-600: var(--danger-600);
+  --color-viz-f: var(--viz-f);
+  --color-viz-d: var(--viz-d);
+  --color-viz-c: var(--viz-c);
+  --color-viz-b: var(--viz-b);
+  --color-viz-a: var(--viz-a);
+  --color-viz-ap: var(--viz-ap);
+
+  /* --- Compatibility aliases (see tokens.css). Maps the ~1,000 existing
+     call sites onto the new palette. New code uses the semantic names above. */
+  --color-canvas-subtle: var(--canvas-subtle);
+  --color-surface-hover: var(--surface-hover);
   --color-ink-muted: var(--ink-muted);
   --color-ink-subtle: var(--ink-subtle);
   --color-ink-inverse: var(--ink-inverse);
-
-  /* Lines */
-  --color-line: var(--line);
-  --color-line-strong: var(--line-strong);
-  /* A border that IS the control (input, checkbox, toggle) must clear 3:1 per
-     WCAG 1.4.11. --line is 1.40:1 — fine for a decorative rule, never legal
-     as a control boundary. */
-  --color-line-control: var(--line-control);
-
-  /* Map — ISO 23601 escape-plan conventions. Resolved by the three.js scene
-     through getComputedStyle, so the 3D map re-tints on theme flip for free. */
-  --color-map-route-horizontal: var(--map-route-horizontal);
-  --color-map-route-vertical: var(--map-route-vertical);
-  --color-map-route-arrow: var(--map-route-arrow);
-  --color-map-you-are-here: var(--map-you-are-here);
-  --color-map-fire-equipment: var(--map-fire-equipment);
-  --color-map-wall: var(--map-wall);
-  --color-map-room: var(--map-room);
-  --color-map-label: var(--map-label);
-
-  /* Brand */
   --color-brand: var(--brand);
   --color-brand-hover: var(--brand-hover);
   --color-brand-ink: var(--brand-ink);
   --color-brand-text: var(--brand-text);
   --color-brand-subtle: var(--brand-subtle);
   --color-brand-border: var(--brand-border);
-  --color-brand-50: var(--brand-50);
-  --color-brand-100: var(--brand-100);
-  --color-brand-200: var(--brand-200);
-  --color-brand-300: var(--brand-300);
-  --color-brand-400: var(--brand-400);
-  --color-brand-500: var(--brand-500);
-  --color-brand-600: var(--brand-600);
-  --color-brand-700: var(--brand-700);
-  --color-brand-800: var(--brand-800);
-  --color-brand-900: var(--brand-900);
-  --color-brand-950: var(--brand-950);
-
-  /* Status */
   --color-danger: var(--danger);
   --color-danger-ink: var(--danger-ink);
   --color-danger-text: var(--danger-text);
@@ -145,369 +132,99 @@
   --color-info-subtle: var(--info-subtle);
   --color-info-border: var(--info-border);
 
-  --color-ring: var(--ring);
-  --color-scrim: var(--scrim);
+  /* --- Radius --- */
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius-xl: var(--r-xl);
+  --radius-pill: var(--r-pill);
 
-  /* Radii — one scale, used everywhere. */
-  --radius-xs: 0.25rem;
-  --radius-sm: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1rem;
-  --radius-xl: 1.25rem;
-  --radius-2xl: 1.75rem;
-  --radius-3xl: 2.25rem;
-
-  /* Elevation */
-  --shadow-xs: var(--shadow-xs);
+  /* --- Elevation --- */
   --shadow-sm: var(--shadow-sm);
   --shadow-md: var(--shadow-md);
   --shadow-lg: var(--shadow-lg);
-  --shadow-xl: var(--shadow-xl);
 
-  /* Motion — 150–300ms band, ease-out on enter. */
-  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* --- Motion --- */
+  --ease-out: var(--ease-out);
+  --ease-in-out: var(--ease-in-out);
+  --duration-fast: var(--dur-fast);
+  --duration-base: var(--dur-base);
+  --duration-slow: var(--dur-slow);
+  --duration-hero: var(--dur-hero);
 
-  --animate-fade-up: fade-up 0.5s var(--ease-out-quint) both;
-  --animate-fade-in: fade-in 0.35s ease-out both;
-  --animate-scale-in: scale-in 0.2s var(--ease-out-quint) both;
-  --animate-slide-in-left: slide-in-left 0.28s var(--ease-out-quint) both;
-  --animate-shimmer: shimmer 1.6s linear infinite;
-  --animate-pulse-ring: pulse-ring 2.4s var(--ease-out-quint) infinite;
-}
+  /* --- Layout --- */
+  --container-content: 1200px;
+  --container-wide: 1320px;
 
-@keyframes fade-up {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 16px, 0);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-  }
-}
-
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes scale-in {
-  from {
-    opacity: 0;
-    transform: scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes slide-in-left {
-  from {
-    transform: translate3d(-100%, 0, 0);
-  }
-  to {
-    transform: translate3d(0, 0, 0);
-  }
-}
-
-@keyframes shimmer {
-  from {
-    background-position: -200% 0;
-  }
-  to {
-    background-position: 200% 0;
-  }
-}
-
-@keyframes pulse-ring {
-  0% {
-    transform: scale(0.9);
-    opacity: 0.6;
-  }
-  70% {
-    transform: scale(1.35);
-    opacity: 0;
-  }
-  100% {
-    transform: scale(1.35);
-    opacity: 0;
-  }
-}
-
-/* ----------------------------------------------------------------------------
-   Map route animations.
-   These are CSS rather than anime.js on purpose: route geometry always arrives
-   with a fetch, and usePageAnimations only scans the DOM once on mount. CSS
-   also respects the reduced-motion kill-switch in the base layer for free —
-   which the safety-critical scan route page depends on.
-   ------------------------------------------------------------------------- */
-@keyframes route-draw {
-  from {
-    stroke-dashoffset: 1;
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
-@keyframes route-march {
-  from {
-    stroke-dashoffset: 40;
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
-.route-path-draw {
-  /* pathLength-independent draw-on: the dash array is expressed in the
-     path's own length via pathLength normalization below. */
-  stroke-dasharray: 1;
-  stroke-dashoffset: 0;
-  animation: route-draw 0.9s var(--ease-out-quint) both;
-}
-
-.route-path-march {
-  animation: route-march 1.6s linear infinite;
-}
-
-.map-user-pulse {
-  animation: var(--animate-pulse-ring);
+  /* --- 4px spacing scale. Tailwind's default is already 4px-based; these are
+     the named section/card rhythms the brief specifies. --- */
+  --spacing-section: 6rem;      /* 96px desktop band */
+  --spacing-section-md: 4rem;   /* 64px tablet */
+  --spacing-section-sm: 3rem;   /* 48px mobile */
+  --spacing-card: 2rem;         /* 32px desktop card padding */
+  --spacing-card-sm: 1.5rem;    /* 24px mobile */
 }
 
 /* ============================================================================
    Base
    ========================================================================= */
 @layer base {
-  * {
-    border-color: var(--line);
-  }
-
-  html {
-    -webkit-text-size-adjust: 100%;
-    scroll-behavior: smooth;
-    /* Anything anchored to an id clears the fixed header. */
-    scroll-padding-top: 6rem;
-  }
-
-  body {
-    background-color: var(--canvas);
-    color: var(--ink);
-    font-family: var(--font-sans);
-    font-size: 1rem;
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
-    transition: background-color 0.2s ease, color 0.2s ease;
-  }
-
-  /* Georgian body text.
-     The default UI stack resolves Georgian through whatever fallback the OS
-     picks, which varies from decent (Android) to cramped (older Windows).
-     Naming Georgian-capable faces first gives consistent glyphs without
-     shipping a webfont — the display faces are already Georgian-specific, so
-     only body copy needed this. LanguageProvider sets <html lang>, which is
-     what :lang(ka) keys off. */
-  :lang(ka) {
-    font-family: "Noto Sans Georgian", "BPG Nino Mtavruli", "Sylfaen",
-      var(--font-sans);
-  }
-
-  h1,
-  h2,
-  h3,
-  h4 {
-    font-family: var(--font-display);
-    line-height: 1.2;
-    letter-spacing: -0.01em;
-    text-wrap: balance;
-  }
-
-  p {
-    text-wrap: pretty;
-  }
-
-  /* One focus treatment for the entire app. Never removed — only restyled. */
-  :focus-visible {
-    outline: 2px solid var(--ring);
-    outline-offset: 2px;
-    border-radius: 0.25rem;
-  }
-
-  ::selection {
-    background-color: var(--brand);
-    color: var(--brand-ink);
-  }
-
-  /* Native controls follow the theme (date pickers, dropdown popups, etc.). */
-  input,
-  textarea,
-  select,
-  button {
-    font: inherit;
-    color: inherit;
-  }
-
-  ::placeholder {
-    color: var(--ink-subtle);
-    opacity: 1;
-  }
-
-  /* Scrollbars: themed, and wide enough to actually grab (the old 1px track
-     was effectively unusable with a pointer). */
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: var(--line-strong) transparent;
-  }
-
-  ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-  }
-
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: var(--line-strong);
-    border-radius: 9999px;
-    border: 2px solid var(--canvas);
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: var(--ink-subtle);
-  }
-}
-
-/* ============================================================================
-   Utilities
-   ========================================================================= */
-@utility text-gradient-brand {
-  /* Monochrome: ink fading toward mid-gray. */
-  background-image: linear-gradient(
-    100deg,
-    var(--ink) 0%,
-    var(--ink) 45%,
-    var(--neutral-500) 100%
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-/* Subtle safety-grid backdrop — evokes a floor plan without competing with
-   content. Fades out toward the bottom so sections can butt up against it. */
-@utility bg-grid {
-  background-image: linear-gradient(
-      to right,
-      color-mix(in oklab, var(--line) 70%, transparent) 1px,
-      transparent 1px
-    ),
-    linear-gradient(
-      to bottom,
-      color-mix(in oklab, var(--line) 70%, transparent) 1px,
-      transparent 1px
-    );
-  background-size: 44px 44px;
-  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
-}
-
-@utility skeleton {
-  background-image: linear-gradient(
-    90deg,
-    var(--surface-2) 25%,
-    var(--surface-hover) 37%,
-    var(--surface-2) 63%
-  );
-  background-size: 200% 100%;
-  animation: var(--animate-shimmer);
-}
-
-/* Keyboard-only escape hatch to the main content. */
-@utility skip-link {
-  position: fixed;
-  top: 0.5rem;
-  left: 0.5rem;
-  z-index: 200;
-  transform: translateY(-150%);
-  transition: transform 0.2s var(--ease-out-quint);
-}
-
-/* ============================================================================
-   Reduced motion — honoured globally, not per component.
-   ========================================================================= */
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
-
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+    border-color: var(--line);
+  }
+
+  /* Never a removed focus ring. In emergency mode --ring is amber, so the
+     indicator stays visible against the dark canvas. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--accent-subtle);
+    color: var(--accent-text);
+  }
+
+  /* Skip link — first focusable element on every page. */
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 100;
+    padding: 0.75rem 1.25rem;
+    background: var(--bg-elevated);
+    color: var(--fg);
+    border: 1px solid var(--line-control);
+    border-radius: var(--r-md);
+  }
+  .skip-link:focus {
+    left: 1rem;
+    top: 1rem;
   }
 }
 
 /* ============================================================================
-   Baseline typography.
-   Kerning and ligatures on everywhere — there is no case for leaving them off.
+   The single decorative gradient in the system: the hero glow.
    ========================================================================= */
-html {
-  font-feature-settings: "kern" 1, "liga" 1;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
+@utility hero-glow {
+  background-image: radial-gradient(
+    60% 50% at 50% 0%,
+    var(--brand-100) 0%,
+    transparent 70%
+  );
 }
 
-h1,
-h2,
-h3,
-h4 {
-  font-weight: var(--weight-heading);
-  /* A hyphenated heading looks like a mistake; a heading that breaks badly
-     looks worse. Balance the lines instead of splitting words. */
-  hyphens: none;
-  text-wrap: balance;
+@keyframes fade-up {
+  from { opacity: 0; transform: translate3d(0, 16px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
 }
-
-p {
-  text-wrap: pretty;
+@keyframes orbit {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
-
-/* Numbers must not jitter as they change — counts, floor numbers, metrics. */
-table,
-.tabular {
-  font-variant-numeric: tabular-nums;
-}
-
-/* Caps are homogeneous rectangles: the eye loses the word contour without
-   extra tracking, so uppercase is never set solid. */
-.uppercase,
-[class*="uppercase"] {
-  letter-spacing: 0.08em;
-}
-
-/* ============================================================================
-   Georgian (Mkhedruli).
-   Only about five letters of ~40 sit at the x-height, so Georgian runs need
-   more ascender and descender room than Latin at the same size.
-
-   And Mkhedruli has no case. The Mtavruli "capitals" apply to a whole word at
-   minimum and read as ALL-CAPS SHOUTING, never as Title Case — so uppercase is
-   disabled outright here rather than policed per component.
-   ========================================================================= */
-[lang="ka"],
-[lang="ka"] * {
-  line-height: 1.63;
-  text-transform: none;
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
 }

@@ -1,263 +1,301 @@
 /* ============================================================================
    AlertUp — Design Tokens
-   ----------------------------------------------------------------------------
-   Two layers:
-     1. PRIMITIVES — the brand ramps. Never referenced by a component.
-     2. SEMANTICS  — role-based tokens (canvas, surface, ink, brand, danger…).
-                     The only layer that changes between light and dark, and
-                     the only layer components are allowed to consume.
+   "Calm confidence." A well-lit, well-signposted building: quiet, spacious,
+   obvious. Everyday mode is warm, editorial and light. Emergency mode is the
+   opposite — dark, high-contrast, loud, impossible to misread.
 
-   THE SYSTEM: TWO REGISTERS, AND THEY NEVER MIX
-   ---------------------------------------------
-     EVERYDAY  — Deep Slate Navy chassis + Signal Cyan accent. Store search,
-                 turn-by-turn wayfinding, the whole admin product. 99.9% of use.
-     EMERGENCY — High-Vis Safety Red. Appears nowhere else, ever. Because it is
-                 absent from everyday use, its arrival on screen IS the alarm.
+   PRINCIPLE: one warm neutral canvas, one ink, one signature accent, one
+   safety green, one emergency amber. No decorative gradients except the single
+   hero glow. Never pure black on pure white for large surfaces.
 
-   Cyan never appears on an emergency surface; red never appears as decoration.
-   Break that once and the override stops reading as an override.
+   WHY AMBER AND NOT RED. ISO 3864 reserves red for fire equipment and
+   prohibition; the escape-route colour has always been green. Amber carries
+   "warning — act now" and stays the most visible hue at distance, while red
+   reads as "stop" and triggers panic. So: amber declares the emergency, green
+   is the way out, and red is demoted to destructive actions and hard errors.
 
-   Verified: Signal Cyan and Safety Red separate by 166–271 (RGB distance after
-   protan/deutan/tritan simulation). A colour-blind user can never mistake an
-   everyday route for an evacuation route.
-
-   Brand identity hexes are #0F172A / #0284C7 / #DC2626 / #F8FAFC / #64748B.
-   Some of those fail WCAG AA in specific roles — Signal Cyan is 4.10:1 behind a
-   white label, Border Charcoal is 3.75:1 on navy. The identity colours are kept
-   exactly as specified for logo, marketing and large display; the semantics
-   below point at accessible neighbours from the same ramp for text-bearing
-   roles. Every pair is checked by tokens.contrast.test.ts.
+   CONTRAST. Every ratio below is COMPUTED, not estimated. Targets: body >= 7:1,
+   secondary >= 4.5:1, button labels >= 4.5:1, non-text (borders that ARE a
+   control, icons, focus) >= 3:1. Pairs marked [refined] moved off the original
+   spec value because the spec value failed; the shift is the smallest one that
+   clears the bar and holds the palette's character.
    ========================================================================= */
 
 :root {
-  /* --- PRIMITIVES: Deep Slate Navy chassis ------------------------------- */
-  --slate-0:   #ffffff;
-  --slate-50:  #f8fafc;   /* Clean Off-White — brand background neutral */
-  --slate-100: #f1f5f9;
-  --slate-200: #e2e8f0;
-  --slate-300: #cbd5e1;
-  --slate-400: #94a3b8;
-  --slate-500: #64748b;   /* Border Charcoal — brand muted UI */
-  --slate-600: #475569;
-  --slate-700: #334155;
-  --slate-800: #1e293b;
-  --slate-900: #0f172a;   /* Deep Slate Navy — brand primary base */
-  --slate-950: #020617;
+  /* --- NEUTRALS — warm, slightly cream -----------------------------------
+     The warmth is what keeps this from reading as template SaaS. It also
+     compresses luminance more than a cool grey would, which is why the border
+     and placeholder values below had to move further than expected. */
+  --canvas:        #f7f5f0;   /* page background */
+  --surface:       #ffffff;   /* cards, inputs */
+  --surface-2:     #f1eee7;   /* subtle panels, table header, hover */
+  --border:        #e4e0d6;   /* decorative 1px rules — 1.21:1, see note */
+  --border-strong: #cfc9bc;   /* hover / divider emphasis — 1.51:1 */
+  /* A border that IS the control (input, checkbox, toggle) must clear 3:1 per
+     WCAG 1.4.11. --border is decorative and exempt; this is not. [refined] */
+  --border-control: #8e8775;  /* 3.28:1 on canvas, 3.58:1 on surface */
 
-  /* --- PRIMITIVES: Signal Cyan (the everyday accent) --------------------- */
-  /* brand-600 is the identity hex. brand-700 is the text/fill cut, because
-     white on brand-600 is 4.10:1 and fails AA. */
-  --brand-50:  #f0f9ff;
-  --brand-100: #e0f2fe;
-  --brand-200: #bae6fd;
-  --brand-300: #7dd3fc;
-  --brand-400: #38bdf8;   /* dark-mode accent — 8.33:1 on navy */
-  --brand-500: #0ea5e9;
-  --brand-600: #0284c7;   /* IDENTITY — Signal Cyan. Logo, marketing, large display */
-  --brand-700: #0369a1;   /* working cut — 5.93:1 white label, 5.67:1 as text */
-  --brand-800: #075985;
-  --brand-900: #0c4a6e;
-  --brand-950: #082f49;
+  --ink:   #111318;   /* 17.05:1 on canvas — headlines, primary text */
+  --ink-2: #3c4048;   /*  9.55:1 on canvas — body text */
+  --ink-3: #676c75;   /*  4.84:1 on canvas, 4.56:1 on surface-2 [refined
+                          from #6B7079, which was 4.30:1 on surface-2] */
+  /* Disabled text only. WCAG 1.4.3 exempts inactive controls from contrast, so
+     2.38:1 is legal here — but ONLY for disabled. Placeholders are NOT exempt
+     and must use --ink-3. */
+  --ink-4: #9ca1a9;
 
-  /* --- PRIMITIVES: SIGNAL register -------------------------------------- */
-  /* High-Vis Safety Red is the specified emergency override. The others follow
-     ISO 3864 meanings so the phone matches the signage on the wall: green is
-     safe condition, yellow is warning, blue is mandatory action. */
-  --red-400:   #f87171;   /* dark-mode emergency text — 6.45:1 on navy */
-  --red-500:   #ef4444;
-  --red-600:   #dc2626;   /* IDENTITY — High-Vis Safety Red */
-  --red-700:   #b91c1c;
+  /* --- BRAND — "Beacon Blue" --------------------------------------------- */
+  --brand-50:  #eef3ff;
+  --brand-100: #d9e4ff;   /* focus ring halo */
+  --brand-300: #8faeff;   /* snap guides, subtle marks */
+  --brand-500: #2d5bff;   /* primary CTA, links, active nav, route line
+                             white label 5.18:1 · as text on canvas 4.76:1 */
+  --brand-600: #2149d6;   /* hover — white label 7.03:1 */
+  --brand-700: #1a3aae;   /* pressed — white label 9.29:1 */
+  --brand-900: #0b1f4d;   /* footer, pricing highlight — cream on it 14.63:1 */
 
-  --green-400: #4ade80;
-  --green-600: #16a34a;
-  --green-700: #15803d;
+  /* --- SAFETY GREEN — "Exit Green" ---------------------------------------
+     Exit signage is green worldwide because people move toward green in a
+     crisis. Never decorative. */
+  --exit-50:  #ecfaf1;
+  --exit-300: #7fe0a6;   /* dark-mode route — 12.14:1 on emergency canvas */
+  --exit-500: #16b364;   /* the brand green. 2.51:1 on canvas, so it is a
+                            DARK-MODE and fill-adjacent value only */
+  --exit-600: #0f9350;   /* light-mode route line — 3.63:1, clears non-text [refined] */
+  --exit-700: #0e7a45;   /* green text and the `safe` button fill
+                            4.96:1 as text · white label 5.40:1 */
 
-  /* ISO safety yellow. Takes a BLACK label — white on it is 1.98:1. Do not
-     darken it to allow white text; that breaks the ISO colour match. */
-  --amber-400: #fbbf24;
-  --amber-500: #f59e0b;
-  --amber-600: #b45309;
+  /* --- EMERGENCY AMBER — "Signal Amber" ---------------------------------- */
+  --signal-100: #fff1cc;
+  --signal-500: #ffb020;   /* emergency banner + accents. ALWAYS ink text:
+                              ink on it is 10.16:1, white on it is 1.83:1 */
+  --signal-700: #c77d00;   /* borders and icon fills only — 3.03:1 */
+  --signal-800: #965e00;   /* amber TEXT on light — 4.94:1 [refined] */
 
-  --blue-400:  #60a5fa;
-  --blue-700:  #1d4ed8;
+  /* Destructive and hard errors only. Never the emergency colour. */
+  --danger-500: #e5484d;   /* decorative / dark-mode only — 3.59:1 on canvas */
+  --danger-600: #c62a2f;   /* error text 5.11:1 · white label 5.57:1 [refined] */
 
-  /* --- SEMANTICS: light theme ------------------------------------------- */
+  /* --- DATA-VIZ ramp (F -> A+). Always paired with a letter or label, so
+     colour is never the only signal. ------------------------------------- */
+  --viz-f:  #e5484d;
+  --viz-d:  #f27a3a;
+  --viz-c:  #f5b02e;
+  --viz-b:  #8dc63f;
+  --viz-a:  #16b364;
+  --viz-ap: #2d5bff;
+
+  /* --- RADIUS ------------------------------------------------------------ */
+  --r-sm:   6px;    /* chips, badges */
+  --r-md:   10px;   /* inputs, secondary buttons */
+  --r-lg:   16px;   /* cards */
+  --r-xl:   24px;   /* hero panels, modals */
+  --r-pill: 999px;  /* primary CTA, chips, all mobile buttons */
+
+  /* --- ELEVATION — depth comes from surface contrast and borders. Shadows
+     are for floating things only; static cards get a 1px border and none. -- */
+  --shadow-sm: 0 1px 2px rgb(17 19 24 / 0.06);
+  --shadow-md: 0 4px 12px rgb(17 19 24 / 0.08), 0 1px 2px rgb(17 19 24 / 0.04);
+  --shadow-lg: 0 16px 40px rgb(17 19 24 / 0.12), 0 2px 6px rgb(17 19 24 / 0.06);
+  --glow-brand: 0 0 0 4px var(--brand-100);
+
+  /* --- MOTION ------------------------------------------------------------ */
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 120ms;
+  --dur-base: 220ms;
+  --dur-slow: 480ms;
+  --dur-hero: 900ms;
+
+  /* --- SEMANTIC ALIASES --------------------------------------------------
+     Components consume these, never the primitives above. This is the layer
+     that flips wholesale when an emergency is declared. */
   color-scheme: light;
 
-  --canvas:        var(--slate-50);   /* Clean Off-White — reduces map clutter */
-  --canvas-subtle: var(--slate-100);
-  --surface:       var(--slate-0);
-  --surface-2:     var(--slate-50);
-  --surface-hover: var(--slate-100);
+  --bg:            var(--canvas);
+  --bg-elevated:   var(--surface);
+  --bg-subtle:     var(--surface-2);
+  --fg:            var(--ink);
+  --fg-body:       var(--ink-2);
+  --fg-muted:      var(--ink-3);
+  --fg-disabled:   var(--ink-4);
+  --line:          var(--border);
+  --line-strong:   var(--border-strong);
+  --line-control:  var(--border-control);
 
-  --ink:         var(--slate-900);    /* Deep Slate Navy — 17.06:1 on canvas */
-  --ink-muted:   var(--slate-500);    /* Border Charcoal — 4.55:1 */
-  --ink-subtle:  var(--slate-400);
-  --ink-inverse: var(--slate-0);
+  --accent:        var(--brand-500);
+  --accent-hover:  var(--brand-600);
+  --accent-press:  var(--brand-700);
+  --accent-ink:    #ffffff;
+  --accent-text:   var(--brand-700);
+  --accent-subtle: var(--brand-50);
 
-  --line:         var(--slate-200);   /* decorative separators only */
-  --line-strong:  var(--slate-300);
-  /* A border that IS the control must clear 3:1 (WCAG 1.4.11). --line is
-     1.32:1 here and slate-400 only 2.45:1 against the off-white canvas —
-     both fine for a rule, neither legal as a control boundary. */
-  --line-control: var(--slate-500);
+  --route:         var(--brand-500);   /* everyday route line */
+  --route-exit:    var(--exit-600);    /* evacuation route, light mode */
 
-  --brand:        var(--brand-700);
-  --brand-hover:  var(--brand-800);
-  --brand-ink:    var(--slate-0);
-  --brand-text:   var(--brand-700);
-  --brand-subtle: var(--brand-50);
-  --brand-border: var(--brand-200);
+  --safe:          var(--exit-700);
+  --safe-ink:      #ffffff;
+  --safe-text:     var(--exit-700);
+  --safe-subtle:   var(--exit-50);
 
-  --danger:        var(--red-600);    /* High-Vis Safety Red */
-  --danger-ink:    var(--slate-0);
-  --danger-text:   var(--red-700);
-  --danger-subtle: #fef2f2;
-  --danger-border: #fecaca;
+  --alarm:         var(--signal-500);
+  --alarm-ink:     var(--ink);         /* 10.16:1 — never white on amber */
+  --alarm-text:    var(--signal-800);
+  --alarm-subtle:  var(--signal-100);
 
-  --success:        var(--green-700);
-  --success-ink:    var(--slate-0);
-  --success-text:   var(--green-700);
-  --success-subtle: #f0fdf4;
-  --success-border: #bbf7d0;
+  --destructive:      var(--danger-600);
+  --destructive-ink:  #ffffff;
+  --destructive-text: var(--danger-600);
 
-  /* Black ink on safety yellow — the one inverted pair in the system. */
-  --warning:        var(--amber-500);
-  --warning-ink:    var(--slate-950);
-  --warning-text:   var(--amber-600);
-  --warning-subtle: #fffbeb;
-  --warning-border: #fde68a;
+  --ring:  var(--brand-500);
+  --scrim: rgb(17 19 24 / 0.4);
 
-  --info:        var(--blue-700);
-  --info-ink:    var(--slate-0);
-  --info-text:   var(--blue-700);
-  --info-subtle: #eff6ff;
-  --info-border: #bfdbfe;
+  /* --- COMPATIBILITY ALIASES ---------------------------------------------
+     ~1,000 call sites across the app already speak the previous semantic
+     vocabulary (bg-canvas, text-ink-muted, bg-brand, text-danger-text...).
+     Rewriting every one of them would be a large, risky diff for zero visual
+     gain, so the old names are kept and re-pointed at the new palette. Every
+     existing component re-skins for free.
 
-  --ring:  var(--brand-700);
-  --scrim: rgb(15 23 42 / 0.6);
+     NEW CODE USES THE NAMES ABOVE (--bg, --fg, --accent, --alarm, --safe).
+     These aliases are for what already exists, not a second API to design in. */
+  --canvas-subtle: var(--surface-2);
+  --surface-hover: var(--surface-2);
+  --ink-muted:     var(--ink-3);
+  --ink-subtle:    var(--ink-3);
+  --ink-inverse:   var(--surface);
 
-  /* Type weight. Three weights, deliberately: an audit of the old system found
-     121 uses of font-semibold against 64 of font-medium — when everything is
-     emphasised, nothing is. Hierarchy comes from size and space first. */
-  --weight-body: 400;
-  --weight-ui: 500;
-  --weight-heading: 600;
+  --brand:         var(--accent);
+  --brand-hover:   var(--accent-hover);
+  --brand-ink:     var(--accent-ink);
+  --brand-text:    var(--accent-text);
+  --brand-subtle:  var(--accent-subtle);
+  --brand-border:  var(--brand-100);
 
-  /* Elevation — hairline borders carry the structure; shadows only whisper. */
-  --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.04);
-  --shadow-sm: 0 1px 3px 0 rgb(15 23 42 / 0.07), 0 1px 2px -1px rgb(15 23 42 / 0.04);
-  --shadow-md: 0 4px 12px -2px rgb(15 23 42 / 0.09), 0 2px 4px -2px rgb(15 23 42 / 0.05);
-  --shadow-lg: 0 12px 28px -6px rgb(15 23 42 / 0.12), 0 4px 8px -4px rgb(15 23 42 / 0.06);
-  --shadow-xl: 0 24px 48px -12px rgb(15 23 42 / 0.16);
-  --shadow-brand: 0 8px 24px -6px rgb(2 132 199 / 0.28);
+  /* danger == destructive, NOT the emergency colour. Amber declares the
+     emergency now; red is for destructive actions and hard errors only. */
+  --danger:        var(--destructive);
+  --danger-ink:    var(--destructive-ink);
+  --danger-text:   var(--destructive-text);
+  --danger-subtle: #fdf0f0;
+  --danger-border: #f5c9ca;
+
+  --success:        var(--safe);
+  --success-ink:    var(--safe-ink);
+  --success-text:   var(--safe-text);
+  --success-subtle: var(--safe-subtle);
+  --success-border: var(--exit-300);
+
+  --warning:        var(--alarm);
+  --warning-ink:    var(--alarm-ink);
+  --warning-text:   var(--alarm-text);
+  --warning-subtle: var(--alarm-subtle);
+  --warning-border: var(--signal-700);
+
+  --info:        var(--brand-500);
+  --info-ink:    #ffffff;
+  --info-text:   var(--brand-700);
+  --info-subtle: var(--brand-50);
+  --info-border: var(--brand-100);
 }
 
 /* ============================================================================
-   Dark theme — the Deep Slate Navy canvas the crisis-mode UI switches to.
-   Accents step LIGHTER: Signal Cyan at #0284C7 is only 4.36:1 on navy and
-   Safety Red only 3.70:1, so both move up the ramp here.
+   EMERGENCY MODE — the whole app inverts.
+   Applied as [data-mode="emergency"] on <html>, or .on-emergency for a single
+   section (the marketing page's emergency band uses the latter).
+
+   The switch must be perceivable at a glance IN GRAYSCALE, not just in colour:
+   canvas luminance goes from ~91% to ~0.5%. That inversion is the signal; the
+   amber is the confirmation.
    ========================================================================= */
-:root[data-theme="dark"],
-.on-dark {
+:root[data-mode="emergency"],
+.on-emergency {
   color-scheme: dark;
 
-  --canvas:        var(--slate-950);
-  --canvas-subtle: #0a1120;
-  --surface:       var(--slate-900);
-  --surface-2:     #16213a;
-  --surface-hover: var(--slate-800);
+  --bg:          #0c0d0f;
+  --bg-elevated: #16181c;
+  --bg-subtle:   #1c1f24;
+  --fg:          #ffffff;   /* 19.44:1 */
+  --fg-body:     #c9ccd2;   /* 12.08:1 */
+  --fg-muted:    #9aa0a8;
+  --fg-disabled: #5e636d;
+  --line:        #2a2d33;   /* decorative, 1.41:1 — exempt */
+  --line-strong: #3e424a;
+  --line-control: #6e737e;  /* 4.09:1 canvas / 3.74:1 elevated / 3.48:1 subtle
+                               [refined from #2A2D33 which was 1.41:1] */
 
-  --ink:         var(--slate-50);
-  --ink-muted:   var(--slate-400);   /* 7.87:1 — charcoal is only 4.24:1 here */
-  --ink-subtle:  var(--slate-500);
-  --ink-inverse: var(--slate-950);
+  /* Amber leads in emergency mode; Beacon Blue steps back entirely, because
+     two competing accents at the moment of an alarm is one too many. */
+  --accent:        var(--signal-500);
+  --accent-hover:  #ffc04d;
+  --accent-press:  #e89a0a;
+  --accent-ink:    var(--ink);        /* 10.16:1 */
+  --accent-text:   var(--signal-500); /* 10.63:1 on emergency canvas */
+  --accent-subtle: #2a1f08;
 
-  --line:         #1e2a41;
-  --line-strong:  var(--slate-800);
-  --line-control: var(--slate-500);
+  --route:      var(--exit-300);      /* the route stays green. Always. */
+  --route-exit: var(--exit-300);      /* 12.14:1 */
 
-  --brand:        var(--brand-400);   /* 8.33:1 on navy */
-  --brand-hover:  var(--brand-300);
-  --brand-ink:    var(--slate-950);
-  --brand-text:   var(--brand-400);
-  --brand-subtle: #0a2438;
-  --brand-border: #10456b;
+  --safe:        var(--exit-500);
+  --safe-ink:    #04140b;
+  --safe-text:   var(--exit-300);
+  --safe-subtle: #0a2018;
 
-  --danger:        var(--red-600);
-  --danger-ink:    var(--slate-0);
-  --danger-text:   var(--red-400);    /* 6.45:1 on navy */
+  --alarm:       var(--signal-500);
+  --alarm-ink:   var(--ink);
+  --alarm-text:  var(--signal-500);
+  --alarm-subtle: #2a1f08;
+
+  /* #E5484D behind a white label is 3.91:1 and fails. Stepping down one holds
+     the label at 4.72:1 while keeping the fill 4.12:1 clear of the canvas. */
+  --destructive:      #d33a3f;
+  --destructive-ink:  #ffffff;
+  --destructive-text: #ff8b8f;
+
+  --ring:  var(--signal-500);
+  --scrim: rgb(0 0 0 / 0.6);
+
+  --glow-brand: 0 0 0 4px rgb(255 176 32 / 0.35);
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.5);
+  --shadow-md: 0 4px 12px rgb(0 0 0 / 0.55), 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 16px 40px rgb(0 0 0 / 0.6), 0 2px 6px rgb(0 0 0 / 0.45);
+
+  /* Compatibility aliases, emergency variants. */
+  --canvas-subtle: var(--bg-subtle);
+  --surface-hover: var(--bg-subtle);
+  --ink-muted:     var(--fg-muted);
+  --ink-subtle:    var(--fg-muted);
+  --ink-inverse:   var(--ink);
+  --brand:         var(--accent);
+  --brand-hover:   var(--accent-hover);
+  --brand-ink:     var(--accent-ink);
+  --brand-text:    var(--accent-text);
+  --brand-subtle:  var(--accent-subtle);
+  --brand-border:  #4a3f24;
+  --danger:        var(--destructive);
+  --danger-ink:    var(--destructive-ink);
+  --danger-text:   var(--destructive-text);
   --danger-subtle: #2a1113;
   --danger-border: #571f22;
-
-  --success:        var(--green-600);
-  --success-ink:    var(--slate-950);
-  --success-text:   var(--green-400);
-  --success-subtle: #0a2018;
+  --success:        var(--safe);
+  --success-ink:    var(--safe-ink);
+  --success-text:   var(--safe-text);
+  --success-subtle: var(--safe-subtle);
   --success-border: #14532d;
-
-  --warning:        var(--amber-500);
-  --warning-ink:    var(--slate-950);
-  --warning-text:   var(--amber-400);
-  --warning-subtle: #261a05;
-  --warning-border: #4a3209;
-
-  --info:        var(--blue-400);
-  --info-ink:    var(--slate-950);
-  --info-text:   var(--blue-400);
-  --info-subtle: #0b1b33;
-  --info-border: #1e3a8a;
-
-  --ring:  var(--brand-400);
-  --scrim: rgb(2 6 23 / 0.75);
-
-  /* Light-on-dark renders optically heavier at the same numeric weight, so
-     headings drop a half-step to read at the same visual weight as light. */
-  --weight-heading: 550;
-
-  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.4);
-  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.5), 0 1px 2px -1px rgb(0 0 0 / 0.4);
-  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.55), 0 2px 4px -2px rgb(0 0 0 / 0.4);
-  --shadow-lg: 0 12px 28px -6px rgb(0 0 0 / 0.6), 0 4px 8px -4px rgb(0 0 0 / 0.45);
-  --shadow-xl: 0 24px 48px -12px rgb(0 0 0 / 0.7);
-  --shadow-brand: 0 8px 24px -6px rgb(56 189 248 / 0.22);
+  --warning:        var(--alarm);
+  --warning-ink:    var(--alarm-ink);
+  --warning-text:   var(--alarm-text);
+  --warning-subtle: var(--alarm-subtle);
+  --warning-border: var(--signal-700);
+  --info:        var(--signal-500);
+  --info-ink:    var(--ink);
+  --info-text:   var(--signal-500);
+  --info-subtle: #2a1f08;
+  --info-border: #4a3209;
 }
 
-.on-dark {
-  background-color: var(--canvas);
-  color: var(--ink);
-}
-
-/* ============================================================================
-   MAP — the two route registers.
-   Everyday routes are Signal Cyan; escape routes follow ISO 23601, which puts
-   horizontal routes in light green and vertical routes (stairs) in dark green —
-   the standard's own answer to multi-floor plans, which is this product's
-   hardest problem.
-
-   Cyan and green separate by only 35.4 under tritanopia, so route TYPE must
-   also be carried by line pattern, never by colour alone: everyday solid,
-   escape dashed, vertical double-dashed.
-   ========================================================================= */
-:root {
-  --map-route-everyday:   var(--brand-600);
-  --map-route-horizontal: #2e9a60;
-  --map-route-vertical:   #0f5c38;
-  --map-route-arrow:      var(--green-700);
-  --map-you-are-here:     var(--brand-700);
-  --map-fire-equipment:   var(--red-600);
-  --map-hazard:           var(--red-600);
-  --map-wall:             var(--slate-400);
-  --map-room:             var(--slate-100);
-  --map-label:            var(--slate-600);
-}
-
-:root[data-theme="dark"] {
-  --map-route-everyday:   var(--brand-400);
-  --map-route-horizontal: #4fd08a;
-  --map-route-vertical:   #22905b;
-  --map-you-are-here:     var(--brand-400);
-  --map-wall:             var(--slate-600);
-  --map-room:             var(--slate-900);
-  --map-label:            var(--slate-300);
+.on-emergency {
+  background-color: var(--bg);
+  color: var(--fg);
 }

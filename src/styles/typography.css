@@ -1,0 +1,173 @@
+/* ============================================================================
+   AlertUp — Typography
+   Two families plus one mono.
+
+   Instrument Serif   display only — H1-H3, pull-quotes, big stat numbers,
+                      wordmark. WEIGHT 400 ONLY, never bold. Negative tracking
+                      at >= 40px, without which it looks slack.
+   Inter              all UI and body. 400 body, 500 labels/buttons/nav,
+                      600 card titles and table headers. Never 700+.
+   JetBrains Mono     building IDs, QR IDs, floor codes, timestamps, build tag.
+
+   BILINGUAL NOTE — this is not in the brief but the product ships `en` and `ka`.
+   Instrument Serif has NO Georgian coverage, so a Georgian H1 would silently
+   fall back to whatever the OS offers (on Windows: Sylfaen, which ships no bold
+   and faux-bolds everything). GL Tatishvili Metal is a Georgian display cut and
+   is already in the repo, so it carries Georgian display text and Noto Sans
+   Georgian carries Georgian body. See the [lang="ka"] block at the end.
+   ========================================================================= */
+
+@import "@fontsource/instrument-serif/400.css";
+@import "@fontsource/instrument-serif/400-italic.css";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/noto-sans-georgian";
+@import "@fontsource-variable/jetbrains-mono";
+
+@font-face {
+  font-family: "GL Tatishvili Metal";
+  src: url("../assets/fonts/GLTatishviliMetal-Bold.ttf") format("truetype");
+  font-weight: 400 800;
+  font-display: swap;
+  /* Georgian block + Georgian Supplement/Extended, so the browser never pulls
+     this file for a page with no Georgian on it. */
+  unicode-range: U+10A0-10FF, U+1C90-1CBF, U+2D00-2D2F;
+}
+
+:root {
+  --font-display: "Instrument Serif", "GL Tatishvili Metal", Georgia, serif;
+  --font-sans: "Inter Variable", "Noto Sans Georgian Variable", ui-sans-serif,
+    system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, "SFMono-Regular", Menlo,
+    monospace;
+
+  /* Max measure. Anything longer than this stops being readable prose. */
+  --measure: 64ch;
+}
+
+/* Single-storey a, open digits, tabular numbers — tnum keeps stats and money
+   from jittering as they change. */
+html {
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01", "tnum";
+  font-size: 100%;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-size: 1rem;
+  line-height: 1.6;
+  font-weight: 400;
+  color: var(--fg-body);
+  background-color: var(--bg);
+}
+
+/* ============================================================================
+   Scale. Mobile value first, desktop at >= 768px.
+   ========================================================================= */
+.t-display-xl,
+.t-display-l,
+.t-display-m,
+.t-stat {
+  font-family: var(--font-display);
+  font-weight: 400;      /* never bold — the face has no business being bold */
+  color: var(--fg);
+}
+
+.t-display-xl { font-size: 2.75rem; line-height: 1.02; letter-spacing: -0.03em; }
+.t-display-l  { font-size: 2.25rem; line-height: 1.05; letter-spacing: -0.025em; }
+.t-display-m  { font-size: 1.875rem; line-height: 1.1; letter-spacing: -0.02em; }
+.t-stat       { font-size: 2.25rem; line-height: 1;   letter-spacing: -0.02em; }
+
+.t-heading-s  { font-size: 1.375rem; line-height: 1.25; letter-spacing: -0.01em; font-weight: 600; }
+.t-heading-xs { font-size: 1.0625rem; line-height: 1.3; font-weight: 600; }
+.t-body-l     { font-size: 1.0625rem; line-height: 1.6; }
+.t-body       { font-size: 1rem;      line-height: 1.6; }
+.t-body-s     { font-size: 0.875rem;  line-height: 1.5; }
+.t-label      { font-size: 0.8125rem; line-height: 1.4; letter-spacing: 0.01em; font-weight: 500; }
+.t-overline {
+  font-size: 0.6875rem;
+  line-height: 1.3;
+  letter-spacing: 0.08em;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+.t-mono { font-family: var(--font-mono); font-weight: 400; font-size: 0.8125rem; }
+
+@media (min-width: 768px) {
+  .t-display-xl { font-size: 4.5rem; }
+  .t-display-l  { font-size: 3.5rem; }
+  .t-display-m  { font-size: 2.5rem; }
+  .t-stat       { font-size: 3rem; }
+  .t-heading-s  { font-size: 1.5rem; }
+  .t-heading-xs { font-size: 1.125rem; }
+  .t-body-l     { font-size: 1.125rem; }
+}
+
+/* One emphasised phrase per headline, in serif italic. */
+.t-display-xl em,
+.t-display-l em,
+.t-display-m em {
+  font-style: italic;
+}
+
+h1, h2, h3, h4 {
+  color: var(--fg);
+  text-wrap: balance;   /* a headline that breaks badly reads as a mistake */
+  hyphens: none;
+}
+
+p {
+  text-wrap: pretty;
+  max-width: var(--measure);
+}
+
+/* Body paragraphs longer than two lines are never centred, so a centred
+   container must opt its prose back to the left. */
+.prose-left p { margin-inline: 0; }
+
+code, kbd, samp, pre, .tabular {
+  font-family: var(--font-mono);
+}
+
+table { font-variant-numeric: tabular-nums; }
+
+a:not([data-button]) {
+  color: var(--accent-text);
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+
+/* ============================================================================
+   Georgian (Mkhedruli).
+   Only ~5 letters of ~40 sit at the x-height, so Georgian needs more vertical
+   room than Latin at the same size. And Mkhedruli has no case: Mtavruli
+   "capitals" apply to a whole word minimum and read as ALL-CAPS SHOUTING, never
+   as Title Case — so uppercase is disabled outright rather than policed per
+   component. That includes .t-overline, which loses its caps in Georgian and
+   keeps only the tracking.
+   ========================================================================= */
+[lang="ka"],
+[lang="ka"] * {
+  line-height: 1.68;
+  text-transform: none;
+}
+
+[lang="ka"] .t-display-xl,
+[lang="ka"] .t-display-l,
+[lang="ka"] .t-display-m,
+[lang="ka"] .t-stat {
+  font-family: "GL Tatishvili Metal", "Noto Sans Georgian Variable", serif;
+  letter-spacing: normal;   /* the negative tracking is tuned for Latin only */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

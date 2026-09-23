@@ -3,12 +3,12 @@ import { join } from "path";
 import { contrastRatio } from "../lib/contrast";
 
 /* ============================================================================
-   The design system's promise is that every foreground/background pair clears
-   WCAG 2.2 AA. A promise nothing checks is a promise that breaks silently, so
-   this parses the real token file and does the arithmetic.
+   The design system promises specific contrast ratios. A promise nothing checks
+   is a promise that breaks silently, so this parses the real token file and
+   does the arithmetic.
 
-   It reads tokens.css rather than the rendered DOM deliberately: jsdom does not
-   resolve var() chains, and the point is to catch a bad value at the source.
+   Targets from the brief: body >= 7:1, secondary >= 4.5:1, button labels
+   >= 4.5:1, non-text (a border that IS a control, icons, focus) >= 3:1.
    ========================================================================= */
 
 const css = readFileSync(join(__dirname, "tokens.css"), "utf8");
@@ -21,10 +21,9 @@ const sliceBlock = (selector: string): string => {
   return css.slice(open, close);
 };
 
-// Primitives are declared on :root and inherited by the dark block, so the dark
-// lookup falls back to :root once its own overrides are exhausted.
 const LIGHT = sliceBlock(":root {");
-const DARK = sliceBlock(':root[data-theme="dark"]') + "\n" + LIGHT;
+// Emergency overrides come first, then :root supplies the primitives it inherits.
+const EMERGENCY = sliceBlock(':root[data-mode="emergency"]') + "\n" + LIGHT;
 
 /** Resolve `--name: #hex;` or `--name: var(--other);` down to a literal hex. */
 const readToken = (block: string, name: string): string => {
@@ -44,41 +43,77 @@ const readToken = (block: string, name: string): string => {
   throw new Error(`Alias chain too deep for --${name}`);
 };
 
-const AA_TEXT = 4.5;
-const AA_NON_TEXT = 3;
+const BODY = 7;
+const SECONDARY = 4.5;
+const NON_TEXT = 3;
 
 describe.each([
-  ["light", LIGHT],
-  ["dark", DARK],
-])("%s theme — WCAG 2.2 AA", (_theme, block) => {
+  ["everyday", LIGHT],
+  ["emergency", EMERGENCY],
+])("%s mode", (_mode, block) => {
   const t = (token: string) => readToken(block, token);
 
   it.each([
+    ["fg on bg", "fg", "bg"],
+    ["fg-body on bg", "fg-body", "bg"],
+    ["fg on bg-elevated", "fg", "bg-elevated"],
+  ])("%s clears 7:1 (body)", (_l, fg, bg) => {
+    expect(contrastRatio(t(fg), t(bg))).toBeGreaterThanOrEqual(BODY);
+  });
+
+  it.each([
+    ["fg-muted on bg", "fg-muted", "bg"],
+    ["fg-muted on bg-subtle", "fg-muted", "bg-subtle"],
+    ["accent-ink on accent", "accent-ink", "accent"],
+    ["accent-text on bg", "accent-text", "bg"],
+    ["safe-ink on safe", "safe-ink", "safe"],
+    ["safe-text on bg", "safe-text", "bg"],
+    ["alarm-ink on alarm", "alarm-ink", "alarm"],
+    ["alarm-text on bg", "alarm-text", "bg"],
+    ["destructive-ink on destructive", "destructive-ink", "destructive"],
+    ["destructive-text on bg", "destructive-text", "bg"],
+  ])("%s clears 4.5:1", (_l, fg, bg) => {
+    expect(contrastRatio(t(fg), t(bg))).toBeGreaterThanOrEqual(SECONDARY);
+  });
+
+  it.each([
+    ["focus ring on bg", "ring", "bg"],
+    ["control border on bg", "line-control", "bg"],
+    ["control border on bg-elevated", "line-control", "bg-elevated"],
+    ["route line on bg", "route", "bg"],
+    ["evacuation route on bg", "route-exit", "bg"],
+  ])("%s clears 3:1 (non-text)", (_l, fg, bg) => {
+    expect(contrastRatio(t(fg), t(bg))).toBeGreaterThanOrEqual(NON_TEXT);
+  });
+});
+
+describe("compatibility aliases still resolve", () => {
+  const t = (token: string) => readToken(LIGHT, token);
+  it.each([
     ["ink on canvas", "ink", "canvas"],
     ["ink-muted on canvas", "ink-muted", "canvas"],
-    ["ink on surface", "ink", "surface"],
-    ["ink on surface-2", "ink", "surface-2"],
-    ["ink-muted on surface", "ink-muted", "surface"],
     ["brand-ink on brand", "brand-ink", "brand"],
     ["danger-ink on danger", "danger-ink", "danger"],
     ["success-ink on success", "success-ink", "success"],
     ["warning-ink on warning", "warning-ink", "warning"],
     ["info-ink on info", "info-ink", "info"],
-    ["danger-text on danger-subtle", "danger-text", "danger-subtle"],
-    ["success-text on success-subtle", "success-text", "success-subtle"],
-    ["warning-text on warning-subtle", "warning-text", "warning-subtle"],
-    ["info-text on info-subtle", "info-text", "info-subtle"],
-    ["brand-text on brand-subtle", "brand-text", "brand-subtle"],
-  ])("%s clears 4.5:1", (_label, fg, bg) => {
-    expect(contrastRatio(t(fg), t(bg))).toBeGreaterThanOrEqual(AA_TEXT);
+  ])("%s clears 4.5:1", (_l, fg, bg) => {
+    expect(contrastRatio(t(fg), t(bg))).toBeGreaterThanOrEqual(SECONDARY);
+  });
+});
+
+describe("the emergency switch is legible without colour", () => {
+  it("inverts canvas luminance, so the mode change survives grayscale", () => {
+    const everyday = readToken(LIGHT, "bg");
+    const emergency = readToken(EMERGENCY, "bg");
+    // A stressed person glancing at the screen must register the change before
+    // reading a word of it. ~17:1 between the two canvases does that.
+    expect(contrastRatio(everyday, emergency)).toBeGreaterThanOrEqual(10);
   });
 
-  it.each([
-    ["focus ring on canvas", "ring", "canvas"],
-    ["focus ring on surface-2", "ring", "surface-2"],
-    ["control border on canvas", "line-control", "canvas"],
-    ["control border on surface-2", "line-control", "surface-2"],
-  ])("%s clears 3:1", (_label, fg, bg) => {
-    expect(contrastRatio(t(fg), t(bg))).toBeGreaterThanOrEqual(AA_NON_TEXT);
+  it("never puts white on the amber alarm — that pair is 1.83:1", () => {
+    const alarm = readToken(LIGHT, "alarm");
+    expect(contrastRatio("#ffffff", alarm)).toBeLessThan(4.5);
+    expect(contrastRatio(readToken(LIGHT, "alarm-ink"), alarm)).toBeGreaterThanOrEqual(7);
   });
 });

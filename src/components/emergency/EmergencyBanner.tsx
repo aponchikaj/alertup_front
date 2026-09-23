@@ -29,7 +29,7 @@ export const EmergencyBanner = ({ onViewRoute, className }: EmergencyBannerProps
       aria-live="assertive"
       data-testid="emergency-banner"
       className={cn(
-        "sticky top-0 z-50 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-danger px-4 py-2 text-center text-danger-ink",
+        "sticky top-0 z-50 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-alarm px-4 py-3 text-center text-alarm-ink",
         className,
       )}
     >
@@ -42,7 +42,7 @@ export const EmergencyBanner = ({ onViewRoute, className }: EmergencyBannerProps
           variant="ghost"
           size="sm"
           onClick={onViewRoute}
-          className="text-danger-ink underline underline-offset-2 hover:bg-white/10"
+          className="text-alarm-ink underline underline-offset-2 hover:bg-black/10"
         >
           {t("emergency.bannerAction")}
         </Button>
