@@ -1,228 +1,226 @@
 /* ============================================================================
-   AlertUp — Design Tokens  ·  "Instrument"
+   AlertUp — Design Tokens
    ----------------------------------------------------------------------------
    Two layers:
-     1. PRIMITIVES — graphite chassis, brand ramp, ISO signal colours.
-                     Never referenced by a component.
-     2. SEMANTICS  — role-based tokens (canvas, surface, ink, line, brand…).
+     1. PRIMITIVES — the brand ramps. Never referenced by a component.
+     2. SEMANTICS  — role-based tokens (canvas, surface, ink, brand, danger…).
                      The only layer that changes between light and dark, and
                      the only layer components are allowed to consume.
 
-   THE RULE THIS FILE ENFORCES
-   ---------------------------
-   Two registers, and they never mix:
+   THE SYSTEM: TWO REGISTERS, AND THEY NEVER MIX
+   ---------------------------------------------
+     EVERYDAY  — Deep Slate Navy chassis + Signal Cyan accent. Store search,
+                 turn-by-turn wayfinding, the whole admin product. 99.9% of use.
+     EMERGENCY — High-Vis Safety Red. Appears nowhere else, ever. Because it is
+                 absent from everyday use, its arrival on screen IS the alarm.
 
-     CALM   — graphite chassis + one brand accent. 99.9% of the product.
-     SIGNAL — ISO 3864 safety colours. Emergency only. Loud on purpose.
+   Cyan never appears on an emergency surface; red never appears as decoration.
+   Break that once and the override stops reading as an override.
 
-   Colour arriving on screen IS the alarm. So brand chroma must never touch
-   map geometry, route lines or status, and signal colour must never be used
-   as decoration. Break this once and the whole idea stops working.
+   Verified: Signal Cyan and Safety Red separate by 166–271 (RGB distance after
+   protan/deutan/tritan simulation). A colour-blind user can never mistake an
+   everyday route for an evacuation route.
 
-   Every ratio in the comments below was COMPUTED, not estimated.
-   Reproduce with: python3 verify-contrast.py
+   Brand identity hexes are #0F172A / #0284C7 / #DC2626 / #F8FAFC / #64748B.
+   Some of those fail WCAG AA in specific roles — Signal Cyan is 4.10:1 behind a
+   white label, Border Charcoal is 3.75:1 on navy. The identity colours are kept
+   exactly as specified for logo, marketing and large display; the semantics
+   below point at accessible neighbours from the same ramp for text-bearing
+   roles. Every pair is checked by tokens.contrast.test.ts.
    ========================================================================= */
 
 :root {
-  /* --- PRIMITIVES: graphite chassis ------------------------------------- */
-  /* Blue-shifted neutrals — reads engineered, not muddy. Note there is no
-     pure black: ISA-101 rejects black grounds for glare fatigue. */
-  --slate-0:    #ffffff;
-  --slate-25:   #fafbfc;
-  --slate-50:   #f3f6f8;
-  --slate-100:  #e7ecf1;
-  --slate-200:  #d3dbe4;
-  --slate-300:  #b0bcc9;
-  --slate-400:  #8090a2;   /* 3.27:1 on white — non-text only */
-  --slate-500:  #5c6e80;   /* 5.25:1 on white — AA muted text */
-  --slate-600:  #44525f;   /* 8.02:1 on white */
-  --slate-700:  #323e4a;   /* 10.92:1 on white */
-  --slate-800:  #212b35;   /* 14.37:1 on white — body text */
-  --slate-900:  #151e27;   /* 16.84:1 on white — dark surface */
-  --slate-950:  #0b1117;   /* 18.97:1 on white — dark canvas */
+  /* --- PRIMITIVES: Deep Slate Navy chassis ------------------------------- */
+  --slate-0:   #ffffff;
+  --slate-50:  #f8fafc;   /* Clean Off-White — brand background neutral */
+  --slate-100: #f1f5f9;
+  --slate-200: #e2e8f0;
+  --slate-300: #cbd5e1;
+  --slate-400: #94a3b8;
+  --slate-500: #64748b;   /* Border Charcoal — brand muted UI */
+  --slate-600: #475569;
+  --slate-700: #334155;
+  --slate-800: #1e293b;
+  --slate-900: #0f172a;   /* Deep Slate Navy — brand primary base */
+  --slate-950: #020617;
 
-  /* --- PRIMITIVES: brand ------------------------------------------------- */
-  /* Purple at hue 271deg: 67.7deg from the nearest ISO safety hue (so it can
-     never be read as a safety instruction) and 32.7deg from the competitor
-     blue cluster at 222-238deg (so AlertUp is not a fifth blue).
-     If purple is rejected, swap this whole ramp for the Civic navy alternate
-     at the bottom of this file — nothing else needs to change. */
-  --brand-50:   #f6f1fc;
-  --brand-100:  #ebe0f9;
-  --brand-200:  #d8c4f3;
-  --brand-300:  #bc9ce9;
-  --brand-400:  #9c6bdb;   /* 5.01:1 on slate-950 — DARK-MODE accent + ring */
-  --brand-500:  #8438ce;   /* 6.11:1 white text */
-  --brand-600:  #7629bf;   /* 7.39:1 white text — LIGHT-MODE solid + ring */
-  --brand-700:  #62219e;   /* 9.41:1 white text */
-  --brand-800:  #4e1c7e;
-  --brand-900:  #3c1661;
-  --brand-950:  #260c42;
+  /* --- PRIMITIVES: Signal Cyan (the everyday accent) --------------------- */
+  /* brand-600 is the identity hex. brand-700 is the text/fill cut, because
+     white on brand-600 is 4.10:1 and fails AA. */
+  --brand-50:  #f0f9ff;
+  --brand-100: #e0f2fe;
+  --brand-200: #bae6fd;
+  --brand-300: #7dd3fc;
+  --brand-400: #38bdf8;   /* dark-mode accent — 8.33:1 on navy */
+  --brand-500: #0ea5e9;
+  --brand-600: #0284c7;   /* IDENTITY — Signal Cyan. Logo, marketing, large display */
+  --brand-700: #0369a1;   /* working cut — 5.93:1 white label, 5.67:1 as text */
+  --brand-800: #075985;
+  --brand-900: #0c4a6e;
+  --brand-950: #082f49;
 
-  /* --- PRIMITIVES: SIGNAL register (ISO 3864) ---------------------------- */
-  /* These four exist so the phone matches the wall. They are the ONLY
-     saturated colours in the product and they appear in the emergency layer
-     and on the map, nowhere else. */
+  /* --- PRIMITIVES: SIGNAL register -------------------------------------- */
+  /* High-Vis Safety Red is the specified emergency override. The others follow
+     ISO 3864 meanings so the phone matches the signage on the wall: green is
+     safe condition, yellow is warning, blue is mandatory action. */
+  --red-400:   #f87171;   /* dark-mode emergency text — 6.45:1 on navy */
+  --red-500:   #ef4444;
+  --red-600:   #dc2626;   /* IDENTITY — High-Vis Safety Red */
+  --red-700:   #b91c1c;
 
-  /* Red — prohibition / fire equipment. Note: NOT #ff0000. Fully saturated
-     red carries a stricter photosensitivity threshold (WCAG 2.3.1). */
-  --signal-red:        #c4211b;  /* white label 5.87:1 AA */
-  --signal-red-text:   #a11a15;  /* on white   7.85:1 AAA */
-  --signal-red-dark:   #ff8179;  /* on slate-950 7.83:1 AAA */
+  --green-400: #4ade80;
+  --green-600: #16a34a;
+  --green-700: #15803d;
 
-  /* Green — safe condition, escape route, all clear. */
-  --signal-green:      #1c7a4c;  /* white label 5.33:1 AA */
-  --signal-green-text: #136139;  /* on white   7.51:1 AAA */
-  --signal-green-dark: #5cd293;  /* on slate-950 10.02:1 AAA */
+  /* ISO safety yellow. Takes a BLACK label — white on it is 1.98:1. Do not
+     darken it to allow white text; that breaks the ISO colour match. */
+  --amber-400: #fbbf24;
+  --amber-500: #f59e0b;
+  --amber-600: #b45309;
 
-  /* Yellow — warning. Takes a BLACK label, per ISO 3864 and per the maths:
-     white on this yellow is 1.98:1 and unreadable. Do not darken the yellow
-     to "fix" it — that breaks the ISO colour match. */
-  --signal-amber:      #f9a800;  /* black label 9.60:1 AAA */
-  --signal-amber-text: #8a5200;  /* on white   6.39:1 AA */
-  --signal-amber-dark: #ffc24d;  /* on slate-950 11.81:1 AAA */
+  --blue-400:  #60a5fa;
+  --blue-700:  #1d4ed8;
 
-  /* Blue — mandatory action. */
-  --signal-blue:       #005387;  /* white label 8.12:1 AAA */
-  --signal-blue-text:  #0a4a75;  /* on white   9.34:1 AAA */
-  --signal-blue-dark:  #77c0f0;  /* on slate-950 9.56:1 AAA */
-
-  /* WARNING, verified: red and amber are indistinguishable to many users.
-     Measured separation after CVD simulation (<40 = identical):
-       red vs green   protan 70.7  deutan 79.3  tritan 220.2   ok
-       red vs amber   protan 61.0  deutan 24.0  tritan   4.2   FAILS
-     So CRITICAL and WARNING must ALSO differ by icon shape (octagon vs
-     triangle) and by text. Colour alone is not allowed to carry this. */
-
-  /* --- SEMANTICS: light theme (default) ---------------------------------- */
+  /* --- SEMANTICS: light theme ------------------------------------------- */
   color-scheme: light;
 
-  --canvas:         var(--slate-0);
-  --canvas-subtle:  var(--slate-50);
-  --surface:        var(--slate-0);
-  --surface-2:      var(--slate-50);
-  --surface-hover:  var(--slate-100);
+  --canvas:        var(--slate-50);   /* Clean Off-White — reduces map clutter */
+  --canvas-subtle: var(--slate-100);
+  --surface:       var(--slate-0);
+  --surface-2:     var(--slate-50);
+  --surface-hover: var(--slate-100);
 
-  --ink:            var(--slate-800);   /* not black — 14.37:1 is plenty */
-  --ink-muted:      var(--slate-500);
-  --ink-subtle:     var(--slate-400);
-  --ink-inverse:    var(--slate-0);
+  --ink:         var(--slate-900);    /* Deep Slate Navy — 17.06:1 on canvas */
+  --ink-muted:   var(--slate-500);    /* Border Charcoal — 4.55:1 */
+  --ink-subtle:  var(--slate-400);
+  --ink-inverse: var(--slate-0);
 
-  --line:           var(--slate-200);   /* decorative separators only */
-  --line-strong:    var(--slate-300);
-  /* Borders that ARE the control (inputs, checkboxes, toggles) must clear 3:1
-     per WCAG 1.4.11. --line is 1.40:1 and is not allowed to do that job. */
-  --line-control:   var(--slate-400);   /* 3.27:1 on canvas, 3.01:1 on surface-2 */
+  --line:         var(--slate-200);   /* decorative separators only */
+  --line-strong:  var(--slate-300);
+  /* A border that IS the control must clear 3:1 (WCAG 1.4.11). --line is
+     1.32:1 here and slate-400 only 2.45:1 against the off-white canvas —
+     both fine for a rule, neither legal as a control boundary. */
+  --line-control: var(--slate-500);
 
-  --brand:          var(--brand-600);
-  --brand-hover:    var(--brand-700);
-  --brand-ink:      var(--slate-0);
-  --brand-text:     var(--brand-700);
-  --brand-subtle:   var(--brand-50);
-  --brand-border:   var(--brand-200);
+  --brand:        var(--brand-700);
+  --brand-hover:  var(--brand-800);
+  --brand-ink:    var(--slate-0);
+  --brand-text:   var(--brand-700);
+  --brand-subtle: var(--brand-50);
+  --brand-border: var(--brand-200);
 
-  --danger:         var(--signal-red);
-  --danger-ink:     var(--slate-0);
-  --danger-text:    var(--signal-red-text);
-  --danger-subtle:  #fdf2f1;
-  --danger-border:  #f3cdca;
+  --danger:        var(--red-600);    /* High-Vis Safety Red */
+  --danger-ink:    var(--slate-0);
+  --danger-text:   var(--red-700);
+  --danger-subtle: #fef2f2;
+  --danger-border: #fecaca;
 
-  --success:        var(--signal-green);
+  --success:        var(--green-700);
   --success-ink:    var(--slate-0);
-  --success-text:   var(--signal-green-text);
-  --success-subtle: #eff8f3;
-  --success-border: #c3e5d3;
+  --success-text:   var(--green-700);
+  --success-subtle: #f0fdf4;
+  --success-border: #bbf7d0;
 
-  /* Black ink on amber — the one inverted pair in the system. */
-  --warning:        var(--signal-amber);
+  /* Black ink on safety yellow — the one inverted pair in the system. */
+  --warning:        var(--amber-500);
   --warning-ink:    var(--slate-950);
-  --warning-text:   var(--signal-amber-text);
-  --warning-subtle: #fdf6e7;
-  --warning-border: #f2dca8;
+  --warning-text:   var(--amber-600);
+  --warning-subtle: #fffbeb;
+  --warning-border: #fde68a;
 
-  --info:           var(--signal-blue);
-  --info-ink:       var(--slate-0);
-  --info-text:      var(--signal-blue-text);
-  --info-subtle:    #eef5fa;
-  --info-border:    #c4dcec;
+  --info:        var(--blue-700);
+  --info-ink:    var(--slate-0);
+  --info-text:   var(--blue-700);
+  --info-subtle: #eff6ff;
+  --info-border: #bfdbfe;
 
-  --ring:           var(--brand-600);   /* 7.39:1 on white */
-  --scrim:          rgb(11 17 23 / 0.6);
+  --ring:  var(--brand-700);
+  --scrim: rgb(15 23 42 / 0.6);
 
-  /* Elevation — hairline borders carry structure; shadows only whisper. */
-  --shadow-xs: 0 1px 2px 0 rgb(11 17 23 / 0.04);
-  --shadow-sm: 0 1px 3px 0 rgb(11 17 23 / 0.06), 0 1px 2px -1px rgb(11 17 23 / 0.04);
-  --shadow-md: 0 4px 12px -2px rgb(11 17 23 / 0.08), 0 2px 4px -2px rgb(11 17 23 / 0.04);
-  --shadow-lg: 0 12px 28px -6px rgb(11 17 23 / 0.11), 0 4px 8px -4px rgb(11 17 23 / 0.05);
-  --shadow-xl: 0 24px 48px -12px rgb(11 17 23 / 0.15);
-  --shadow-brand: 0 8px 24px -6px rgb(118 41 191 / 0.24);
+  /* Type weight. Three weights, deliberately: an audit of the old system found
+     121 uses of font-semibold against 64 of font-medium — when everything is
+     emphasised, nothing is. Hierarchy comes from size and space first. */
+  --weight-body: 400;
+  --weight-ui: 500;
+  --weight-heading: 600;
+
+  /* Elevation — hairline borders carry the structure; shadows only whisper. */
+  --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.04);
+  --shadow-sm: 0 1px 3px 0 rgb(15 23 42 / 0.07), 0 1px 2px -1px rgb(15 23 42 / 0.04);
+  --shadow-md: 0 4px 12px -2px rgb(15 23 42 / 0.09), 0 2px 4px -2px rgb(15 23 42 / 0.05);
+  --shadow-lg: 0 12px 28px -6px rgb(15 23 42 / 0.12), 0 4px 8px -4px rgb(15 23 42 / 0.06);
+  --shadow-xl: 0 24px 48px -12px rgb(15 23 42 / 0.16);
+  --shadow-brand: 0 8px 24px -6px rgb(2 132 199 / 0.28);
 }
 
 /* ============================================================================
-   Dark theme.
+   Dark theme — the Deep Slate Navy canvas the crisis-mode UI switches to.
+   Accents step LIGHTER: Signal Cyan at #0284C7 is only 4.36:1 on navy and
+   Safety Red only 3.70:1, so both move up the ramp here.
    ========================================================================= */
 :root[data-theme="dark"],
 .on-dark {
   color-scheme: dark;
 
-  --canvas:         var(--slate-950);
-  --canvas-subtle:  #0f161d;
-  --surface:        var(--slate-900);
-  --surface-2:      #1b2530;
-  --surface-hover:  #243039;
+  --canvas:        var(--slate-950);
+  --canvas-subtle: #0a1120;
+  --surface:       var(--slate-900);
+  --surface-2:     #16213a;
+  --surface-hover: var(--slate-800);
 
-  --ink:            var(--slate-50);
-  --ink-muted:      var(--slate-400);   /* 5.81:1 on slate-950 */
-  --ink-subtle:     var(--slate-500);
-  --ink-inverse:    var(--slate-950);
+  --ink:         var(--slate-50);
+  --ink-muted:   var(--slate-400);   /* 7.87:1 — charcoal is only 4.24:1 here */
+  --ink-subtle:  var(--slate-500);
+  --ink-inverse: var(--slate-950);
 
-  --line:           #253039;            /* decorative separators only */
-  --line-strong:    #33414d;
-  --line-control:   #647689;            /* 4.06:1 on canvas, 3.60:1 on surface */
+  --line:         #1e2a41;
+  --line-strong:  var(--slate-800);
+  --line-control: var(--slate-500);
 
-  /* Dark mode steps the brand LIGHTER. brand-600 is only 2.57:1 against
-     slate-950 — as a focus ring it fails 1.4.11 outright. This swap is not
-     optional. */
-  --brand:          var(--brand-400);
-  --brand-hover:    var(--brand-300);
-  --brand-ink:      var(--slate-950);
-  --brand-text:     var(--brand-300);
-  --brand-subtle:   #1d1630;
-  --brand-border:   #3a2a5c;
+  --brand:        var(--brand-400);   /* 8.33:1 on navy */
+  --brand-hover:  var(--brand-300);
+  --brand-ink:    var(--slate-950);
+  --brand-text:   var(--brand-400);
+  --brand-subtle: #0a2438;
+  --brand-border: #10456b;
 
-  --danger:         var(--signal-red);
-  --danger-ink:     var(--slate-0);
-  --danger-text:    var(--signal-red-dark);
-  --danger-subtle:  #2a1413;
-  --danger-border:  #4d211e;
+  --danger:        var(--red-600);
+  --danger-ink:    var(--slate-0);
+  --danger-text:   var(--red-400);    /* 6.45:1 on navy */
+  --danger-subtle: #2a1113;
+  --danger-border: #571f22;
 
-  --success:        var(--signal-green);
-  --success-ink:    var(--slate-0);
-  --success-text:   var(--signal-green-dark);
-  --success-subtle: #0f2119;
-  --success-border: #1d3c2c;
+  --success:        var(--green-600);
+  --success-ink:    var(--slate-950);
+  --success-text:   var(--green-400);
+  --success-subtle: #0a2018;
+  --success-border: #14532d;
 
-  --warning:        var(--signal-amber);
+  --warning:        var(--amber-500);
   --warning-ink:    var(--slate-950);
-  --warning-text:   var(--signal-amber-dark);
-  --warning-subtle: #241c0b;
-  --warning-border: #453516;
+  --warning-text:   var(--amber-400);
+  --warning-subtle: #261a05;
+  --warning-border: #4a3209;
 
-  --info:           var(--signal-blue-dark);
-  --info-ink:       var(--slate-950);
-  --info-text:      var(--signal-blue-dark);
-  --info-subtle:    #0e1c28;
-  --info-border:    #1d3448;
+  --info:        var(--blue-400);
+  --info-ink:    var(--slate-950);
+  --info-text:   var(--blue-400);
+  --info-subtle: #0b1b33;
+  --info-border: #1e3a8a;
 
-  --ring:           var(--brand-400);   /* 5.01:1 on slate-950 */
-  --scrim:          rgb(0 0 0 / 0.72);
+  --ring:  var(--brand-400);
+  --scrim: rgb(2 6 23 / 0.75);
+
+  /* Light-on-dark renders optically heavier at the same numeric weight, so
+     headings drop a half-step to read at the same visual weight as light. */
+  --weight-heading: 550;
 
   --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.4);
   --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.5), 0 1px 2px -1px rgb(0 0 0 / 0.4);
   --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.55), 0 2px 4px -2px rgb(0 0 0 / 0.4);
   --shadow-lg: 0 12px 28px -6px rgb(0 0 0 / 0.6), 0 4px 8px -4px rgb(0 0 0 / 0.45);
   --shadow-xl: 0 24px 48px -12px rgb(0 0 0 / 0.7);
-  --shadow-brand: 0 8px 24px -6px rgb(156 107 219 / 0.22);
+  --shadow-brand: 0 8px 24px -6px rgb(56 189 248 / 0.22);
 }
 
 .on-dark {
@@ -231,48 +229,35 @@
 }
 
 /* ============================================================================
-   MAP — ISO 23601 escape and evacuation plan conventions.
-   Light green for horizontal routes, DARK green for vertical (stairs) is the
-   standard's own answer to multi-floor plans, which is AlertUp's hardest UI
-   problem. Pattern (solid vs dashed) must carry the same distinction, so the
-   map still reads on a dimmed phone or to a colour-blind user.
+   MAP — the two route registers.
+   Everyday routes are Signal Cyan; escape routes follow ISO 23601, which puts
+   horizontal routes in light green and vertical routes (stairs) in dark green —
+   the standard's own answer to multi-floor plans, which is this product's
+   hardest problem.
+
+   Cyan and green separate by only 35.4 under tritanopia, so route TYPE must
+   also be carried by line pattern, never by colour alone: everyday solid,
+   escape dashed, vertical double-dashed.
    ========================================================================= */
 :root {
-  --map-route-horizontal: #2e9a60;  /* 3.28:1 on --map-room */
-  --map-route-vertical:   #0f5c38;  /* 7.42:1 on --map-room */
-  --map-route-arrow:      var(--signal-green);
-  --map-you-are-here:     var(--brand-600);
-  --map-fire-equipment:   var(--signal-red);
-  --map-wall:             var(--slate-300);
-  --map-room:             var(--slate-50);
+  --map-route-everyday:   var(--brand-600);
+  --map-route-horizontal: #2e9a60;
+  --map-route-vertical:   #0f5c38;
+  --map-route-arrow:      var(--green-700);
+  --map-you-are-here:     var(--brand-700);
+  --map-fire-equipment:   var(--red-600);
+  --map-hazard:           var(--red-600);
+  --map-wall:             var(--slate-400);
+  --map-room:             var(--slate-100);
   --map-label:            var(--slate-600);
 }
 
 :root[data-theme="dark"] {
-  --map-route-horizontal: #4fd08a;  /* 8.60:1 on --map-room */
-  --map-route-vertical:   #22905b;  /* 4.18:1 on --map-room */
+  --map-route-everyday:   var(--brand-400);
+  --map-route-horizontal: #4fd08a;
+  --map-route-vertical:   #22905b;
   --map-you-are-here:     var(--brand-400);
-  --map-wall:             #33414d;
-  --map-room:             #151e27;
+  --map-wall:             var(--slate-600);
+  --map-room:             var(--slate-900);
   --map-label:            var(--slate-300);
 }
-
-/* ============================================================================
-   ALTERNATE BRAND — "Civic navy".
-   The conservative option from DESIGN-DIRECTION.md section 1.2. Loses the
-   differentiation argument (7.7deg from Situm's indigo, 11.1deg from ISO
-   safety blue) but is unimpeachable in a procurement meeting.
-   To switch: delete the purple --brand-* block above and uncomment this.
-
-   --brand-50:  #eef2f8;
-   --brand-100: #dbe3ef;
-   --brand-200: #b8c8de;
-   --brand-300: #8da5c6;
-   --brand-400: #5c7aa6;   dark-mode accent
-   --brand-500: #2d4f7c;
-   --brand-600: #1f4270;
-   --brand-700: #16355e;   12.32:1 white text
-   --brand-800: #112a4b;
-   --brand-900: #0c1f38;
-   --brand-950: #071425;
-   ========================================================================= */
