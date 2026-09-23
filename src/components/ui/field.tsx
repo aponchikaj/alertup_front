@@ -6,6 +6,7 @@ import {
   type TextareaHTMLAttributes,
 } from "react";
 import { cn } from "../../lib/cn";
+import { XCircleIcon } from "./icons";
 import { inputStyles } from "./styles";
 import { EyeIcon, EyeOffIcon } from "./icons";
 
@@ -76,7 +77,11 @@ export const Field = ({
           role="alert"
           className="flex items-start gap-1.5 text-xs font-medium text-danger-text"
         >
-          {error}
+          {/* The icon is not decoration. Red and amber separate by only 4.2
+              under tritanopia, so a red message with no shape attached does
+              not read as an error at all to a lot of people. */}
+          <XCircleIcon size={14} className="mt-px shrink-0" aria-hidden="true" />
+          <span>{error}</span>
         </p>
       )}
     </div>

@@ -1,4 +1,4 @@
-import { AlertTriangleIcon } from "../ui/icons";
+import { EvacuateIcon } from "../ui/safetyIcons";
 import { Button } from "../ui/button";
 import { useI18n } from "../../i18n/LanguageProvider";
 import { cn } from "../../lib/cn";
@@ -34,7 +34,7 @@ export const EmergencyBanner = ({ onViewRoute, className }: EmergencyBannerProps
       )}
     >
       <span className="inline-flex items-center gap-2 text-sm font-bold tracking-wide">
-        <AlertTriangleIcon className="size-4 shrink-0" aria-hidden="true" />
+        <EvacuateIcon title="" size={17} className="shrink-0" />
         {t("emergency.bannerText")}
       </span>
       {onViewRoute ? (

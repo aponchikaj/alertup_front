@@ -32,6 +32,7 @@ const Settings = lazy(() => import("./pages/settings/settings"));
 const Members = lazy(() => import("./pages/buildings/members"));
 const InviteAccept = lazy(() => import("./pages/invite/inviteAccept"));
 const PageNotFound = lazy(() => import("./pages/other/pageNotFound"));
+const DesignGallery = lazy(() => import("./pages/other/designGallery"));
 const Pricing = lazy(() => import("./pages/pricing/pricing"));
 const Help = lazy(() => import("./pages/help/help"));
 const Privacy = lazy(() => import("./pages/legal/privacy"));
@@ -219,6 +220,9 @@ const App = () => {
             />
 
             {/* Catch-all */}
+            {/* Unlisted design-system reference. Not in the nav, not in the
+                sitemap, no data access. */}
+            <Route path="/_design" element={<DesignGallery />} />
             <Route path="*" element={<PageNotFound />} />
           </Routes>
         </Suspense>
