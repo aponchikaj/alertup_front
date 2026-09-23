@@ -3,228 +3,171 @@
 @import "./styles/tokens.css";
 @import "./styles/typography.css";
 
-/* Emergency mode is an explicit attribute on <html>, not an OS query — the app
-   declares it, the operating system has no opinion about it. */
-@custom-variant emergency (&:where([data-mode="emergency"], [data-mode="emergency"] *));
+/* Explicit theme attributes on <html>. Dark also follows the OS unless pinned.
+   Emergency is declared by the app; the OS has no opinion about it. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+@custom-variant emergency (&:where([data-mode="emergency"], [data-mode="emergency"] *, .on-emergency, .on-emergency *));
 
 /* ============================================================================
    Tailwind v4 theme mapping.
 
-   NOTE ON THE BRIEF: it asks for `tailwind.config.ts` with `theme.extend`.
-   This project is on Tailwind 4.1.18, which removed the JS config in favour of
-   `@theme` in CSS — there is no tailwind.config.* in the repo and adding one
-   would be ignored. This block IS the config; every token below generates the
-   same utilities `theme.extend` would have (`bg-canvas`, `text-ink-2`,
-   `rounded-lg`, `duration-base`, and so on).
+   THE BRIEF ASKS FOR tailwind.config.ts. This repo is Tailwind 4.1.18, which
+   replaced the JS config with @theme in CSS — a config file would be ignored.
+   This block IS theme.extend: every token here becomes a utility (bg-card,
+   text-fg-secondary, rounded-lg, duration-smooth, ease-snappy…).
 
-   `inline` keeps `var(--bg)` in the generated utility rather than resolving it
-   at build time, so a single attribute flip on <html> re-themes every component
-   at once. That is what makes the emergency switch instant.
+   `inline` keeps var(--bg) in the emitted utility instead of resolving it at
+   build time, so one attribute flip on <html> re-themes the whole page — that
+   is what makes the emergency switch a 400ms crossfade instead of a reload.
    ========================================================================= */
 @theme inline {
-  /* --- Fonts --- */
-  --font-display: var(--font-display);
   --font-sans: var(--font-sans);
+  --font-rounded: var(--font-rounded);
   --font-mono: var(--font-mono);
 
-  /* --- Semantic surfaces (these flip in emergency mode) --- */
+  /* Semantic surfaces and text */
   --color-bg: var(--bg);
-  --color-bg-elevated: var(--bg-elevated);
-  --color-bg-subtle: var(--bg-subtle);
+  --color-card: var(--bg-card);
+  --color-inset: var(--bg-inset);
+  --color-elevated: var(--bg-elevated);
   --color-fg: var(--fg);
-  --color-fg-body: var(--fg-body);
-  --color-fg-muted: var(--fg-muted);
+  --color-fg-secondary: var(--fg-secondary);
+  --color-fg-tertiary: var(--fg-tertiary);
   --color-fg-disabled: var(--fg-disabled);
   --color-line: var(--line);
-  --color-line-strong: var(--line-strong);
+  --color-line-opaque: var(--line-opaque);
   --color-line-control: var(--line-control);
+  --color-fill: var(--fill);
+  --color-fill-secondary: var(--fill-secondary);
+  --color-fill-tertiary: var(--fill-tertiary);
 
-  /* --- Accent --- */
+  /* Accent (the one saturated colour on a screen) */
   --color-accent: var(--accent);
-  --color-accent-hover: var(--accent-hover);
-  --color-accent-press: var(--accent-press);
-  --color-accent-ink: var(--accent-ink);
+  --color-accent-icon: var(--accent-icon);
   --color-accent-text: var(--accent-text);
-  --color-accent-subtle: var(--accent-subtle);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-wash: var(--accent-wash);
 
-  /* --- Routes, safety, alarm --- */
+  /* Semantic states */
   --color-route: var(--route);
   --color-route-exit: var(--route-exit);
-  --color-safe: var(--safe);
-  --color-safe-ink: var(--safe-ink);
-  --color-safe-text: var(--safe-text);
-  --color-safe-subtle: var(--safe-subtle);
-  --color-alarm: var(--alarm);
-  --color-alarm-ink: var(--alarm-ink);
-  --color-alarm-text: var(--alarm-text);
-  --color-alarm-subtle: var(--alarm-subtle);
+  --color-safe: var(--safe);           --color-safe-ink: var(--safe-ink);
+  --color-safe-text: var(--safe-text); --color-safe-subtle: var(--safe-subtle);
+  --color-alarm: var(--alarm);         --color-alarm-ink: var(--alarm-ink);
+  --color-alarm-text: var(--alarm-text); --color-alarm-subtle: var(--alarm-subtle);
   --color-destructive: var(--destructive);
   --color-destructive-ink: var(--destructive-ink);
   --color-destructive-text: var(--destructive-text);
-
+  --color-ai: var(--ai);               --color-ai-text: var(--ai-text);
+  --color-stepfree: var(--stepfree);   --color-stepfree-text: var(--stepfree-text);
+  --color-drill: var(--drill);         --color-drill-text: var(--drill-text);
   --color-ring: var(--ring);
   --color-scrim: var(--scrim);
 
-  /* --- Raw ramps, for charts and the rare place a step is needed --- */
-  --color-canvas: var(--canvas);
-  --color-surface: var(--surface);
-  --color-surface-2: var(--surface-2);
-  --color-ink: var(--ink);
-  --color-ink-2: var(--ink-2);
-  --color-ink-3: var(--ink-3);
-  --color-ink-4: var(--ink-4);
-  --color-brand-50: var(--brand-50);
-  --color-brand-100: var(--brand-100);
-  --color-brand-300: var(--brand-300);
-  --color-brand-500: var(--brand-500);
-  --color-brand-600: var(--brand-600);
-  --color-brand-700: var(--brand-700);
-  --color-brand-900: var(--brand-900);
-  --color-exit-50: var(--exit-50);
-  --color-exit-300: var(--exit-300);
-  --color-exit-500: var(--exit-500);
-  --color-exit-600: var(--exit-600);
-  --color-exit-700: var(--exit-700);
-  --color-signal-100: var(--signal-100);
-  --color-signal-500: var(--signal-500);
-  --color-signal-700: var(--signal-700);
-  --color-signal-800: var(--signal-800);
-  --color-danger-500: var(--danger-500);
-  --color-danger-600: var(--danger-600);
-  --color-viz-f: var(--viz-f);
-  --color-viz-d: var(--viz-d);
-  --color-viz-c: var(--viz-c);
-  --color-viz-b: var(--viz-b);
-  --color-viz-a: var(--viz-a);
-  --color-viz-ap: var(--viz-ap);
+  /* Apple primitives, for the rare place a role is not enough */
+  --color-tint: var(--tint);     --color-green: var(--green);   --color-orange: var(--orange);
+  --color-red: var(--red);       --color-yellow: var(--yellow); --color-indigo: var(--indigo);
+  --color-teal: var(--teal);     --color-gray: var(--gray);
+  --color-gray-2: var(--gray-2); --color-gray-3: var(--gray-3); --color-gray-4: var(--gray-4);
+  --color-gray-5: var(--gray-5); --color-gray-6: var(--gray-6);
+  --color-viz-f: var(--viz-f); --color-viz-d: var(--viz-d); --color-viz-c: var(--viz-c);
+  --color-viz-b: var(--viz-b); --color-viz-a: var(--viz-a); --color-viz-ap: var(--viz-ap);
 
-  /* --- Compatibility aliases (see tokens.css). Maps the ~1,000 existing
-     call sites onto the new palette. New code uses the semantic names above. */
-  --color-canvas-subtle: var(--canvas-subtle);
+  /* Compat aliases — previous vocabulary, see tokens.css */
+  --color-canvas: var(--canvas);         --color-canvas-subtle: var(--canvas-subtle);
+  --color-surface: var(--surface);       --color-surface-2: var(--surface-2);
   --color-surface-hover: var(--surface-hover);
-  --color-ink-muted: var(--ink-muted);
-  --color-ink-subtle: var(--ink-subtle);
-  --color-ink-inverse: var(--ink-inverse);
-  --color-brand: var(--brand);
-  --color-brand-hover: var(--brand-hover);
-  --color-brand-ink: var(--brand-ink);
-  --color-brand-text: var(--brand-text);
-  --color-brand-subtle: var(--brand-subtle);
-  --color-brand-border: var(--brand-border);
-  --color-danger: var(--danger);
-  --color-danger-ink: var(--danger-ink);
-  --color-danger-text: var(--danger-text);
-  --color-danger-subtle: var(--danger-subtle);
-  --color-danger-border: var(--danger-border);
-  --color-success: var(--success);
-  --color-success-ink: var(--success-ink);
-  --color-success-text: var(--success-text);
-  --color-success-subtle: var(--success-subtle);
-  --color-success-border: var(--success-border);
-  --color-warning: var(--warning);
-  --color-warning-ink: var(--warning-ink);
-  --color-warning-text: var(--warning-text);
-  --color-warning-subtle: var(--warning-subtle);
-  --color-warning-border: var(--warning-border);
-  --color-info: var(--info);
-  --color-info-ink: var(--info-ink);
-  --color-info-text: var(--info-text);
-  --color-info-subtle: var(--info-subtle);
-  --color-info-border: var(--info-border);
+  --color-ink: var(--ink);   --color-ink-2: var(--ink-2);  --color-ink-3: var(--ink-3);  --color-ink-4: var(--ink-4);
+  --color-ink-muted: var(--ink-muted);   --color-ink-subtle: var(--ink-subtle);  --color-ink-inverse: var(--ink-inverse);
+  --color-line-strong: var(--line-strong);
+  --color-brand: var(--brand);   --color-brand-hover: var(--brand-hover);  --color-brand-ink: var(--brand-ink);
+  --color-brand-text: var(--brand-text); --color-brand-subtle: var(--brand-subtle); --color-brand-border: var(--brand-border);
+  --color-brand-50: var(--brand-50);   --color-brand-100: var(--brand-100); --color-brand-300: var(--brand-300);
+  --color-brand-500: var(--brand-500); --color-brand-600: var(--brand-600); --color-brand-700: var(--brand-700);
+  --color-brand-900: var(--brand-900);
+  --color-danger: var(--danger);   --color-danger-ink: var(--danger-ink);   --color-danger-text: var(--danger-text);
+  --color-danger-subtle: var(--danger-subtle); --color-danger-border: var(--danger-border);
+  --color-success: var(--success); --color-success-ink: var(--success-ink); --color-success-text: var(--success-text);
+  --color-success-subtle: var(--success-subtle); --color-success-border: var(--success-border);
+  --color-exit-300: var(--exit-300); --color-exit-500: var(--exit-500); --color-exit-600: var(--exit-600); --color-exit-700: var(--exit-700);
+  --color-warning: var(--warning); --color-warning-ink: var(--warning-ink); --color-warning-text: var(--warning-text);
+  --color-warning-subtle: var(--warning-subtle); --color-warning-border: var(--warning-border);
+  --color-signal-700: var(--signal-700);
+  --color-info: var(--info); --color-info-ink: var(--info-ink); --color-info-text: var(--info-text);
+  --color-info-subtle: var(--info-subtle); --color-info-border: var(--info-border);
 
-  /* --- Radius --- */
-  --radius-sm: var(--r-sm);
-  --radius-md: var(--r-md);
-  --radius-lg: var(--r-lg);
-  --radius-xl: var(--r-xl);
-  --radius-pill: var(--r-pill);
+  /* Shape — concentric */
+  --radius-xs: var(--r-xs);   --radius-sm: var(--r-sm);   --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);   --radius-xl: var(--r-xl);   --radius-pill: var(--r-pill);
 
-  /* --- Elevation --- */
-  --shadow-sm: var(--shadow-sm);
-  --shadow-md: var(--shadow-md);
-  --shadow-lg: var(--shadow-lg);
+  /* Elevation */
+  --shadow-card: var(--shadow-card);   --shadow-float: var(--shadow-float);
+  --shadow-sheet: var(--shadow-sheet); --shadow-glass: var(--glass-shadow);
+  --shadow-sm: var(--shadow-card);     --shadow-md: var(--shadow-float);  --shadow-lg: var(--shadow-sheet);
 
-  /* --- Motion --- */
-  --ease-out: var(--ease-out);
-  --ease-in-out: var(--ease-in-out);
-  --duration-fast: var(--dur-fast);
-  --duration-base: var(--dur-base);
-  --duration-slow: var(--dur-slow);
-  --duration-hero: var(--dur-hero);
+  /* Motion */
+  --ease-snappy: var(--spring-snappy); --ease-smooth: var(--spring-smooth); --ease-bouncy: var(--spring-bouncy);
+  --ease-out: var(--spring-smooth);    --ease-in-out: var(--spring-smooth);
+  --duration-snappy: var(--dur-snappy); --duration-smooth: var(--dur-smooth);
+  --duration-bouncy: var(--dur-bouncy); --duration-fade: var(--dur-fade);
+  --duration-fast: var(--dur-snappy);  --duration-base: var(--dur-snappy);
+  --duration-slow: var(--dur-smooth);  --duration-hero: 900ms;
 
-  /* --- Layout --- */
-  --container-content: 1200px;
-  --container-wide: 1320px;
+  /* Layout — a website that mimics iOS must not stretch a list row to 1600px */
+  --container-list: 720px;     /* lists, forms */
+  --container-content: 1040px; /* marketing */
+  --container-wide: 1280px;    /* map editor, analytics */
 
-  /* --- 4px spacing scale. Tailwind's default is already 4px-based; these are
-     the named section/card rhythms the brief specifies. --- */
-  --spacing-section: 6rem;      /* 96px desktop band */
-  --spacing-section-md: 4rem;   /* 64px tablet */
-  --spacing-section-sm: 3rem;   /* 48px mobile */
-  --spacing-card: 2rem;         /* 32px desktop card padding */
-  --spacing-card-sm: 1.5rem;    /* 24px mobile */
+  /* Breakpoints — iPad size classes */
+  --breakpoint-regular: 768px;
+  --breakpoint-wide: 1024px;
+  --breakpoint-xwide: 1440px;
 }
 
-/* ============================================================================
-   Base
-   ========================================================================= */
 @layer base {
-  *,
-  *::before,
-  *::after {
-    border-color: var(--line);
-  }
+  *, *::before, *::after { border-color: var(--line); }
 
-  /* Never a removed focus ring. In emergency mode --ring is amber, so the
-     indicator stays visible against the dark canvas. */
-  :focus-visible {
-    outline: 2px solid var(--ring);
-    outline-offset: 2px;
-  }
+  /* Never a removed focus ring. Solid, 2px — the spec's .35 alpha was 1.60:1. */
+  :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+  ::selection { background: var(--accent-wash); color: var(--fg); }
 
-  ::selection {
-    background: var(--accent-subtle);
-    color: var(--accent-text);
-  }
-
-  /* Skip link — first focusable element on every page. */
   .skip-link {
-    position: absolute;
-    left: -9999px;
-    top: 0;
-    z-index: 100;
-    padding: 0.75rem 1.25rem;
-    background: var(--bg-elevated);
-    color: var(--fg);
-    border: 1px solid var(--line-control);
-    border-radius: var(--r-md);
+    position: absolute; left: -9999px; top: 0; z-index: 100;
+    padding: 12px 20px; border-radius: var(--r-sm);
+    background: var(--bg-elevated); color: var(--fg); box-shadow: var(--shadow-float);
   }
-  .skip-link:focus {
-    left: 1rem;
-    top: 1rem;
-  }
+  .skip-link:focus { left: 16px; top: 16px; }
 }
 
 /* ============================================================================
-   The single decorative gradient in the system: the hero glow.
+   Materials. Glass is for bars, toolbars and floating controls — never for
+   content. A solid fallback ships for browsers without backdrop-filter, and
+   prefers-reduced-transparency flips --glass-bg to the solid value.
    ========================================================================= */
-@utility hero-glow {
-  background-image: radial-gradient(
-    60% 50% at 50% 0%,
-    var(--brand-100) 0%,
-    transparent 70%
-  );
+@utility glass {
+  background-color: var(--glass-solid);
+  box-shadow: var(--glass-edge), var(--glass-shadow);
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    background-color: var(--glass-bg);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+  }
 }
 
-@keyframes fade-up {
-  from { opacity: 0; transform: translate3d(0, 16px, 0); }
-  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+/* Inset grouped card: no border in light, a 0.5px hairline in dark. */
+@utility card-inset {
+  background-color: var(--bg-card);
+  border-radius: var(--r-lg);
+  box-shadow: var(--card-edge);
 }
-@keyframes orbit {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-}
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.35; }
-}
+
+/* Fixed bars honour the notch and the home indicator. */
+@utility safe-top { padding-top: env(safe-area-inset-top); }
+@utility safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+@utility safe-x { padding-inline: env(safe-area-inset-left) env(safe-area-inset-right); }
+
+@keyframes fade-up { from { opacity: 0; transform: translate3d(0, 12px, 0); } to { opacity: 1; transform: none; } }
+@keyframes orbit { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes counter-orbit { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
+@keyframes pulse-dot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.55; transform: scale(0.85); } }
+@keyframes pulse-ring { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(2.4); opacity: 0; } }

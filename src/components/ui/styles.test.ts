@@ -7,105 +7,123 @@ import {
   cardStyles,
 } from "./styles";
 
-describe("buttonStyles", () => {
-  it("defaults to the accent-filled primary", () => {
+describe("buttonStyles — iOS button styles", () => {
+  it("defaults to `filled`: tint background, white label", () => {
     expect(buttonStyles()).toContain("bg-accent");
     expect(buttonStyles()).toContain("text-accent-ink");
   });
 
-  it("makes primary a pill, so it reads as the thing to press", () => {
-    expect(buttonStyles({ variant: "primary" })).toContain("rounded-pill");
+  it("ships the four HIG styles plus glass", () => {
+    expect(buttonStyles({ variant: "tinted" })).toContain("bg-accent-wash");
+    expect(buttonStyles({ variant: "gray" })).toContain("bg-fill");
+    expect(buttonStyles({ variant: "plain" })).toContain("bg-transparent");
+    expect(buttonStyles({ variant: "glass" })).toContain("glass");
   });
 
-  it("gives form and table controls the tighter radius — a row of pills is confetti", () => {
-    expect(buttonStyles({ variant: "secondary" })).toContain("rounded-md");
-    expect(buttonStyles({ variant: "ghost" })).toContain("rounded-md");
-    expect(buttonStyles({ variant: "destructive" })).toContain("rounded-md");
-  });
-
-  it("can force the tighter radius on a pill variant", () => {
-    expect(buttonStyles({ variant: "primary", square: true })).toContain("rounded-md");
-  });
-
-  it("sizes at 36 / 44 / 52, with 44 the default touch target", () => {
-    expect(buttonStyles({ size: "sm" })).toContain("h-9");
+  it("sizes at 34 / 44 / 50 with 44 the default touch target", () => {
+    expect(buttonStyles({ size: "sm" })).toContain("h-[34px]");
     expect(buttonStyles({ size: "md" })).toContain("h-11");
-    expect(buttonStyles({ size: "lg" })).toContain("h-13");
+    expect(buttonStyles({ size: "lg" })).toContain("h-[50px]");
     expect(buttonStyles()).toContain("h-11");
   });
 
-  it("uses amber for emergency, never red", () => {
+  it("regular buttons take r-md; prominent, glass and icon buttons are pills", () => {
+    expect(buttonStyles({ size: "md" })).toContain("rounded-md");
+    expect(buttonStyles({ size: "lg" })).toContain("rounded-pill");
+    expect(buttonStyles({ variant: "glass", size: "sm" })).toContain("rounded-pill");
+    expect(buttonStyles({ size: "icon" })).toContain("rounded-pill");
+  });
+
+  it("labels are headline weight (600), never a heading weight", () => {
+    expect(buttonStyles()).toContain("font-semibold");
+    expect(buttonStyles()).not.toContain("font-bold");
+  });
+
+  it("presses with opacity + scale — transform only, never a layout property", () => {
+    expect(buttonStyles()).toContain("active:scale-[0.97]");
+    expect(buttonStyles()).toContain("active:opacity-80");
+  });
+
+  it("disables the iOS way: fill background and tertiary label, not a ghosted primary", () => {
+    expect(buttonStyles()).toContain("disabled:bg-fill");
+    expect(buttonStyles()).toContain("disabled:text-fg-tertiary");
+  });
+
+  it("uses orange for emergency, never red, and is always full width", () => {
     const em = buttonStyles({ variant: "emergency" });
     expect(em).toContain("bg-alarm");
     expect(em).toContain("text-alarm-ink");
-    expect(em).not.toContain("bg-destructive");
-    // A half-width evacuate button is a bug, not a layout choice.
+    expect(em).not.toContain("destructive");
     expect(em).toContain("w-full");
   });
 
-  it("uses exit green for the safe action", () => {
+  it("gives the safe action the green fill with a dark label", () => {
     expect(buttonStyles({ variant: "safe" })).toContain("bg-safe");
     expect(buttonStyles({ variant: "safe" })).toContain("text-safe-ink");
   });
 
-  it("never ships a filled red button by default", () => {
+  it("destructive is plain red by default — filled red lives only in a sheet", () => {
     const d = buttonStyles({ variant: "destructive" });
     expect(d).toContain("bg-transparent");
-    expect(d).toContain("border-destructive");
-    expect(d).toContain("hover:bg-destructive");
-  });
-
-  it("uses the UI weight, never a heading weight", () => {
-    expect(buttonStyles()).toContain("font-medium");
+    expect(d).toContain("text-destructive-text");
   });
 });
 
-describe("inputStyles", () => {
-  it("borders with line-control, which clears 3:1 — the decorative line does not", () => {
-    expect(inputStyles()).toContain("border-line-control");
+describe("inputStyles — iOS text field", () => {
+  it("is a fill, not a bordered box", () => {
+    const i = inputStyles();
+    expect(i).toContain("bg-fill-tertiary");
+    expect(i).not.toContain("border-line");
   });
 
-  it("marks invalid with the destructive border", () => {
-    expect(inputStyles({ invalid: true })).toContain("border-destructive");
+  it("takes a solid 2px focus ring — the alpha ring measured 1.60:1", () => {
+    expect(inputStyles()).toContain("focus:ring-2");
+    expect(inputStyles()).toContain("focus:ring-ring");
   });
 
-  it("never drops below 16px — smaller makes iOS zoom the viewport on focus", () => {
-    expect(inputStyles()).toContain("text-base");
+  it("marks invalid with a red ring, never colour on the text alone", () => {
+    expect(inputStyles({ invalid: true })).toContain("ring-destructive-text");
   });
 
-  it("is 44px tall and takes the control radius", () => {
-    expect(inputStyles()).toContain("h-11");
-    expect(inputStyles()).toContain("rounded-md");
+  it("is 44px, 17px text, r-sm — under 16px makes iOS zoom the viewport", () => {
+    const i = inputStyles();
+    expect(i).toContain("h-11");
+    expect(i).toContain("text-[17px]");
+    expect(i).toContain("rounded-sm");
   });
 });
 
 describe("searchFieldStyles", () => {
-  it("is the biggest control in the product — a stressed person's first tap", () => {
+  it("is the biggest control in the product — 56px pill, 17px text", () => {
     const s = searchFieldStyles();
     expect(s).toContain("h-14");
     expect(s).toContain("rounded-pill");
-    expect(s).toContain("text-[1.125rem]");
+    expect(s).toContain("bg-fill-tertiary");
   });
 });
 
 describe("chipStyles", () => {
-  it("is a 36px pill that reads differently when selected", () => {
+  it("is a 36px capsule on fill; selected takes the tint wash", () => {
     expect(chipStyles()).toContain("h-9");
     expect(chipStyles()).toContain("rounded-pill");
-    expect(chipStyles({ selected: true })).toContain("bg-brand-50");
+    expect(chipStyles()).toContain("bg-fill");
+    expect(chipStyles({ selected: true })).toContain("bg-accent-wash");
   });
 });
 
 describe("badgeStyles", () => {
-  it("renders each tone against its own subtle ground", () => {
-    expect(badgeStyles({ tone: "safe" })).toContain("bg-safe-subtle");
-    expect(badgeStyles({ tone: "alarm" })).toContain("bg-alarm-subtle");
-    expect(badgeStyles({ tone: "brand" })).toContain("bg-brand-50");
+  it("is a capsule at caption1 600, sentence case — Apple does not shout", () => {
+    const b = badgeStyles();
+    expect(b).toContain("rounded-pill");
+    expect(b).toContain("h-[22px]");
+    expect(b).toContain("font-semibold");
+    expect(b).not.toContain("uppercase");
   });
 
-  it("is overline type at 22px", () => {
-    expect(badgeStyles()).toContain("h-[22px]");
-    expect(badgeStyles()).toContain("uppercase");
+  it("renders each tone as 15% tint + tint text", () => {
+    expect(badgeStyles({ tone: "safe" })).toContain("bg-safe-subtle");
+    expect(badgeStyles({ tone: "alarm" })).toContain("bg-alarm-subtle");
+    expect(badgeStyles({ tone: "brand" })).toContain("bg-accent-wash");
   });
 
   it("keeps the deprecated tone names working", () => {
@@ -114,11 +132,11 @@ describe("badgeStyles", () => {
   });
 });
 
-describe("cardStyles", () => {
-  it("carries a 1px border and no shadow — depth comes from contrast", () => {
+describe("cardStyles — inset grouped card", () => {
+  it("has no border and no drop shadow; the canvas contrast does the work", () => {
     const c = cardStyles();
-    expect(c).toContain("rounded-lg");
-    expect(c).toContain("border-line");
-    expect(c).not.toContain("shadow");
+    expect(c).toContain("card-inset");
+    expect(c).not.toContain("border-line");
+    expect(c).not.toContain("shadow-");
   });
 });

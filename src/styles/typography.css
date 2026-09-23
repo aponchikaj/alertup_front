@@ -1,170 +1,139 @@
 /* ============================================================================
-   AlertUp — Typography
-   Two families plus one mono.
+   AlertUp — Typography · the iOS Dynamic Type ladder, in px
+   ----------------------------------------------------------------------------
+   The platform font, so the site reads like an app that was already on the
+   phone. On Apple devices that is SF Pro at 0KB; everywhere else Inter (UI)
+   and Nunito 700/800 (rounded numbers) hold the same scale.
 
-   Instrument Serif   display only — H1-H3, pull-quotes, big stat numbers,
-                      wordmark. WEIGHT 400 ONLY, never bold. Negative tracking
-                      at >= 40px, without which it looks slack.
-   Inter              all UI and body. 400 body, 500 labels/buttons/nav,
-                      600 card titles and table headers. Never 700+.
-   JetBrains Mono     building IDs, QR IDs, floor codes, timestamps, build tag.
+   Weights: 400, 500 (rare), 600, 700. Never 300, never 800+, never italics for
+   emphasis — emphasis is weight or colour.
 
-   BILINGUAL NOTE — this is not in the brief but the product ships `en` and `ka`.
-   Instrument Serif has NO Georgian coverage, so a Georgian H1 would silently
-   fall back to whatever the OS offers (on Windows: Sylfaen, which ships no bold
-   and faux-bolds everything). GL Tatishvili Metal is a Georgian display cut and
-   is already in the repo, so it carries Georgian display text and Noto Sans
-   Georgian carries Georgian body. See the [lang="ka"] block at the end.
+   BILINGUAL: the product ships `en` and `ka`. Neither SF Pro nor Inter carries
+   Mkhedruli, so Noto Sans Georgian sits in the stack ahead of any OS fallback
+   (on Windows that fallback is Sylfaen — no bold, faux-bolds everything).
    ========================================================================= */
 
-@import "@fontsource/instrument-serif/400.css";
-@import "@fontsource/instrument-serif/400-italic.css";
 @import "@fontsource-variable/inter";
 @import "@fontsource-variable/noto-sans-georgian";
+@import "@fontsource/nunito/700.css";
+@import "@fontsource/nunito/800.css";
 @import "@fontsource-variable/jetbrains-mono";
 
-@font-face {
-  font-family: "GL Tatishvili Metal";
-  src: url("../assets/fonts/GLTatishviliMetal-Bold.ttf") format("truetype");
-  font-weight: 400 800;
-  font-display: swap;
-  /* Georgian block + Georgian Supplement/Extended, so the browser never pulls
-     this file for a page with no Georgian on it. */
-  unicode-range: U+10A0-10FF, U+1C90-1CBF, U+2D00-2D2F;
-}
-
 :root {
-  --font-display: "Instrument Serif", "GL Tatishvili Metal", Georgia, serif;
-  --font-sans: "Inter Variable", "Noto Sans Georgian Variable", ui-sans-serif,
-    system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "JetBrains Mono Variable", ui-monospace, "SFMono-Regular", Menlo,
-    monospace;
-
-  /* Max measure. Anything longer than this stops being readable prose. */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    "Inter Variable", "Noto Sans Georgian Variable", "Helvetica Neue", Roboto,
+    system-ui, sans-serif;
+  --font-rounded: -apple-system-ui-rounded, "SF Pro Rounded", "Nunito",
+    "Noto Sans Georgian Variable", var(--font-sans);
+  --font-mono: "SF Mono", ui-monospace, "JetBrains Mono Variable", Menlo, monospace;
   --measure: 64ch;
 }
 
-/* Single-storey a, open digits, tabular numbers — tnum keeps stats and money
-   from jittering as they change. */
 html {
   font-family: var(--font-sans);
-  font-feature-settings: "cv11", "ss01", "tnum";
-  font-size: 100%;
+  /* tnum on everything: a count-up or a changing timer never re-flows. */
+  font-feature-settings: "tnum";
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
 body {
-  font-size: 1rem;
-  line-height: 1.6;
+  font-size: 17px;
+  line-height: 22px;
+  letter-spacing: -0.41px;
   font-weight: 400;
-  color: var(--fg-body);
+  color: var(--fg);
   background-color: var(--bg);
 }
 
 /* ============================================================================
-   Scale. Mobile value first, desktop at >= 768px.
+   The ladder. Each step is size / leading, weight, tracking — exactly iOS.
    ========================================================================= */
-.t-display-xl,
-.t-display-l,
-.t-display-m,
-.t-stat {
-  font-family: var(--font-display);
-  font-weight: 400;      /* never bold — the face has no business being bold */
-  color: var(--fg);
+.t-large-title { font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: 0.37px; }
+.t-title1      { font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: 0.36px; }
+.t-title2      { font-size: 22px; line-height: 28px; font-weight: 700; letter-spacing: 0.35px; }
+.t-title3      { font-size: 20px; line-height: 25px; font-weight: 600; letter-spacing: 0.38px; }
+.t-headline    { font-size: 17px; line-height: 22px; font-weight: 600; letter-spacing: -0.41px; }
+.t-body        { font-size: 17px; line-height: 22px; font-weight: 400; letter-spacing: -0.41px; }
+.t-callout     { font-size: 16px; line-height: 21px; font-weight: 400; letter-spacing: -0.32px; }
+.t-subheadline { font-size: 15px; line-height: 20px; font-weight: 400; letter-spacing: -0.24px; }
+.t-footnote    { font-size: 13px; line-height: 18px; font-weight: 400; letter-spacing: -0.08px; }
+.t-caption1    { font-size: 12px; line-height: 16px; font-weight: 400; letter-spacing: 0; }
+.t-caption2    { font-size: 11px; line-height: 13px; font-weight: 400; letter-spacing: 0.07px; }
+
+/* Marketing-only display steps, desktop. Same family — no serif, ever. */
+.t-display    { font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: 0.37px; }
+.t-display-xl { font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: 0.37px; }
+@media (min-width: 1024px) {
+  .t-display    { font-size: 56px; line-height: 60px; letter-spacing: -1.2px; }
+  .t-display-xl { font-size: 72px; line-height: 76px; letter-spacing: -1.8px; }
 }
 
-.t-display-xl { font-size: 2.75rem; line-height: 1.02; letter-spacing: -0.03em; }
-.t-display-l  { font-size: 2.25rem; line-height: 1.05; letter-spacing: -0.025em; }
-.t-display-m  { font-size: 1.875rem; line-height: 1.1; letter-spacing: -0.02em; }
-.t-stat       { font-size: 2.25rem; line-height: 1;   letter-spacing: -0.02em; }
+/* Rounded numerals — big stats, the visitor screens, ring centres. */
+.t-number {
+  font-family: var(--font-rounded);
+  font-size: 34px;
+  line-height: 41px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
 
-.t-heading-s  { font-size: 1.375rem; line-height: 1.25; letter-spacing: -0.01em; font-weight: 600; }
-.t-heading-xs { font-size: 1.0625rem; line-height: 1.3; font-weight: 600; }
-.t-body-l     { font-size: 1.0625rem; line-height: 1.6; }
-.t-body       { font-size: 1rem;      line-height: 1.6; }
-.t-body-s     { font-size: 0.875rem;  line-height: 1.5; }
-.t-label      { font-size: 0.8125rem; line-height: 1.4; letter-spacing: 0.01em; font-weight: 500; }
-.t-overline {
-  font-size: 0.6875rem;
-  line-height: 1.3;
-  letter-spacing: 0.08em;
-  font-weight: 500;
+/* Group header — exactly Settings: footnote, uppercase, secondary, inset. */
+.t-group-header {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-}
-.t-mono { font-family: var(--font-mono); font-weight: 400; font-size: 0.8125rem; }
-
-@media (min-width: 768px) {
-  .t-display-xl { font-size: 4.5rem; }
-  .t-display-l  { font-size: 3.5rem; }
-  .t-display-m  { font-size: 2.5rem; }
-  .t-stat       { font-size: 3rem; }
-  .t-heading-s  { font-size: 1.5rem; }
-  .t-heading-xs { font-size: 1.125rem; }
-  .t-body-l     { font-size: 1.125rem; }
+  color: var(--fg-secondary);
+  padding-inline-start: 16px;
+  margin-block-end: 8px;
 }
 
-/* One emphasised phrase per headline, in serif italic. */
-.t-display-xl em,
-.t-display-l em,
-.t-display-m em {
-  font-style: italic;
-}
+.t-mono { font-family: var(--font-mono); font-size: 13px; line-height: 18px; font-weight: 400; }
 
-h1, h2, h3, h4 {
-  color: var(--fg);
-  text-wrap: balance;   /* a headline that breaks badly reads as a mistake */
-  hyphens: none;
-}
+/* Aliases for the previous ladder, so the components built on it keep
+   their type until they are rebuilt. Not for new code. */
+.t-stat       { font-family: var(--font-rounded); font-size: 34px; line-height: 41px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.t-overline   { font-size: 11px; line-height: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.t-heading-s  { font-size: 20px; line-height: 25px; font-weight: 600; letter-spacing: 0.38px; }
+.t-heading-xs { font-size: 17px; line-height: 22px; font-weight: 600; letter-spacing: -0.41px; }
+.t-body-l     { font-size: 17px; line-height: 22px; letter-spacing: -0.41px; }
+.t-body-s     { font-size: 15px; line-height: 20px; letter-spacing: -0.24px; }
+.t-label      { font-size: 13px; line-height: 18px; font-weight: 500; }
 
-p {
-  text-wrap: pretty;
-  max-width: var(--measure);
-}
-
-/* Body paragraphs longer than two lines are never centred, so a centred
-   container must opt its prose back to the left. */
-.prose-left p { margin-inline: 0; }
-
-code, kbd, samp, pre, .tabular {
-  font-family: var(--font-mono);
-}
-
+h1, h2, h3, h4 { color: var(--fg); text-wrap: balance; hyphens: none; }
+p { text-wrap: pretty; max-width: var(--measure); }
+em, i { font-style: normal; font-weight: 600; }   /* emphasis is weight, never italic */
+code, kbd, samp, pre { font-family: var(--font-mono); }
 table { font-variant-numeric: tabular-nums; }
+a:not([data-button]) { color: var(--accent-text); text-decoration: none; }
+a:not([data-button]):hover { text-decoration: underline; text-underline-offset: 2px; }
 
-a:not([data-button]) {
-  color: var(--accent-text);
-  text-underline-offset: 2px;
-  text-decoration-thickness: 1px;
-}
+/* Emergency: everything one step larger. A stressed person reads 19px body. */
+[data-mode="emergency"] body,
+[data-mode="emergency"] .t-body,
+.on-emergency .t-body { font-size: 19px; line-height: 25px; letter-spacing: -0.43px; }
+[data-mode="emergency"] .t-headline,
+.on-emergency .t-headline { font-size: 19px; line-height: 25px; }
+[data-mode="emergency"] .t-title3,
+.on-emergency .t-title3 { font-size: 22px; line-height: 28px; }
 
 /* ============================================================================
-   Georgian (Mkhedruli).
-   Only ~5 letters of ~40 sit at the x-height, so Georgian needs more vertical
-   room than Latin at the same size. And Mkhedruli has no case: Mtavruli
-   "capitals" apply to a whole word minimum and read as ALL-CAPS SHOUTING, never
-   as Title Case — so uppercase is disabled outright rather than policed per
-   component. That includes .t-overline, which loses its caps in Georgian and
-   keeps only the tracking.
+   Georgian (Mkhedruli). Only ~5 letters of ~40 sit at the x-height, so it
+   needs more leading; and Mkhedruli has no case — Mtavruli "capitals" apply to
+   whole words and read as SHOUTING, so uppercase is off, group headers included
+   (they keep the tracking, lose the caps).
    ========================================================================= */
 [lang="ka"],
 [lang="ka"] * {
-  line-height: 1.68;
+  line-height: 1.5;
+  letter-spacing: normal;
   text-transform: none;
 }
 
-[lang="ka"] .t-display-xl,
-[lang="ka"] .t-display-l,
-[lang="ka"] .t-display-m,
-[lang="ka"] .t-stat {
-  font-family: "GL Tatishvili Metal", "Noto Sans Georgian Variable", serif;
-  letter-spacing: normal;   /* the negative tracking is tuned for Latin only */
-}
-
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

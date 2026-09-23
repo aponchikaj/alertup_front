@@ -12,13 +12,22 @@ import { cn } from "../../lib/cn";
    ========================================================================= */
 
 export type ButtonVariant =
+  /** iOS `filled` — bg tint, white label. The one saturated control per screen. */
   | "primary"
-  | "secondary"
-  | "ghost"
+  /** iOS `tinted` — 15% tint wash, tint text. */
+  | "tinted"
+  /** iOS `gray` — fill bg, label text. Cancel, secondary. */
+  | "gray"
+  /** iOS `plain` — text only, tint. */
+  | "plain"
+  /** 34px circle / pill on glass, for toolbars and nav bars. */
+  | "glass"
   | "safe"
   | "emergency"
   | "destructive"
-  /** @deprecated use `destructive` — kept so existing call sites compile. */
+  /** @deprecated aliases kept so existing call sites compile. */
+  | "secondary"
+  | "ghost"
   | "danger"
   | "subtle"
   | "link";
@@ -27,69 +36,58 @@ export type ButtonSize = "sm" | "md" | "lg" | "icon" | "icon-sm";
 
 const BUTTON_BASE = cn(
   "relative inline-flex items-center justify-center gap-2 whitespace-nowrap",
-  "font-medium select-none",
-  "transition-[background-color,border-color,color,box-shadow,transform]",
-  "duration-base ease-out",
+  // headline: 17px / 600. Buttons are labels, not headings.
+  "text-[17px] font-semibold tracking-[-0.41px] select-none",
+  "transition-[background-color,color,opacity,transform]",
+  "duration-snappy ease-snappy",
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-  "disabled:opacity-40 disabled:pointer-events-none disabled:cursor-not-allowed",
-  // Press feedback that does not move neighbouring content.
-  "active:scale-[0.98]",
+  // iOS disabled: fill bg + tertiary label, never a ghosted primary.
+  "disabled:pointer-events-none disabled:cursor-not-allowed",
+  // iOS press: opacity .8 + scale .97. Transform only — never a layout property.
+  "active:opacity-80 active:scale-[0.97]",
 );
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   // `accent-ink` is the token paired with `accent` for AA contrast; never
-  // hardcode a foreground here.
-  primary: cn(
-    "bg-accent text-accent-ink",
-    "hover:bg-accent-hover active:bg-accent-press",
-  ),
-  secondary: cn(
-    "bg-surface text-ink border border-line-strong",
-    "hover:bg-surface-2 hover:border-line-control",
-  ),
-  ghost: cn("text-ink-2 bg-transparent", "hover:bg-surface-2 hover:text-ink"),
-  subtle: cn(
-    "bg-accent-subtle text-accent-text border border-brand-100",
-    "hover:bg-brand-100",
-  ),
+  // hardcode a foreground here. In light the fill is #0066D6 (white 5.42:1);
+  // the stock #007AFF is 4.02:1 and is reserved for icons, rings and the route.
+  primary: cn("bg-accent text-accent-ink", "disabled:bg-fill disabled:text-fg-tertiary"),
+  tinted: cn("bg-accent-wash text-accent-text", "disabled:bg-fill disabled:text-fg-tertiary"),
+  gray: cn("bg-fill text-fg", "disabled:text-fg-tertiary"),
+  plain: cn("bg-transparent text-accent-text", "disabled:text-fg-tertiary"),
+  glass: cn("glass text-fg", "disabled:text-fg-tertiary"),
+  secondary: cn("bg-fill text-fg", "disabled:text-fg-tertiary"),
+  ghost: cn("bg-transparent text-accent-text", "disabled:text-fg-tertiary"),
+  subtle: cn("bg-accent-wash text-accent-text", "disabled:text-fg-tertiary"),
   /* "Start evacuation route" / "Mark as safe". Green because people move
      toward green in a crisis — this is the one place the colour is load-bearing
      rather than decorative. */
-  safe: cn("bg-safe text-safe-ink", "hover:brightness-110"),
+  safe: cn("bg-safe text-safe-ink", "disabled:bg-fill disabled:text-fg-tertiary"),
   /* "Declare emergency". Amber, never red: red reads as stop and triggers
      panic, amber reads as act-now and stays the most visible hue at distance.
      ALWAYS behind a hold-to-confirm modal — see ConfirmDialog. */
-  emergency: cn(
-    "bg-alarm text-alarm-ink font-semibold",
-    "hover:brightness-105 focus-visible:outline-alarm",
-  ),
+  emergency: cn("bg-alarm text-alarm-ink", "focus-visible:outline-alarm"),
   /* Outline by default, filling only on hover — a page full of solid red
      buttons trains people to ignore red. */
-  destructive: cn(
-    "bg-transparent text-destructive-text border border-destructive",
-    "hover:bg-destructive hover:text-destructive-ink",
-  ),
-  danger: cn(
-    "bg-transparent text-destructive-text border border-destructive",
-    "hover:bg-destructive hover:text-destructive-ink",
-  ),
-  link: cn(
-    "text-accent-text underline underline-offset-4 decoration-1",
-    "hover:decoration-2",
-  ),
+  /* iOS destructive is `plain` red by default. Filled red exists only inside
+     a confirmation sheet — pass `square` + className there. */
+  destructive: cn("bg-transparent text-destructive-text"),
+  danger: cn("bg-transparent text-destructive-text"),
+  link: cn("bg-transparent text-accent-text underline underline-offset-2"),
 };
 
-/* 36 / 44 / 52. md is the default because 44px is the platform touch target. */
+/* 34 small (toolbars) / 44 regular / 50 prominent (visitor CTAs). */
 const BUTTON_SIZES: Record<ButtonSize, string> = {
-  sm: "h-9 min-h-9 px-4 text-sm",
-  md: "h-11 min-h-11 px-5 text-[0.9375rem]",
-  lg: "h-13 min-h-13 px-7 text-base",
+  sm: "h-[34px] min-h-[34px] px-3.5 text-[15px] tracking-[-0.24px]",
+  md: "h-11 min-h-11 px-5",
+  lg: "h-[50px] min-h-[50px] px-6",
   icon: "h-11 w-11 min-h-11 p-0",
-  "icon-sm": "h-9 w-9 min-h-9 p-0",
+  "icon-sm": "h-[34px] w-[34px] min-h-[34px] p-0",
 };
 
-/** Secondary controls inside forms and tables take the tighter radius. */
-const SQUARE_VARIANTS: ButtonVariant[] = ["secondary", "ghost", "destructive", "danger"];
+/* Regular buttons take r-md (14). Prominent CTAs, glass toolbar buttons and
+   icon buttons are pills. */
+const PILL_ALWAYS: ButtonVariant[] = ["glass"];
 
 export const buttonStyles = ({
   variant = "primary",
@@ -109,8 +107,12 @@ export const buttonStyles = ({
     BUTTON_BASE,
     BUTTON_VARIANTS[variant],
     BUTTON_SIZES[size],
-    square || SQUARE_VARIANTS.includes(variant) ? "rounded-md" : "rounded-pill",
-    variant === "link" && "h-auto min-h-0 rounded-sm px-0",
+    square
+      ? "rounded-md"
+      : PILL_ALWAYS.includes(variant) || size === "lg" || size.startsWith("icon")
+        ? "rounded-pill"
+        : "rounded-md",
+    (variant === "link" || variant === "plain") && "h-auto min-h-0 px-0",
     // A half-width evacuate button is a bug, not a layout choice.
     (fullWidth || variant === "emergency") && "w-full",
     className,
@@ -125,12 +127,13 @@ export const cardStyles = ({
   className = "",
 }: { interactive?: boolean; className?: string } = {}) =>
   cn(
-    "rounded-lg border border-line bg-surface",
+    // Inset grouped card: white on the gray canvas does the work in light;
+    // dark adds a 0.5px hairline via --card-edge. No border, no drop shadow.
+    "card-inset",
     interactive &&
       cn(
-        "transition-[transform,border-color] duration-base ease-out",
-        "hover:-translate-y-0.5 hover:border-line-strong",
-        "focus-within:-translate-y-0.5 focus-within:border-line-strong",
+        "transition-[transform,opacity] duration-snappy ease-snappy",
+        "active:scale-[0.99] active:opacity-90",
       ),
     className,
   );
@@ -142,20 +145,17 @@ export const inputStyles = ({
   className = "",
 }: { invalid?: boolean; className?: string } = {}) =>
   cn(
-    "w-full rounded-md border bg-surface px-3.5 text-ink",
-    // 44px, and 16px text — anything smaller makes iOS zoom the viewport on
-    // focus, which on a phone reads as the page breaking.
-    "h-11 min-h-11 text-base",
-    "transition-[border-color,box-shadow] duration-base ease-out",
-    "placeholder:text-ink-3",
-    "focus:outline-none focus:border-accent focus:shadow-[var(--glow-brand)]",
-    "disabled:bg-surface-2 disabled:text-ink-4 disabled:cursor-not-allowed",
-    "read-only:bg-surface-2",
-    invalid
-      ? "border-destructive focus:border-destructive"
-      // --border is 1.21:1. Decorative rules may use it; a border that IS the
-      // control may not (WCAG 1.4.11 wants 3:1).
-      : "border-line-control",
+    // iOS text field: fill background, no border, r-sm. 44px and 17px text —
+    // anything under 16px makes iOS zoom the viewport on focus.
+    "w-full rounded-sm bg-fill-tertiary px-3 text-fg",
+    "h-11 min-h-11 text-[17px] tracking-[-0.41px]",
+    "transition-[box-shadow,background-color] duration-snappy ease-snappy",
+    "placeholder:text-fg-secondary",
+    // Solid 2px ring: the spec's .35-alpha ring measured 1.60:1.
+    "focus:outline-none focus:ring-2 focus:ring-ring",
+    "disabled:text-fg-tertiary disabled:cursor-not-allowed",
+    "read-only:bg-fill-secondary",
+    invalid && "ring-2 ring-destructive-text focus:ring-destructive-text",
     className,
   );
 
@@ -163,11 +163,11 @@ export const inputStyles = ({
  *  first interaction after scanning. Bigger than anything else on the screen. */
 export const searchFieldStyles = ({ className = "" }: { className?: string } = {}) =>
   cn(
-    "w-full rounded-pill border border-line-control bg-surface",
-    "h-14 pl-12 pr-4 text-[1.125rem] text-ink",
-    "transition-[border-color,box-shadow] duration-base ease-out",
-    "placeholder:text-ink-3",
-    "focus:outline-none focus:border-accent focus:shadow-[var(--glow-brand)]",
+    "w-full rounded-pill bg-fill-tertiary",
+    "h-14 pl-12 pr-4 text-[17px] tracking-[-0.41px] text-fg",
+    "transition-[box-shadow,background-color] duration-snappy ease-snappy",
+    "placeholder:text-fg-secondary",
+    "focus:outline-none focus:ring-2 focus:ring-ring",
     className,
   );
 
@@ -178,12 +178,11 @@ export const chipStyles = ({
   className = "",
 }: { selected?: boolean; className?: string } = {}) =>
   cn(
-    "inline-flex h-9 items-center gap-2 rounded-pill border px-4",
-    "text-sm font-medium",
-    "transition-[background-color,border-color,transform] duration-fast ease-out",
-    selected
-      ? "border-brand-300 bg-brand-50 text-accent-text"
-      : "border-line-strong bg-surface text-ink-2 hover:-translate-y-px hover:border-line-control",
+    "inline-flex h-9 items-center gap-2 rounded-pill px-4",
+    "text-[15px] font-semibold tracking-[-0.24px]",
+    "transition-[background-color,color,transform] duration-snappy ease-snappy",
+    "active:scale-[0.97]",
+    selected ? "bg-accent-wash text-accent-text" : "bg-fill text-fg",
     className,
   );
 
@@ -202,15 +201,15 @@ export type BadgeTone =
   | "info";
 
 const BADGE_TONES: Record<BadgeTone, string> = {
-  neutral: "bg-surface-2 text-ink-3 border-line-strong",
-  brand: "bg-brand-50 text-accent-text border-brand-100",
-  safe: "bg-safe-subtle text-safe-text border-exit-300",
-  alarm: "bg-alarm-subtle text-alarm-text border-signal-700",
-  destructive: "bg-danger-subtle text-destructive-text border-danger-border",
-  success: "bg-safe-subtle text-safe-text border-exit-300",
-  warning: "bg-alarm-subtle text-alarm-text border-signal-700",
-  danger: "bg-danger-subtle text-destructive-text border-danger-border",
-  info: "bg-brand-50 text-accent-text border-brand-100",
+  neutral: "bg-fill text-fg-secondary",
+  brand: "bg-accent-wash text-accent-text",
+  safe: "bg-safe-subtle text-safe-text",
+  alarm: "bg-alarm-subtle text-alarm-text",
+  destructive: "bg-danger-subtle text-destructive-text",
+  success: "bg-safe-subtle text-safe-text",
+  warning: "bg-alarm-subtle text-alarm-text",
+  danger: "bg-danger-subtle text-destructive-text",
+  info: "bg-accent-wash text-accent-text",
 };
 
 export const badgeStyles = ({
@@ -218,8 +217,9 @@ export const badgeStyles = ({
   className = "",
 }: { tone?: BadgeTone; className?: string } = {}) =>
   cn(
-    "inline-flex h-[22px] items-center gap-1.5 rounded-sm border px-2",
-    "text-[0.6875rem] font-medium uppercase leading-none tracking-[0.08em]",
+    // Capsule, caption1 at 600. Sentence case — Apple does not shout.
+    "inline-flex h-[22px] items-center gap-1 rounded-pill px-2",
+    "text-[12px] font-semibold leading-none",
     BADGE_TONES[tone],
     className,
   );
