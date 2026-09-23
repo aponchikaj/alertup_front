@@ -13,8 +13,12 @@ export interface IconProps extends Omit<SVGProps<SVGSVGElement>, "children"> {
 
 /**
  * Shared chassis for every icon in the app: one grid (24), one stroke width
- * (1.75), one set of caps and joins. Consistency here is most of what makes an
+ * (1.5), one set of caps and joins. Consistency here is most of what makes an
  * icon set read as designed rather than assembled.
+ *
+ * 1.5 rather than 1.75 matches the Lucide geometry the design system specifies,
+ * so the hand-rolled set and any Lucide icon pulled in for a gap sit together
+ * without one looking heavier than the other.
  */
 export const Icon = ({
   size = "1em",
@@ -29,7 +33,7 @@ export const Icon = ({
     height={size}
     fill="none"
     stroke="currentColor"
-    strokeWidth={1.75}
+    strokeWidth={1.5}
     strokeLinecap="round"
     strokeLinejoin="round"
     role={title ? "img" : undefined}

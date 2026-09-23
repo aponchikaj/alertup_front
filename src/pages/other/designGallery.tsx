@@ -176,7 +176,7 @@ const DesignGallery = () => {
           </Button>
         </div>
         <div className="mt-6 max-w-md">
-          <Button variant="emergency" size="xl">
+          <Button variant="emergency" size="lg">
             <EvacuateIcon title="" size={20} />
             Evacuate now
           </Button>

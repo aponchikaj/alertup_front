@@ -11,6 +11,17 @@ export {
   CardFooter,
 } from "./card";
 export { Field, TextField, PasswordField, TextAreaField } from "./field";
+export { SearchField, type SearchSuggestion, type SearchFieldProps } from "./searchField";
+export { Chip, ChipStatic, type ChipProps } from "./chip";
+export { Stat, StatRow, ScoreBar, DonutRing, type StatProps, type Grade } from "./stats";
+export {
+  FloorSwitcher,
+  RouteStepList,
+  IconTiles,
+  type FloorOption,
+  type RouteStep,
+  type IconTile,
+} from "./wayfinding";
 export { Alert, Badge, Skeleton, EmptyState } from "./feedback";
 export {
   Container,
@@ -49,6 +60,8 @@ export {
   buttonStyles,
   cardStyles,
   inputStyles,
+  searchFieldStyles,
+  chipStyles,
   badgeStyles,
   type ButtonVariant,
   type ButtonSize,
