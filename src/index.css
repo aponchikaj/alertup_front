@@ -1,4 +1,15 @@
 @import "tailwindcss";
+
+/* ============================================================================
+   Fonts — self-hosted variable faces, so no external CDN request and no CSP
+   question. Inter carries Latin, Noto Sans Georgian carries Mkhedruli, both
+   with REAL weights. That last part is the point: the previous stack had no
+   Georgian coverage, so Windows fell through to Sylfaen — which ships no bold —
+   and faux-bolded every Georgian heading in a product that is half Georgian.
+   ========================================================================= */
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/noto-sans-georgian";
+
 @import "./styles/tokens.css";
 
 /* Theme is driven by an explicit attribute on <html>, not the OS query, so the
@@ -6,29 +17,12 @@
    resolved value onto the attribute. */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
-/* ============================================================================
-   Fonts — typeface.ge families with Georgian + Latin coverage.
-   All three custom faces are display cuts, so body/UI text stays on the
-   system stack for legibility: GL Tatishvili Metal is the heading face,
-   GL Kirovi an alternate display, and Dachi The Lynx a decorative accent
-   for brand moments only.
-   ========================================================================= */
+/* The one remaining custom face: a Georgian-designed display cut, used for
+   headings and brand moments only. Body and UI text never touch it. */
 @font-face {
   font-family: "GL Tatishvili Metal";
   src: url("./assets/fonts/GLTatishviliMetal-Bold.ttf") format("truetype");
   font-weight: 400 800;
-  font-display: swap;
-}
-@font-face {
-  font-family: "GL Kirovi";
-  src: url("./assets/fonts/GLKirovi-Bold.ttf") format("truetype");
-  font-weight: 400 800;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Dachi The Lynx";
-  src: url("./assets/fonts/DachiTheLynx.otf") format("opentype");
-  font-weight: 400;
   font-display: swap;
 }
 
@@ -38,12 +32,45 @@
    resolved in the element's own context and re-resolves when the theme flips.
    ========================================================================= */
 @theme inline {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
-  --font-display: "GL Tatishvili Metal", "Segoe UI", system-ui, sans-serif;
-  --font-alt: "GL Kirovi", "GL Tatishvili Metal", system-ui, sans-serif;
-  --font-accent: "Dachi The Lynx", "GL Kirovi", system-ui, sans-serif;
+  --font-sans: "Inter Variable", "Noto Sans Georgian Variable", ui-sans-serif,
+    system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "GL Tatishvili Metal", "Noto Sans Georgian Variable",
+    "Inter Variable", system-ui, sans-serif;
   --font-mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, monospace;
+
+  /* --- Weight ------------------------------------------------------------
+     Three weights, deliberately. Indirected through tokens.css so dark mode
+     can drop a half-step: light-on-dark renders optically heavier. */
+  --font-weight-body: var(--weight-body);
+  --font-weight-ui: var(--weight-ui);
+  --font-weight-heading: var(--weight-heading);
+
+  /* --- Measure -----------------------------------------------------------
+     In ch, so the cap scales with the font size instead of fighting it. No
+     paragraph in the product exceeds --measure-prose. The single most common
+     responsive failure is scaling images and nav carefully while letting body
+     text run edge to edge. */
+  --measure-prose: 68ch;
+  --measure-text: 60ch;
+  --measure-tight: 44ch;
+
+  /* --- Type scale --------------------------------------------------------
+     Each step carries its own leading and tracking: large text gets tighter
+     both, small text gets looser. Body never drops below 16px — anything
+     smaller makes iOS zoom the viewport on input focus. */
+  --text-display: 3rem;
+  --text-display--line-height: 1.05;
+  --text-display--letter-spacing: -0.02em;
+  --text-h1: 2rem;
+  --text-h1--line-height: 1.15;
+  --text-h1--letter-spacing: -0.015em;
+  --text-h2: 1.5rem;
+  --text-h2--line-height: 1.25;
+  --text-h2--letter-spacing: -0.01em;
+  --text-h3: 1.1875rem;
+  --text-h3--line-height: 1.35;
+  --text-body: 1rem;
+  --text-body--line-height: 1.55;
 
   /* Surfaces */
   --color-canvas: var(--canvas);
@@ -430,4 +457,57 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ============================================================================
+   Baseline typography.
+   Kerning and ligatures on everywhere — there is no case for leaving them off.
+   ========================================================================= */
+html {
+  font-feature-settings: "kern" 1, "liga" 1;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-weight: var(--weight-heading);
+  /* A hyphenated heading looks like a mistake; a heading that breaks badly
+     looks worse. Balance the lines instead of splitting words. */
+  hyphens: none;
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+/* Numbers must not jitter as they change — counts, floor numbers, metrics. */
+table,
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Caps are homogeneous rectangles: the eye loses the word contour without
+   extra tracking, so uppercase is never set solid. */
+.uppercase,
+[class*="uppercase"] {
+  letter-spacing: 0.08em;
+}
+
+/* ============================================================================
+   Georgian (Mkhedruli).
+   Only about five letters of ~40 sit at the x-height, so Georgian runs need
+   more ascender and descender room than Latin at the same size.
+
+   And Mkhedruli has no case. The Mtavruli "capitals" apply to a whole word at
+   minimum and read as ALL-CAPS SHOUTING, never as Title Case — so uppercase is
+   disabled outright here rather than policed per component.
+   ========================================================================= */
+[lang="ka"],
+[lang="ka"] * {
+  line-height: 1.63;
+  text-transform: none;
 }
