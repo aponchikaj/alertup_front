@@ -61,6 +61,21 @@
   /* Lines */
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
+  /* A border that IS the control (input, checkbox, toggle) must clear 3:1 per
+     WCAG 1.4.11. --line is 1.40:1 — fine for a decorative rule, never legal
+     as a control boundary. */
+  --color-line-control: var(--line-control);
+
+  /* Map — ISO 23601 escape-plan conventions. Resolved by the three.js scene
+     through getComputedStyle, so the 3D map re-tints on theme flip for free. */
+  --color-map-route-horizontal: var(--map-route-horizontal);
+  --color-map-route-vertical: var(--map-route-vertical);
+  --color-map-route-arrow: var(--map-route-arrow);
+  --color-map-you-are-here: var(--map-you-are-here);
+  --color-map-fire-equipment: var(--map-fire-equipment);
+  --color-map-wall: var(--map-wall);
+  --color-map-room: var(--map-room);
+  --color-map-label: var(--map-label);
 
   /* Brand */
   --color-brand: var(--brand);
