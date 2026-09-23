@@ -2,7 +2,15 @@ import { useState, type ReactNode } from "react";
 import {
   Button,
   TextField,
+  SearchField,
+  Chip,
   Alert,
+  StatRow,
+  ScoreBar,
+  DonutRing,
+  FloorSwitcher,
+  RouteStepList,
+  IconTiles,
   badgeStyles,
   cardStyles,
   type BadgeTone,
@@ -15,7 +23,16 @@ import {
   MandatoryIcon,
   FireExtinguisherIcon,
 } from "../../components/ui/safetyIcons";
-import { ScanIcon, RouteIcon, MapPinIcon, QrCodeIcon } from "../../components/ui/icons";
+import {
+  ScanIcon,
+  RouteIcon,
+  MapPinIcon,
+  QrCodeIcon,
+  ExitDoorIcon,
+  LayersIcon,
+  SearchIcon,
+  BuildingIcon,
+} from "../../components/ui/icons";
 
 /* ============================================================================
    /_design — the design system, rendered.
@@ -62,10 +79,30 @@ const BRAND = [
   "--brand-50", "--brand-100", "--brand-200", "--brand-300", "--brand-400",
   "--brand-500", "--brand-600", "--brand-700", "--brand-800", "--brand-900",
 ];
-const TONES: BadgeTone[] = ["neutral", "brand", "success", "danger", "warning", "info"];
+const TONES: BadgeTone[] = ["neutral", "brand", "safe", "alarm", "destructive"];
+
+const VENUES = ["Malls", "Hospitals", "Airports", "Campuses", "Offices", "Stadiums"];
+
+const STEPS = [
+  { id: "1", instruction: "Walk to the end of the corridor", icon: <RouteIcon size={18} />, distance: "20 m", floor: "2" },
+  { id: "2", instruction: "Take the lift to floor 3", icon: <LayersIcon size={18} />, floor: "3" },
+  { id: "3", instruction: "Turn right — the pharmacy is on your left", icon: <MapPinIcon size={18} />, distance: "8 m", floor: "3" },
+];
+
+const TILES = [
+  { id: "shops", label: "Find a shop", icon: <SearchIcon size={24} /> },
+  { id: "exits", label: "Exits", icon: <ExitDoorIcon size={24} /> },
+  { id: "lifts", label: "Lifts", icon: <LayersIcon size={24} /> },
+  { id: "rooms", label: "Toilets", icon: <BuildingIcon size={24} /> },
+  { id: "step", label: "Step-free route", icon: <RouteIcon size={24} /> },
+  { id: "ai", label: "Ask Wayfinder", icon: <ScanIcon size={24} /> },
+];
 
 const DesignGallery = () => {
   const [showError, setShowError] = useState(true);
+  const [query, setQuery] = useState("");
+  const [venue, setVenue] = useState<string | null>("Malls");
+  const [floor, setFloor] = useState("g");
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-12">
@@ -151,14 +188,15 @@ const DesignGallery = () => {
 
       <GallerySection
         title="Buttons"
-        note="10px radius. Emergency is the only control allowed a saturated fill, and it is always full width and taller than everything near it."
+        note="Pill on primary and mobile CTAs; the tighter radius on secondary controls inside forms and tables. Emergency is amber and always full width."
       >
         <div className="flex flex-wrap items-center gap-3">
           <Button variant="primary">Primary</Button>
           <Button variant="secondary">Secondary</Button>
           <Button variant="subtle">Subtle</Button>
           <Button variant="ghost">Ghost</Button>
-          <Button variant="danger">Danger</Button>
+          <Button variant="safe">Start evacuation route</Button>
+          <Button variant="destructive">Delete building</Button>
           <Button variant="link">Link</Button>
           <Button variant="primary" disabled>
             Disabled
@@ -170,7 +208,7 @@ const DesignGallery = () => {
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <Button size="sm">Small 36px</Button>
           <Button size="md">Medium 44px</Button>
-          <Button size="lg">Large 48px</Button>
+          <Button size="lg">Large 52px</Button>
           <Button size="icon" aria-label="Scan">
             <ScanIcon size={18} />
           </Button>
@@ -236,6 +274,81 @@ const DesignGallery = () => {
               Lifts on hover and on focus-within, so keyboard users get it too.
             </p>
           </div>
+        </div>
+      </GallerySection>
+
+      <GallerySection
+        title="Search field"
+        note="The single most important control in the product. 56px, 18px text, pill. Keyboard-navigable suggestions — arrow keys and Enter, Escape to dismiss."
+      >
+        <div className="max-w-xl">
+          <SearchField
+            label="Search this building"
+            placeholder="Shop, service, or room…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onClear={() => setQuery("")}
+            suggestions={
+              query
+                ? [
+                    { id: "1", label: "Pharmacy", detail: "Floor 2 · Health" },
+                    { id: "2", label: "Parking — Level B1", detail: "Basement" },
+                  ]
+                : []
+            }
+          />
+        </div>
+      </GallerySection>
+
+      <GallerySection title="Chips" note="Selectable pills. Real buttons with aria-pressed, not divs with onClick.">
+        <div className="flex flex-wrap gap-2">
+          {VENUES.map((v) => (
+            <Chip
+              key={v}
+              selected={venue === v}
+              onClick={() => setVenue(venue === v ? null : v)}
+            >
+              {v}
+            </Chip>
+          ))}
+        </div>
+      </GallerySection>
+
+      <GallerySection title="Stats and data" note="Numbers in the display serif with tabular figures, so a count-up cannot change the element width mid-count.">
+        <StatRow
+          stats={[
+            { value: "< 10s", caption: "To first route" },
+            { value: "[[SCANS]]", caption: "Scans per month" },
+            { value: "100%", caption: "Works without an app" },
+          ]}
+        />
+        <div className="mt-10 grid gap-10 sm:grid-cols-2">
+          <ScoreBar grade="B" label="Routable coverage" />
+          <DonutRing value={72} label="Routes completed" caption="Routes completed" delta="+6 this week" />
+        </div>
+      </GallerySection>
+
+      <GallerySection title="Wayfinding" note="Floor switcher is vertical because floors are — the control is a small picture of the building.">
+        <div className="flex flex-wrap items-start gap-10">
+          <FloorSwitcher
+            floors={[
+              { id: "b1", label: "B1" },
+              { id: "g", label: "G" },
+              { id: "1", label: "1" },
+              { id: "2", label: "2" },
+            ]}
+            current={floor}
+            onChange={setFloor}
+          />
+          <div className="min-w-[280px] flex-1">
+            <RouteStepList steps={STEPS} currentIndex={1} />
+          </div>
+        </div>
+      </GallerySection>
+
+      <GallerySection title="Icon tiles" note="The visitor home. 88px targets, because this is the second of the two taps between scanning a code and seeing an exit.">
+        <div className="max-w-sm">
+          <IconTiles tiles={TILES} />
         </div>
       </GallerySection>
 
