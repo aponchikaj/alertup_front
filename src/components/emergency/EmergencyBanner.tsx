@@ -21,9 +21,12 @@ export const EmergencyBanner = ({ onViewRoute, className }: EmergencyBannerProps
   const { t } = useI18n();
 
   return (
+    // `alert`/`assertive`, not `status`/`polite`: polite makes a screen reader
+    // hold the announcement until the user pauses. For a banner that means
+    // "the building is still in an emergency", waiting for a gap is wrong.
     <div
-      role="status"
-      aria-live="polite"
+      role="alert"
+      aria-live="assertive"
       data-testid="emergency-banner"
       className={cn(
         "sticky top-0 z-50 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-danger px-4 py-2 text-center text-danger-ink",

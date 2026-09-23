@@ -78,13 +78,22 @@ describe("EmergencyBanner", () => {
     renderWithI18n(<EmergencyBanner onViewRoute={onViewRoute} />);
 
     const banner = screen.getByTestId("emergency-banner");
-    expect(banner).toHaveAttribute("role", "status");
+    expect(banner).toHaveAttribute("role", "alert");
     expect(screen.getByText(en.emergency.bannerText)).toBeInTheDocument();
 
     await userEvent.click(
       screen.getByRole("button", { name: en.emergency.bannerAction }),
     );
     expect(onViewRoute).toHaveBeenCalledTimes(1);
+  });
+
+  test("announces assertively — a life-safety alert must not wait for a pause", () => {
+    renderWithI18n(<EmergencyBanner />);
+    const banner = screen.getByTestId("emergency-banner");
+    // `polite` makes a screen reader hold the announcement until the user
+    // pauses. The building is on fire; it does not wait for a gap.
+    expect(banner).toHaveAttribute("role", "alert");
+    expect(banner).toHaveAttribute("aria-live", "assertive");
   });
 
   test("renders without an action when none is supplied", () => {
