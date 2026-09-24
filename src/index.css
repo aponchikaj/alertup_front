@@ -171,3 +171,41 @@
 @keyframes counter-orbit { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
 @keyframes pulse-dot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.55; transform: scale(0.85); } }
 @keyframes pulse-ring { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(2.4); opacity: 0; } }
+
+/* ============================================================================
+   Route rendering — RouteLayer (2D) draws the walking path with pathLength={1}
+   set on the stroke path, which normalizes any leg's real length to 1 unit so
+   these keyframes animate identically for a 20px hop and a 2000px corridor.
+   ----------------------------------------------------------------------------
+   route-draw: the line materializing from start to destination on arrival.
+   route-march: dashes sliding along the line on top, showing travel direction.
+   map-user-pulse: the "you are here" ring — an SVG-safe reuse of pulse-ring
+   (see UserDotLayer.tsx) since animating a circle's r is unreliable cross-
+   browser; this instead scales a fixed-radius ring about its own center.
+   ========================================================================= */
+@keyframes route-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes route-march { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -40; } }
+
+.route-path-draw {
+  stroke-dasharray: 1;
+  animation: route-draw 900ms ease-out both;
+}
+.route-path-march {
+  animation: route-march 900ms linear infinite;
+}
+.map-user-pulse {
+  animation: pulse-ring 1.8s ease-out infinite;
+}
+
+/* Disabling the animation (rather than zeroing its duration) matters here:
+   .route-path-draw's only stroke-dashoffset value comes from the keyframes,
+   so turning animation off reverts to the initial value (0) — fully drawn —
+   instead of risking a browser that skips the "to" frame and leaves the
+   dashoffset stuck at 1 (an invisible line). */
+@media (prefers-reduced-motion: reduce) {
+  .route-path-draw,
+  .route-path-march,
+  .map-user-pulse {
+    animation: none;
+  }
+}

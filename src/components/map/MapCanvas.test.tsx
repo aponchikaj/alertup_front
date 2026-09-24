@@ -33,6 +33,17 @@ const segment: RouteSegment = {
   distanceMeters: 40,
 };
 
+const segmentWithPoints: RouteSegment = {
+  ...segment,
+  // Smoothed polyline sent by the backend — deliberately different from the
+  // node-to-node path so the assertion proves points win, not nodes.
+  points: [
+    { x: 100, y: 100, nodeId: 'a' },
+    { x: 200, y: 140 },
+    { x: 300, y: 100, nodeId: 'x' },
+  ],
+};
+
 const pois: Poi[] = [
   { id: 'poi1', nodeId: 'p', name: 'LC Waikiki', category: 'Apparel', keywords: [] },
 ];
@@ -140,6 +151,27 @@ describe('layers', () => {
       </MapCanvas>,
     );
     expect(container.querySelector('[data-testid="route-layer"]')).toBeNull();
+  });
+
+  test('RouteLayer draws the smoothed points polyline when present, falling back to nodes otherwise', () => {
+    const { container, rerender } = render(
+      <MapCanvas>
+        <RouteLayer segment={segmentWithPoints} tone="danger" />
+      </MapCanvas>,
+    );
+    const drawn = container.querySelector('.route-path-draw');
+    expect(drawn).toHaveAttribute('d', 'M 100 100 L 200 140 L 300 100');
+
+    // No points on the segment → falls back to the node-to-node path.
+    rerender(
+      <MapCanvas>
+        <RouteLayer segment={segment} tone="danger" />
+      </MapCanvas>,
+    );
+    expect(container.querySelector('.route-path-draw')).toHaveAttribute(
+      'd',
+      'M 100 100 L 300 100 L 500 100',
+    );
   });
 
   test('UserDotLayer renders only when a position is known', () => {

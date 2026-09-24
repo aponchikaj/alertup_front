@@ -27,6 +27,7 @@ import {
   type FloorDrawing,
   type IconKind,
 } from '../map/drawing';
+import { segmentPolyline } from '../map/routeGeometry';
 import type { MapNode, MapEdge, NodeType, TransitType, RouteSegment } from '../map/types';
 import { wallHeightFor, wallSolid, SLAB_THICKNESS, PLATFORM_HEIGHT, type WallSolid } from './geometry3d';
 
@@ -339,11 +340,12 @@ export function buildFloorSpec(input: BuildFloorSpecInput): FloorSpec {
     });
   }
 
+  const routePolyline = routeSegment ? segmentPolyline(routeSegment) : [];
   const routes: RouteSpec[] =
-    routeSegment && routeSegment.nodes.length >= 2
+    routePolyline.length >= 2
       ? [
           {
-            points: routeSegment.nodes.map((n) => ({ x: n.x, y: n.y })),
+            points: routePolyline.map((p) => ({ x: p.x, y: p.y })),
             colorToken: ROUTE_TONES[routeTone],
             animated: routeAnimated,
           },

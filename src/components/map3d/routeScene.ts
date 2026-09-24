@@ -14,6 +14,7 @@
 
 import type { AssembledRoute, RouteStep } from '../map/types';
 import type { RouteTone } from '../map/mapTheme';
+import { segmentPolyline } from '../map/routeGeometry';
 import { stackFloors, wallHeightFor, type FloorLevel } from './geometry3d';
 import { buildFloorSpec, type SceneSpec, type ConnectorSpec, type FloorSpec } from './sceneBuilder';
 
@@ -95,9 +96,10 @@ export function buildRouteScene(input: RouteSceneInput): RouteScene {
           : null,
     });
     for (const segment of segments.slice(1)) {
-      if (segment.nodes.length >= 2) {
+      const polyline = segmentPolyline(segment);
+      if (polyline.length >= 2) {
         spec.routes.push({
-          points: segment.nodes.map((n) => ({ x: n.x, y: n.y })),
+          points: polyline.map((p) => ({ x: p.x, y: p.y })),
           colorToken: spec.routes[0]?.colorToken ?? 'var(--brand)',
           animated: false,
         });
