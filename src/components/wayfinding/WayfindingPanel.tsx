@@ -104,6 +104,12 @@ export const WayfindingPanel = ({
 }: WayfindingPanelProps) => {
   const { t, lang } = useI18n();
   const [route, setRoute] = useState<AssembledRoute | null>(null);
+  /**
+   * Bumped on every successful load. `route` identity is not enough on its own:
+   * a cached or memoised response can arrive as the very same object, and a
+   * fresh load still has to put the visitor back at the top of the route.
+   */
+  const [routeSeq, setRouteSeq] = useState(0);
   const [destinationName, setDestinationName] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   /** A profile-change refetch: the route stays on screen while it runs. */
@@ -122,6 +128,13 @@ export const WayfindingPanel = ({
   const requestSeqRef = useRef(0);
   /** Abort handle for the in-flight request, so a superseded fetch stops. */
   const inFlightRef = useRef<AbortController | null>(null);
+  /**
+   * The selection we have already re-requested with a compass heading.
+   * Compared by identity, not value: a heading refetch re-stores the very same
+   * selection object, while a new destination brings a new one — so the heading
+   * goes out exactly once per route instead of looping on its own response.
+   */
+  const headingSentForRef = useRef<DestinationSelection | null>(null);
   const supports3d = useMap3dSupport();
   const [viewMode, setViewMode] = useState<MapViewMode>(readMapViewPreference);
   const view3d = supports3d && viewMode === "3d";
@@ -188,22 +201,21 @@ export const WayfindingPanel = ({
         if (requestSeqRef.current !== seq) return;
 
         setRoute(next);
+        setRouteSeq((n) => n + 1);
         // Only now: a destination that never loaded must not become the one a
         // later profile change silently re-requests.
         lastSelectionRef.current = selection;
         setDestinationName(selection.name);
-        progress.reset();
         writeStoredDestination(buildingId, {
           kind: selection.kind,
           poiId: selection.poiId,
           nodeId: selection.nodeId,
           name: selection.name,
         });
-
-        // A rescan lands mid-journey: jump to the leg on the scanned floor.
-        if (originFloorNumber !== undefined) {
-          progress.syncToFloorNumber(originFloorNumber);
-        }
+        // Progress restarts on its own: useRouteProgress resets whenever a new
+        // route arrives. Re-anchoring after a rescan happens in an effect
+        // below, against the route that actually committed — the `progress`
+        // captured here belongs to the route being replaced.
       } catch (err) {
         if (requestSeqRef.current !== seq) return;
         // Deliberately does NOT clear `route`: a stale route still gets the
@@ -211,15 +223,37 @@ export const WayfindingPanel = ({
         setError(errorMessage(err));
       } finally {
         // `finally` runs even on the early returns above; only the newest
-        // request may take the spinners down.
+        // request may take the spinners down — and only it may declare the
+        // panel idle again, which is what the heading refetch checks before it
+        // dares replace a request that is still running.
         if (requestSeqRef.current === seq) {
+          inFlightRef.current = null;
           setLoading(false);
           setRefreshing(false);
         }
       }
     },
-    [buildingId, originNodeId, originFloorNumber, profile, progress],
+    [buildingId, originNodeId, profile],
   );
+
+  /**
+   * A new route puts the visitor back at its first instruction — and, after a
+   * rescan, on the leg for the floor the code was actually on.
+   *
+   * This has to run after the new route commits. Doing it inside `loadRoute`
+   * ran it against the `progress` captured when the fetch started, so the
+   * re-anchor index was computed over the *previous* route's feed and then
+   * applied to the new one.
+   */
+  const resetProgressRef = useLatestRef(progress.reset);
+  const syncToFloorRef = useLatestRef(progress.syncToFloorNumber);
+  useEffect(() => {
+    if (routeSeq === 0) return;
+    resetProgressRef.current();
+    if (originFloorNumber !== undefined) {
+      syncToFloorRef.current(originFloorNumber);
+    }
+  }, [routeSeq, originFloorNumber, resetProgressRef, syncToFloorRef]);
 
   /** Remember the preference, then re-route the journey already on screen. */
   const onProfileChange = useCallback(
@@ -228,6 +262,27 @@ export const WayfindingPanel = ({
       writeRouteProfile(next);
       const selection = lastSelectionRef.current;
       if (selection) void loadRoute(selection, { profile: next, silent: true });
+    },
+    [loadRoute],
+  );
+
+  /**
+   * The compass produced a bearing. Only the opening instruction depends on
+   * which way the visitor is facing, so this re-asks the server once, silently:
+   * the route already on screen stays put while the better-phrased one loads,
+   * and a failure leaves the visitor with a route that still works.
+   */
+  const onHeading = useCallback(
+    (heading: number) => {
+      // A request is still running, and `lastSelectionRef` is only written on
+      // success — so it still names the destination being replaced. Refetching
+      // it now would abort the newer request and strand the user on the old
+      // destination. A heading is an improvement, never worth that: stand down.
+      if (inFlightRef.current) return;
+      const selection = lastSelectionRef.current;
+      if (!selection || headingSentForRef.current === selection) return;
+      headingSentForRef.current = selection;
+      void loadRoute(selection, { heading, silent: true });
     },
     [loadRoute],
   );
@@ -244,6 +299,7 @@ export const WayfindingPanel = ({
     setLoading(false);
     setRefreshing(false);
     lastSelectionRef.current = null;
+    headingSentForRef.current = null;
     writeStoredDestination(buildingId, null);
   }, [buildingId]);
 
@@ -433,7 +489,8 @@ export const WayfindingPanel = ({
               >
                 <Map3DRouteLazy
                   route={route}
-                  activeStepIndex={progress.activeIndex}
+                  // The scene indexes route.steps, not the instruction feed.
+                  activeStepIndex={progress.activeStepIndex}
                   tone={routeTone}
                   userDot={
                     !progress.isPreviewing &&
@@ -485,7 +542,11 @@ export const WayfindingPanel = ({
           </MapCanvas>
           )}
 
-          <RouteStepper progress={progress} onRescan={onRescan} />
+          <RouteStepper
+            progress={progress}
+            onRescan={onRescan}
+            onHeading={onHeading}
+          />
         </div>
       ) : (
         !loading && idleContent

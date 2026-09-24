@@ -23,6 +23,18 @@ jest.mock("../map3d/useMap3dSupport", () => ({
   resetSupportCache: () => {},
 }));
 
+// The compass, on a device that has one. jsdom has no orientation events, so
+// the real hook can only ever report `unsupported` here.
+let mockHeading: number | null = null;
+jest.mock("../../lib/useDeviceHeading", () => ({
+  useDeviceHeading: () => ({
+    heading: mockHeading,
+    state: mockHeading === null ? "idle" : "granted",
+    request: () => {},
+  }),
+  headingFromEvent: () => null,
+}));
+
 const mockedApi = wayfindingApi as jest.Mocked<typeof wayfindingApi>;
 
 if (typeof globalThis.ResizeObserver === "undefined") {
@@ -135,6 +147,7 @@ beforeEach(() => {
   jest.resetAllMocks();
   localStorage.clear();
   sessionStorage.clear();
+  mockHeading = null;
 });
 
 describe("WayfindingPanel — route preference", () => {
@@ -234,6 +247,58 @@ describe("WayfindingPanel — route preference", () => {
     );
     const [, options] = mockedApi.fetchEvacuationRoute.mock.calls[0];
     expect(options).not.toHaveProperty("profile");
+  });
+
+  test("re-requests the route with the compass heading exactly once", async () => {
+    mockHeading = 90;
+    mockedApi.fetchRoute.mockResolvedValue(makeRoute());
+    renderPanel();
+
+    await screen.findByTestId("route-stepper");
+
+    // One silent refetch carrying the heading — and then no more, even though
+    // the refetch itself lands a fresh route and re-renders the stepper.
+    await waitFor(() => expect(mockedApi.fetchRoute).toHaveBeenCalledTimes(2));
+    expect(mockedApi.fetchRoute).toHaveBeenLastCalledWith(
+      expect.objectContaining({ toPoiId: "p1", heading: 90 }),
+    );
+
+    await act(async () => {});
+    expect(mockedApi.fetchRoute).toHaveBeenCalledTimes(2);
+  });
+
+  test("a compass heading never aborts a request already in flight", async () => {
+    mockedApi.fetchRoute.mockResolvedValueOnce(makeRoute());
+    renderPanel();
+    await screen.findByTestId("route-stepper");
+    expect(mockedApi.fetchRoute).toHaveBeenCalledTimes(1);
+
+    // A load is under way. `lastSelectionRef` still names the OLD destination
+    // (it is only written on success), so a heading refetch fired now would
+    // re-request the old one and abort this request on its way out.
+    let resolvePending: (route: AssembledRoute) => void = () => {};
+    mockedApi.fetchRoute.mockImplementationOnce(
+      () =>
+        new Promise<AssembledRoute>((resolve) => {
+          resolvePending = resolve;
+        }),
+    );
+    // The compass reading lands in the render this change triggers.
+    mockHeading = 90;
+    fireEvent.change(profilePicker(), { target: { value: "wheelchair" } });
+
+    await waitFor(() => expect(mockedApi.fetchRoute).toHaveBeenCalledTimes(2));
+    // The heading must have stood down: a third request here is the abort.
+    expect(mockedApi.fetchRoute).toHaveBeenCalledTimes(2);
+    expect(mockedApi.fetchRoute).toHaveBeenLastCalledWith(
+      expect.objectContaining({ profile: "wheelchair" }),
+    );
+
+    // …and the request it would have aborted still lands on screen.
+    await act(async () => {
+      resolvePending(makeRoute({ totalDistanceM: 120, totalDurationSec: 180 }));
+    });
+    expect(screen.getByText("120 m · 3 min")).toBeInTheDocument();
   });
 
   test("starting over mid-refetch is not undone when the stale response lands", async () => {

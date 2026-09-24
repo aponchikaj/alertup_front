@@ -602,6 +602,12 @@ export const ka: Messages = {
     profileMinFloorChanges: "ნაკლები სართულის ცვლილება",
     warningsTitle: "გაითვალისწინეთ",
     segmentNotAccessible: "საფეხურებით",
+    landmark: "{name} თქვენს {side}",
+    sideLeft: "მარცხნივ",
+    sideRight: "მარჯვნივ",
+    useCompass: "კომპასის გამოყენება",
+    compassDenied: "კომპასზე წვდომა უარყოფილია.",
+    facing: "მიმართულება {deg}°",
   },
 
   qr: {

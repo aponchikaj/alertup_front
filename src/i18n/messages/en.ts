@@ -601,6 +601,12 @@ export const en = {
     profileMinFloorChanges: "Fewest floor changes",
     warningsTitle: "Heads-up",
     segmentNotAccessible: "Not step-free",
+    landmark: "{name} on your {side}",
+    sideLeft: "left",
+    sideRight: "right",
+    useCompass: "Use compass",
+    compassDenied: "Compass access was declined.",
+    facing: "Facing {deg}°",
   },
 
   qr: {

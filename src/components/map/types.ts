@@ -189,7 +189,9 @@ export interface RouteLandmark {
   poiId: string;
   name: string;
   relation: 'before' | 'after' | 'at';
-  side?: 'left' | 'right';
+  /** Required: the stepper always says which side, so the builder always sends
+   *  a landmark with one rather than a half-useful "past the Coffee Bar". */
+  side: 'left' | 'right';
 }
 
 /** One turn-by-turn instruction, bilingual by construction. */
