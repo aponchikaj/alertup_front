@@ -76,8 +76,10 @@ import { getBuilding } from '../../../apis/building';
 import type { Node as LegacyNode } from '../../../apis/nodesApi';
 import {
   autoConnectFloor,
+  createClosure,
   createEdge,
   createFloor,
+  deleteClosure,
   deleteEdge,
   createNode,
   createTransitLink,
@@ -85,6 +87,7 @@ import {
   deleteNode,
   deletePoi,
   getBuildingGraph,
+  listClosures,
   savePoi,
   toEditorEdge,
   toEditorFloor,
@@ -95,6 +98,7 @@ import {
   updateNode,
   uploadShopLogo,
   validateBuilding,
+  type Closure,
   type EditorEdge,
   type EditorGraph,
   type EditorNode,
@@ -103,6 +107,7 @@ import {
   type RawFloor,
   type RawNode,
   type RawPoi,
+  type UpdateEdgeInput,
   type ValidationReport,
 } from '../../../apis/mapEditorApi';
 import {
@@ -128,6 +133,7 @@ import { EditorAiPanel } from './editorAiPanel';
 import { AgentChatPanel } from '../../../components/ai/AgentChatPanel';
 import { LinkFloorsDialog } from './linkFloorsDialog';
 import { ValidationPanel } from './validationPanel';
+import { ClosuresPanel, type ClosureDraftInput } from './closuresPanel';
 
 /* ============================================================================
    Map editor page (F3).
@@ -295,6 +301,13 @@ export const MapEditorPage = () => {
   const [report, setReport] = useState<ValidationReport | null>(null);
   const [validating, setValidating] = useState(false);
 
+  // Closures. `closureDraft` is null when nobody is picking edges and an array
+  // (possibly empty) while the draft is open — the distinction is what arms
+  // edge-tap-to-toggle and what Escape cancels.
+  const [closures, setClosures] = useState<Closure[]>([]);
+  const [closuresLoading, setClosuresLoading] = useState(true);
+  const [closureDraft, setClosureDraft] = useState<string[] | null>(null);
+
   // Rubber band for the room/shop tools, and the cursor that previews the next
   // wall segment. Both are ephemeral pointer state, so they live here rather
   // than in the reducer — same reasoning as the existing node drag.
@@ -351,6 +364,8 @@ export const MapEditorPage = () => {
   editorRef.current = editor;
   const placeTypeRef = useRef(placeType);
   placeTypeRef.current = placeType;
+  const closureDraftRef = useRef(closureDraft);
+  closureDraftRef.current = closureDraft;
 
   // Relays a confirmed mutation to the other editors in the room. A ref
   // because the mutation handlers above are declared before the collab hook
@@ -1223,6 +1238,28 @@ export const MapEditorPage = () => {
     };
   }, [buildingId]);
 
+  // Closures are advisory rather than structural: a failure here must not stop
+  // the editor loading, so the error is swallowed and the panel simply shows an
+  // empty list.
+  useEffect(() => {
+    if (!buildingId) return;
+    let cancelled = false;
+    setClosuresLoading(true);
+    listClosures(buildingId)
+      .then((rows) => {
+        if (!cancelled) setClosures(rows);
+      })
+      .catch(() => {
+        /* the panel falls back to "no active closures" */
+      })
+      .finally(() => {
+        if (!cancelled) setClosuresLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [buildingId]);
+
   const runValidation = useCallback(async () => {
     if (!buildingId) return;
     setValidating(true);
@@ -1286,6 +1323,11 @@ export const MapEditorPage = () => {
   const selectedEdge = useMemo(
     () => graph.edges.find((edge) => edge.id === editor.selectedEdgeId) ?? null,
     [graph.edges, editor.selectedEdgeId],
+  );
+
+  const closureDraftSet = useMemo(
+    () => (closureDraft === null ? undefined : new Set(closureDraft)),
+    [closureDraft],
   );
 
   const activeDrawing = activeFloor?.drawing ?? EMPTY_DRAWING;
@@ -1952,6 +1994,14 @@ export const MapEditorPage = () => {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        // The closure draft is the outermost gesture: while it is open Escape
+        // abandons it and stops, so a half-picked closure is never thrown away
+        // together with the selection underneath it.
+        if (closureDraftRef.current !== null) {
+          setClosureDraft(null);
+          return;
+        }
+
         // Escape peels one layer at a time: abandon the gesture in progress
         // first, and only leave fullscreen once there is nothing to cancel.
         // Otherwise a mis-drawn wall would also throw away the workspace.
@@ -2189,6 +2239,19 @@ export const MapEditorPage = () => {
           category: values.category || null,
           description: values.description || null,
           keywords: values.keywords,
+          externalId: values.externalId || null,
+          // `aliases` is forwarded ONLY when the inspector says the chips were
+          // edited — the server replaces the whole `names` column whenever the
+          // key is present, so an untouched field must send nothing at all.
+          // When it IS sent, the loaded en/ka ride along so the rewrite cannot
+          // drop translations another client set.
+          ...(values.aliases !== undefined
+            ? {
+                aliases: values.aliases,
+                nameEn: values.nameEn,
+                nameKa: values.nameKa,
+              }
+            : {}),
         }),
       );
       if (!poi) return;
@@ -2241,8 +2304,27 @@ export const MapEditorPage = () => {
   const deleteEdgeByIdRef = useRef(deleteEdgeById);
   deleteEdgeByIdRef.current = deleteEdgeById;
 
+  /** Add or remove one edge from the open closure draft. */
+  const toggleClosureEdge = useCallback((edgeId: string) => {
+    setClosureDraft((current) => {
+      if (current === null) return current;
+      return current.includes(edgeId)
+        ? current.filter((id) => id !== edgeId)
+        : [...current, edgeId];
+    });
+  }, []);
+
   const handleEdgeClick = useCallback(
     (edge: { id: string }) => {
+      // A closure draft owns the map while it is open: a tap picks or unpicks
+      // the connection instead of selecting or erasing it. Otherwise the
+      // eraser would silently delete the edge someone meant to close.
+      if (closureDraftRef.current !== null) {
+        toggleClosureEdge(edge.id);
+        dispatch({ type: 'SELECT_EDGE', edgeId: edge.id });
+        return;
+      }
+
       const tool = editorRef.current.tool;
       if (tool === 'erase') {
         void deleteEdgeById(edge.id);
@@ -2252,15 +2334,11 @@ export const MapEditorPage = () => {
       dispatch({ type: 'SELECT_EDGE', edgeId: edge.id });
       setInspectorOpen(true);
     },
-    [deleteEdgeById, dispatch],
+    [deleteEdgeById, dispatch, toggleClosureEdge],
   );
 
   const handleSaveEdge = useCallback(
-    async (patch: {
-      transitType?: TransitType;
-      accessible?: boolean;
-      weight?: number | null;
-    }) => {
+    async (patch: Omit<UpdateEdgeInput, 'buildingId'>) => {
       if (!selectedEdge) return;
       const updated = await mutate(() =>
         updateEdge(selectedEdge.id, { buildingId, ...patch }),
@@ -2282,6 +2360,47 @@ export const MapEditorPage = () => {
     setInspectorOpen(false);
     toast({ title: t('mapEditor.saved'), tone: 'success' });
   }, [deleteEdgeById, selectedEdge, t, toast]);
+
+  /* --- closures ----------------------------------------------------------- */
+
+  const handleCreateClosure = useCallback(
+    async (input: ClosureDraftInput): Promise<boolean> => {
+      const edgeIds = closureDraftRef.current;
+      if (!edgeIds || edgeIds.length === 0) return false;
+      const created = await mutate(() =>
+        createClosure(buildingId, {
+          edgeIds,
+          reason: input.reason,
+          endsAt: input.endsAt,
+          // Passed through verbatim: `null` here is the BLOCKED sentinel the
+          // panel made the operator choose, never a default this layer invents.
+          costMultiplier: input.costMultiplier,
+        }),
+      );
+      // `mutate` swallows the error into a toast and hands back null. Saying
+      // so out loud is what stops the panel from clearing a form whose save
+      // never landed.
+      if (!created) return false;
+      setClosures((current) => [created, ...current]);
+      setClosureDraft(null);
+      toast({ title: t('mapEditor.closureSaved'), tone: 'success' });
+      return true;
+    },
+    [buildingId, mutate, t, toast],
+  );
+
+  const handleDeleteClosure = useCallback(
+    async (closureId: string) => {
+      const done = await mutate(async () => {
+        await deleteClosure(buildingId, closureId);
+        return true;
+      });
+      if (!done) return;
+      setClosures((current) => current.filter((c) => c.id !== closureId));
+      toast({ title: t('mapEditor.saved'), tone: 'success' });
+    },
+    [buildingId, mutate, t, toast],
+  );
 
   /* --- shape actions ----------------------------------------------------- */
 
@@ -2414,6 +2533,9 @@ export const MapEditorPage = () => {
       target={graph.nodes.find((n) => n.id === selectedEdge.targetNodeId) ?? null}
       onSave={handleSaveEdge}
       onDelete={handleDeleteEdge}
+      closureDraftActive={closureDraft !== null}
+      inClosureDraft={closureDraft?.includes(selectedEdge.id) ?? false}
+      onAddToClosure={() => toggleClosureEdge(selectedEdge.id)}
     />
   ) : selectedNode ? (
     <NodeInspector
@@ -2706,7 +2828,14 @@ export const MapEditorPage = () => {
           nodesById={nodesById}
           inaccessibleLabel={t('mapEditor.edgeAccessible')}
           selectedEdgeId={editor.selectedEdgeId}
-          onEdgeClick={editor.tool === 'select' ? handleEdgeClick : undefined}
+          highlightedEdgeIds={closureDraftSet}
+          // While a closure draft is open every tool defers to edge picking —
+          // otherwise the operator would have to arm Select first.
+          onEdgeClick={
+            editor.tool === 'select' || closureDraft !== null
+              ? handleEdgeClick
+              : undefined
+          }
         />
       )}
       {nodesMode && (
@@ -2835,6 +2964,22 @@ export const MapEditorPage = () => {
               loading={validating}
               onRerun={() => void runValidation()}
               onFocusNode={focusNode}
+            />
+
+            <ClosuresPanel
+              closures={closures}
+              loading={closuresLoading}
+              draftEdgeIds={closureDraft}
+              onStartDraft={() => {
+                // Picking happens on the routing graph, which only renders in
+                // Nodes mode — arming the draft in Draw mode would show a hint
+                // pointing at connections nobody can see.
+                setNodesMode(true);
+                setClosureDraft([]);
+              }}
+              onCancelDraft={() => setClosureDraft(null)}
+              onCreate={handleCreateClosure}
+              onDelete={handleDeleteClosure}
             />
           </div>
         </div>

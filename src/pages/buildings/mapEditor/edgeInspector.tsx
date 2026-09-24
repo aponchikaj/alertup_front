@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type KeyboardEvent } from 'react';
 import { Button } from '../../../components/ui/button';
 import { ConfirmDialog } from '../../../components/ui/confirmDialog';
 import { TextField } from '../../../components/ui/field';
 import { Select } from '../../../components/ui/select';
 import { Badge } from '../../../components/ui/feedback';
-import { TrashIcon } from '../../../components/ui/icons';
+import { CloseIcon, PlusIcon, TrashIcon } from '../../../components/ui/icons';
 import { useI18n } from '../../../i18n/LanguageProvider';
 import type { TransitType } from '../../../components/map';
+import type { EdgeDirection } from '../../../components/map/types';
 import type { EditorEdge, EditorNode, UpdateEdgeInput } from '../../../apis/mapEditorApi';
 
 /* ============================================================================
@@ -35,6 +36,22 @@ export interface EdgeInspectorProps {
   target: EditorNode | null;
   onSave: (patch: Omit<UpdateEdgeInput, 'buildingId'>) => Promise<void>;
   onDelete: () => Promise<void>;
+  /** True while a closure draft is collecting edges. */
+  closureDraftActive?: boolean;
+  /** Whether this edge is already in that draft. */
+  inClosureDraft?: boolean;
+  /**
+   * Adds the edge the inspector is pointed at to the open closure draft.
+   *
+   * NOT a keyboard path, despite being a button: it only renders for a
+   * SELECTED edge, and the only way to select one today is clicking a bare
+   * <line> in EdgeLayer that has neither tabIndex nor a role. So closure
+   * picking is pointer-driven end to end; this button just saves a second trip
+   * to the canvas once an edge is already selected. A real keyboard path needs
+   * a focusable list of the floor's connections — routed to the accessibility
+   * sweep (F13).
+   */
+  onAddToClosure?: () => void;
 }
 
 export const EdgeInspector = ({
@@ -43,11 +60,17 @@ export const EdgeInspector = ({
   target,
   onSave,
   onDelete,
+  closureDraftActive = false,
+  inClosureDraft = false,
+  onAddToClosure,
 }: EdgeInspectorProps) => {
   const { t } = useI18n();
   const [transitType, setTransitType] = useState<TransitType>(edge.transitType);
   const [accessible, setAccessible] = useState(edge.accessible);
   const [weight, setWeight] = useState(edge.weight === undefined ? '' : String(edge.weight));
+  const [direction, setDirection] = useState<EdgeDirection>(edge.direction);
+  const [tags, setTags] = useState<string[]>(edge.tags);
+  const [tagDraft, setTagDraft] = useState('');
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -57,11 +80,60 @@ export const EdgeInspector = ({
     setTransitType(edge.transitType);
     setAccessible(edge.accessible);
     setWeight(edge.weight === undefined ? '' : String(edge.weight));
+    setDirection(edge.direction);
+    setTags(edge.tags);
+    setTagDraft('');
     setConfirmDelete(false);
-  }, [edge.id, edge.transitType, edge.accessible, edge.weight]);
+  }, [
+    edge.id,
+    edge.transitType,
+    edge.accessible,
+    edge.weight,
+    edge.direction,
+    edge.tags,
+  ]);
 
   const endpointLabel = (node: EditorNode | null, fallbackId: string): string =>
     node?.label || node?.type || fallbackId.slice(0, 8);
+
+  const fromLabel = endpointLabel(source, edge.sourceNodeId);
+  const toLabel = endpointLabel(target, edge.targetNodeId);
+
+  // Direction is stored relative to the edge's own sourceNodeId → targetNodeId,
+  // which is not necessarily the order the two nodes were clicked in. Spelling
+  // the options with the endpoint names is the only way an operator can tell
+  // which way "forward" actually points.
+  const directionOptions: { value: EdgeDirection; label: string }[] = [
+    { value: 'BOTH', label: t('mapEditor.edgeDirectionBoth') },
+    {
+      value: 'FORWARD',
+      label: t('mapEditor.edgeDirectionForward', { from: fromLabel, to: toLabel }),
+    },
+    {
+      value: 'REVERSE',
+      label: t('mapEditor.edgeDirectionForward', { from: toLabel, to: fromLabel }),
+    },
+  ];
+
+  const addTag = (raw: string) => {
+    const value = raw.trim();
+    if (!value) return;
+    setTags((current) => (current.includes(value) ? current : [...current, value]));
+    setTagDraft('');
+  };
+
+  const handleTagKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      // Enter inside the inspector must not bubble up and submit the floors
+      // form sitting in the same column.
+      e.preventDefault();
+      addTag(tagDraft);
+      return;
+    }
+    if (e.key === 'Backspace' && tagDraft === '') {
+      setTags((current) => (current.length === 0 ? current : current.slice(0, -1)));
+    }
+  };
 
   const weightValue = weight.trim();
   const weightNumber = Number(weightValue);
@@ -80,10 +152,22 @@ export const EdgeInspector = ({
       </div>
 
       <p className="text-sm text-ink-muted">
-        {endpointLabel(source, edge.sourceNodeId)}
+        {fromLabel}
         <span className="px-1.5 text-ink-subtle">↔</span>
-        {endpointLabel(target, edge.targetNodeId)}
+        {toLabel}
       </p>
+
+      {closureDraftActive && onAddToClosure && (
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={inClosureDraft}
+          onClick={onAddToClosure}
+        >
+          <PlusIcon size={16} />
+          {t('mapEditor.closureAddEdge')}
+        </Button>
+      )}
 
       <Select
         label={t('mapEditor.edgeTransitType')}
@@ -93,6 +177,13 @@ export const EdgeInspector = ({
           value,
           label: t(TRANSIT_KEYS[value]),
         }))}
+      />
+
+      <Select
+        label={t('mapEditor.edgeDirection')}
+        value={direction}
+        onChange={(e) => setDirection(e.target.value as EdgeDirection)}
+        options={directionOptions}
       />
 
       <label className="flex items-center gap-2.5 text-sm text-ink">
@@ -117,6 +208,38 @@ export const EdgeInspector = ({
         onChange={(e) => setWeight(e.target.value)}
       />
 
+      {/* Same chip pattern as the POI keywords field — one vocabulary for
+          "type a word, press Enter, get a removable token". */}
+      <div className="flex flex-col gap-2">
+        <TextField
+          label={t('mapEditor.edgeTags')}
+          hint={t('mapEditor.edgeTagsHint')}
+          value={tagDraft}
+          onChange={(e) => setTagDraft(e.target.value)}
+          onKeyDown={handleTagKeyDown}
+          onBlur={() => addTag(tagDraft)}
+        />
+        {tags.length > 0 && (
+          <ul className="flex flex-wrap gap-1.5">
+            {tags.map((tag) => (
+              <li key={tag}>
+                <span className="inline-flex items-center gap-1 rounded-full border border-line bg-surface-2 py-1 pl-3 pr-1 text-xs text-ink">
+                  {tag}
+                  <button
+                    type="button"
+                    aria-label={`${t('common.delete')} ${tag}`}
+                    onClick={() => setTags((current) => current.filter((x) => x !== tag))}
+                    className="grid h-5 w-5 place-items-center rounded-full text-ink-subtle hover:bg-surface-hover hover:text-ink"
+                  >
+                    <CloseIcon size={12} />
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       <div className="flex flex-wrap gap-2">
         <Button
           size="sm"
@@ -130,6 +253,8 @@ export const EdgeInspector = ({
                 accessible,
                 // Empty clears the override; the router falls back to distance.
                 weight: weightValue === '' ? null : weightNumber,
+                direction,
+                tags,
               });
             } finally {
               setSaving(false);

@@ -147,7 +147,20 @@ export interface EditorEdge extends MapEdge {
   tags: string[];
 }
 
-export type EditorPoi = Poi;
+/**
+ * A POI as the editor loads it.
+ *
+ * Carries the localized display names as well as the aliases, because the
+ * PUT-POI route replaces the whole `names` JSON column whenever the key is
+ * present at all: a client that only knew about `aliases` could not edit them
+ * without dropping any `en`/`ka` someone else had set. These two are not
+ * editable in the editor UI — they exist so a save can echo back what it
+ * loaded. See `savePoi`.
+ */
+export interface EditorPoi extends Poi {
+  nameEn?: string;
+  nameKa?: string;
+}
 
 export interface EditorGraph {
   floors: EditorFloor[];
@@ -295,6 +308,8 @@ export const toEditorPoi = (row: RawPoi): EditorPoi => ({
   keywords: Array.isArray(row.keywords) ? row.keywords : [],
   externalId: nullableStr(row.externalId) ?? undefined,
   aliases: Array.isArray(row.names?.aliases) ? row.names.aliases : [],
+  nameEn: nullableStr(row.names?.en) ?? undefined,
+  nameKa: nullableStr(row.names?.ka) ?? undefined,
 });
 
 /** `costMultiplier === null` on the wire is the BLOCKED sentinel, not "no
@@ -610,6 +625,15 @@ export interface PoiInput {
    *  `names: {}` on a plain rename would silently erase them); `null` clears
    *  them outright. */
   aliases?: string[] | null;
+  /**
+   * The localized names the caller LOADED (`EditorPoi.nameEn`/`nameKa`), not
+   * an edit. They are re-sent verbatim alongside `aliases` because the server
+   * overwrites the whole `names` column — without them an alias-only edit
+   * would drop the translations, and `{aliases: []}` on its own parses to null
+   * there and nulls the column outright.
+   */
+  nameEn?: string | null;
+  nameKa?: string | null;
 }
 
 /** Upsert — also flips the node's type to POI server-side. */
@@ -627,7 +651,18 @@ export const savePoi = async (nodeId: string, input: PoiInput): Promise<EditorPo
   // key is absent, not present-with-a-default.
   if (input.externalId !== undefined) body.externalId = input.externalId;
   if (input.aliases !== undefined) {
-    body.names = input.aliases === null ? null : { aliases: input.aliases };
+    if (input.aliases === null) {
+      body.names = null;
+    } else {
+      // Rebuilt, not patched: the server swaps the column for exactly this
+      // object, so every key that must survive has to be in it.
+      const names: { aliases: string[]; en?: string; ka?: string } = {
+        aliases: input.aliases,
+      };
+      if (input.nameEn) names.en = input.nameEn;
+      if (input.nameKa) names.ka = input.nameKa;
+      body.names = names;
+    }
   }
 
   const data = unwrap(

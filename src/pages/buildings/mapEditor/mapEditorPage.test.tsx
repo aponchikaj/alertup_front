@@ -149,6 +149,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   api.getBuildingGraph.mockResolvedValue(graph);
   api.validateBuilding.mockResolvedValue({ ok: true, issues: [] });
+  api.listClosures.mockResolvedValue([]);
   building.getBuilding.mockResolvedValue({
     Success: true,
     Message: { buildingName: 'Tbilisi Mall' },
@@ -235,6 +236,8 @@ describe('MapEditorPage — drawing edges', () => {
       buildingId: 'b1',
       transitType: 'WALKWAY',
       accessible: true,
+      direction: 'BOTH',
+      tags: [],
     });
 
     const { container } = renderPage();
@@ -276,6 +279,8 @@ describe('MapEditorPage — drawing edges', () => {
           transitType: 'WALKWAY',
           accessible: true,
           distance: 100,
+          direction: 'BOTH',
+          tags: [],
         },
       ],
     });
@@ -318,6 +323,8 @@ describe('MapEditorPage — drawing edges', () => {
       buildingId: 'b1',
       transitType: 'WALKWAY',
       accessible: true,
+      direction: 'BOTH',
+      tags: [],
     });
 
     renderPage();
@@ -960,5 +967,214 @@ describe('MapEditorPage — floor mode hit order', () => {
        
       strip.compareDocumentPosition(bottomMid) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+});
+
+describe('MapEditorPage — saving a shop', () => {
+  const realMatchMedia = window.matchMedia;
+
+  beforeEach(() => {
+    window.matchMedia = ((query: string) => ({
+      matches: true,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia;
+  });
+
+  afterEach(() => {
+    window.matchMedia = realMatchMedia;
+  });
+
+  test('an alias edit forwards the loaded translations so the server cannot drop them', async () => {
+    const poi = {
+      id: 'p1',
+      nodeId: 'n1',
+      name: 'Aversi',
+      category: null,
+      description: null,
+      keywords: [],
+      aliases: ['apteka'],
+      nameKa: 'ფარმაცია',
+    };
+    api.getBuildingGraph.mockResolvedValue({ ...graph, pois: [poi] });
+    api.savePoi.mockResolvedValue(poi);
+
+    const { container } = renderPage();
+    await screen.findByText('Ground floor');
+    fireEvent.click(screen.getByRole('radio', { name: en.mapEditor.modeNodes }));
+    fireEvent.click(container.querySelector('[data-node-id="n1"]') as Element);
+
+    await screen.findByTestId('node-inspector');
+    const input = screen.getByLabelText(en.mapEditor.poiAliases);
+    fireEvent.change(input, { target: { value: 'chemist' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: en.mapEditor.savePoi }));
+
+    await waitFor(() => expect(api.savePoi).toHaveBeenCalledTimes(1));
+    expect(api.savePoi).toHaveBeenCalledWith(
+      'n1',
+      expect.objectContaining({
+        aliases: ['apteka', 'chemist'],
+        nameKa: 'ფარმაცია',
+      }),
+    );
+  });
+});
+
+describe('MapEditorPage — closures', () => {
+  // jsdom answers every media query with matches:false, which is the mobile
+  // path where the inspector hides inside a Sheet. The closure-draft button
+  // is a side-column affordance, so this suite runs as a desktop viewport.
+  const realMatchMedia = window.matchMedia;
+
+  beforeEach(() => {
+    window.matchMedia = ((query: string) => ({
+      matches: true,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia;
+  });
+
+  afterEach(() => {
+    window.matchMedia = realMatchMedia;
+  });
+
+  const closureEdge = {
+    id: 'e9',
+    sourceNodeId: 'n1',
+    targetNodeId: 'n2',
+    buildingId: 'b1',
+    transitType: 'WALKWAY' as const,
+    accessible: true,
+    distance: 100,
+    direction: 'BOTH' as const,
+    tags: [],
+  };
+
+  const openDraft = async () => {
+    api.getBuildingGraph.mockResolvedValue({ ...graph, edges: [closureEdge] });
+    const view = renderPage();
+    await screen.findByText('Ground floor');
+    fireEvent.click(screen.getByRole('radio', { name: en.mapEditor.modeNodes }));
+    fireEvent.click(screen.getByRole('button', { name: en.mapEditor.closureAdd }));
+    return view;
+  };
+
+  const hitLine = (container: HTMLElement) =>
+    container
+      .querySelector('[data-edge-id="e9"]')!
+      .querySelector('line[stroke="transparent"]') as Element;
+
+  const count = (n: number) =>
+    en.mapEditor.closureSelectedCount.replace('{count}', String(n));
+
+  test('tapping an edge while drafting toggles it in and out of the closure', async () => {
+    const { container } = await openDraft();
+
+    expect(screen.getByText(count(0))).toBeInTheDocument();
+
+    fireEvent.click(hitLine(container));
+    expect(await screen.findByText(count(1))).toBeInTheDocument();
+
+    // Same edge again removes it — picking is a toggle, not an append.
+    fireEvent.click(hitLine(container));
+    expect(await screen.findByText(count(0))).toBeInTheDocument();
+  });
+
+  test('a picked edge is painted as highlighted on the map', async () => {
+    const { container } = await openDraft();
+
+    fireEvent.click(hitLine(container));
+
+    await waitFor(() =>
+      expect(
+        container.querySelector('[data-edge-id="e9"] line[data-closure-draft="true"]'),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  test('saving posts the picked edges with an explicit blocking multiplier', async () => {
+    api.createClosure.mockResolvedValue({
+      id: 'c1',
+      floorId: null,
+      edgeIds: ['e9'],
+      nodeIds: [],
+      costMultiplier: null,
+      reason: 'Burst pipe',
+      startsAt: '2026-09-25T10:00:00.000Z',
+      endsAt: '2026-09-25T11:00:00.000Z',
+      createdById: null,
+      createdAt: null,
+      updatedAt: null,
+      blocked: true,
+      active: true,
+    });
+
+    const { container } = await openDraft();
+    fireEvent.click(hitLine(container));
+
+    fireEvent.change(screen.getByLabelText(en.mapEditor.closureReason), {
+      target: { value: 'Burst pipe' },
+    });
+    fireEvent.click(screen.getByRole('radio', { name: en.mapEditor.closureBlocked }));
+    // The edge inspector is on screen too and also has a Save — scope to the
+    // closures panel.
+    const panel = screen.getByRole('region', { name: en.mapEditor.closures });
+    fireEvent.click(within(panel).getByRole('button', { name: en.common.save }));
+
+    await waitFor(() => expect(api.createClosure).toHaveBeenCalledTimes(1));
+    expect(api.createClosure).toHaveBeenCalledWith(
+      'b1',
+      expect.objectContaining({
+        edgeIds: ['e9'],
+        costMultiplier: null,
+        reason: 'Burst pipe',
+      }),
+    );
+
+    // The draft closes and the new closure joins the list.
+    await waitFor(() =>
+      expect(screen.queryByText(en.mapEditor.closurePickEdges)).not.toBeInTheDocument(),
+    );
+    expect(screen.getByText('Burst pipe')).toBeInTheDocument();
+  });
+
+  test('Escape abandons the draft without touching the API', async () => {
+    const { container } = await openDraft();
+    fireEvent.click(hitLine(container));
+    await screen.findByText(count(1));
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+
+    await waitFor(() =>
+      expect(screen.queryByText(en.mapEditor.closurePickEdges)).not.toBeInTheDocument(),
+    );
+    expect(api.createClosure).not.toHaveBeenCalled();
+  });
+
+  test('the edge inspector can add the selected edge to the open draft', async () => {
+    const { container } = await openDraft();
+
+    // Selecting still needs a pointer (EdgeLayer's lines are not focusable);
+    // the button is a shortcut from the inspector, not an a11y path. F13 owns
+    // the focusable-edge-list work.
+    fireEvent.click(screen.getByRole('radio', { name: en.mapEditor.modeNodes }));
+    fireEvent.click(hitLine(container));
+    await screen.findByText(count(1));
+
+    const addButtons = screen.getAllByRole('button', {
+      name: en.mapEditor.closureAddEdge,
+    });
+    expect(addButtons.length).toBeGreaterThan(0);
   });
 });

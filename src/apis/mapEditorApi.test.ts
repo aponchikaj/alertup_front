@@ -115,6 +115,56 @@ describe('POI externalId/aliases', () => {
     expect(body).not.toHaveProperty('names');
   });
 
+  test('toEditorPoi carries the localized names, so a later save can echo them back', () => {
+    const poi = toEditorPoi({
+      ...baseRawPoi(),
+      names: { en: 'Pharmacy', ka: 'ფარმაცია', aliases: ['apteka'] },
+    });
+    expect(poi.nameEn).toBe('Pharmacy');
+    expect(poi.nameKa).toBe('ფარმაცია');
+
+    const bare = toEditorPoi(baseRawPoi());
+    expect(bare.nameEn).toBeUndefined();
+    expect(bare.nameKa).toBeUndefined();
+  });
+
+  test('savePoi echoes the loaded en/ka back whenever it sends names', async () => {
+    mockedPut.mockResolvedValue({ success: true, data: { poi: baseRawPoi() } });
+
+    await savePoi('n1', {
+      buildingId: 'b1',
+      name: 'Cafe',
+      aliases: ['apteka', 'chemist'],
+      nameEn: 'Pharmacy',
+      nameKa: 'ფარმაცია',
+    });
+
+    const [, body] = mockedPut.mock.calls[0] as [string, Record<string, unknown>];
+    // The server replaces the whole `names` column, so an alias-only edit has
+    // to resend the translations it loaded or they are gone.
+    expect(body.names).toEqual({
+      aliases: ['apteka', 'chemist'],
+      en: 'Pharmacy',
+      ka: 'ფარმაცია',
+    });
+  });
+
+  test('clearing every alias on a translated POI keeps the translations alive', async () => {
+    mockedPut.mockResolvedValue({ success: true, data: { poi: baseRawPoi() } });
+
+    await savePoi('n1', {
+      buildingId: 'b1',
+      name: 'Cafe',
+      aliases: [],
+      nameKa: 'ფარმაცია',
+    });
+
+    const [, body] = mockedPut.mock.calls[0] as [string, Record<string, unknown>];
+    // `{aliases: []}` alone parses to null server-side and nulls the column;
+    // the ka key is what keeps it a real object.
+    expect(body.names).toEqual({ aliases: [], ka: 'ფარმაცია' });
+  });
+
   test('savePoi sends aliases under names and lets an explicit null clear externalId', async () => {
     mockedPut.mockResolvedValue({ success: true, data: { poi: baseRawPoi() } });
 
