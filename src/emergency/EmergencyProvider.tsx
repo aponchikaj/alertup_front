@@ -52,6 +52,8 @@ export const EmergencyProvider = ({
   const [logs, setLogs] = useState<EmergencyContextValue["logs"]>([]);
   const [counters, setCounters] = useState<EmergencySnapshot["counters"]>(null);
   const [connection, setConnection] = useState<ChannelStatus>("connecting");
+  /** Bumped on every `closure_changed` frame — see EmergencyContextValue. */
+  const [closureVersion, setClosureVersion] = useState(0);
 
   // Seed from the page payload so an active emergency is on screen before the
   // stream connects — during a fire, a round-trip of latency is not free.
@@ -117,6 +119,9 @@ export const EmergencyProvider = ({
         case "counters_updated":
           setCounters(event.data);
           break;
+        case "closure_changed":
+          setClosureVersion((n) => n + 1);
+          break;
       }
     });
 
@@ -146,10 +151,11 @@ export const EmergencyProvider = ({
       logs,
       counters,
       connection,
+      closureVersion,
       bypass,
       dismissResolvedNotice,
     }),
-    [state, logs, counters, connection, bypass, dismissResolvedNotice],
+    [state, logs, counters, connection, closureVersion, bypass, dismissResolvedNotice],
   );
 
   return (

@@ -90,6 +90,14 @@ export interface WayfindingPanelProps {
   /** Hide the built-in search box — for hosts with their own picker (the scan
    *  page's directory) that push choices via externalSelection. */
   hideSearch?: boolean;
+  /**
+   * Bumped by the host (the scan page's `closureVersion`) whenever a closure
+   * changed on the server. A change silently re-requests the destination
+   * already on screen — `lastSelectionRef.current` — and does nothing when no
+   * route is displayed. Distinct from `externalSelection`: this never opens a
+   * new destination, it only refreshes the one already showing.
+   */
+  refetchToken?: number;
   className?: string;
 }
 
@@ -102,6 +110,7 @@ export const WayfindingPanel = ({
   idleContent,
   onRouteActive,
   hideSearch = false,
+  refetchToken,
   className,
 }: WayfindingPanelProps) => {
   const { t, lang } = useI18n();
@@ -348,6 +357,24 @@ export const WayfindingPanel = ({
     });
   }, [externalSelection, loadRoute]);
 
+  /**
+   * A closure changed somewhere in the building. `refetchToken` only ever
+   * moves forward (the host's `closureVersion` counter), so any change here —
+   * never the initial value — means "re-request what's on screen, silently".
+   * Nothing to do when no route is displayed: there is nothing to refresh, and
+   * the token still has to be recorded so a later route doesn't inherit a
+   * refetch meant for an event that predates it.
+   */
+  const lastRefetchTokenRef = useRef(refetchToken);
+  useEffect(() => {
+    if (refetchToken === undefined) return;
+    if (lastRefetchTokenRef.current === refetchToken) return;
+    lastRefetchTokenRef.current = refetchToken;
+    const selection = lastSelectionRef.current;
+    if (!selection) return;
+    void loadRoute(selection, { silent: true });
+  }, [refetchToken, loadRoute]);
+
   const routeActive = Boolean(route && !loading);
   const onRouteActiveRef = useLatestRef(onRouteActive);
   useEffect(() => {
@@ -378,6 +405,37 @@ export const WayfindingPanel = ({
     route && isEmergencyRoute(route) ? ("danger" as const) : ("brand" as const);
 
   const warnings = route?.warnings ?? [];
+
+  /**
+   * `{reason} — until {time}`, localised with `Intl.DateTimeFormat` — `ka-GE`
+   * for Georgian, `en-GB` otherwise, per the brief. A closure with no
+   * `endsAt` (open-ended) shows just its reason rather than an "until never".
+   *
+   * `reason` is nullable on the wire (`publicClosure` emits `row.reason ??
+   * null`) — falling straight into the template would interpolate the
+   * literal string "null" in front of a visitor mid-route, so a missing
+   * reason is replaced with a generic label before it ever reaches `t()`.
+   */
+  const closureLabels = useMemo(() => {
+    const closures = route?.closures ?? [];
+    if (closures.length === 0) return [];
+    const formatter = new Intl.DateTimeFormat(lang === "ka" ? "ka-GE" : "en-GB", {
+      dateStyle: "short",
+      timeStyle: "short",
+    });
+    return closures.map((closure) => {
+      const reason = closure.reason ?? t("wayfinding.closureReasonUnknown");
+      return {
+        id: closure.id,
+        text: closure.endsAt
+          ? t("wayfinding.closureUntil", {
+              reason,
+              time: formatter.format(new Date(closure.endsAt)),
+            })
+          : reason,
+      };
+    });
+  }, [route, lang, t]);
 
   // Floors the route actually crosses, in walking order.
   const floors = useMemo<FloorSummary[]>(() => {
@@ -469,6 +527,16 @@ export const WayfindingPanel = ({
               <ul className="space-y-0.5">
                 {warnings.map((warning, index) => (
                   <li key={`${warning.code}-${index}`}>{warning.message}</li>
+                ))}
+              </ul>
+            </Alert>
+          ) : null}
+
+          {closureLabels.length > 0 ? (
+            <Alert tone="info" title={t("wayfinding.closuresTitle")}>
+              <ul className="space-y-0.5">
+                {closureLabels.map((closure) => (
+                  <li key={closure.id}>{closure.text}</li>
                 ))}
               </ul>
             </Alert>

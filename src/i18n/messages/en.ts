@@ -545,6 +545,7 @@ export const en = {
     messagePlaceholder: "e.g. Fire on level 2 — use the north stairs",
     liveLog: "Live activity",
     liveLogEmpty: "No activity yet.",
+    connectionLost: "Connection lost — showing the last known route.",
   },
 
   emergencyChallenge: {
@@ -608,6 +609,9 @@ export const en = {
     useCompass: "Use compass",
     compassDenied: "Compass access was declined.",
     facing: "Facing {deg}°",
+    closuresTitle: "Route adjusted for closures",
+    closureUntil: "{reason} — until {time}",
+    closureReasonUnknown: "Temporary closure",
   },
 
   qr: {

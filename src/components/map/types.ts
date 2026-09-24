@@ -236,11 +236,18 @@ export interface RouteAlternative {
   route: AssembledRoute;
 }
 
-/** A routing restriction in effect on part of the graph. */
+/**
+ * A routing restriction in effect on part of the graph.
+ *
+ * `floorId` and `reason` mirror the backend's `publicClosure` verbatim
+ * (`floorId: row.floorId ?? null`, `reason: row.reason ?? null`) — both
+ * columns are nullable there, so neither can be typed as a plain `string`
+ * here without lying to every consumer.
+ */
 export interface RouteClosure {
   id: string;
-  floorId: string;
-  reason: string;
+  floorId: string | null;
+  reason: string | null;
   costMultiplier: number | null;
   startsAt?: string | null;
   endsAt?: string | null;

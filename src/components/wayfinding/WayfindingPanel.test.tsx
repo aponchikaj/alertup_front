@@ -3,7 +3,7 @@ import { LanguageProvider } from "../../i18n/LanguageProvider";
 import { en } from "../../i18n/messages/en";
 import * as wayfindingApi from "../../apis/wayfindingApi";
 import { WayfindingPanel } from "./WayfindingPanel";
-import type { AssembledRoute, RouteAlternative } from "../map/types";
+import type { AssembledRoute, RouteAlternative, RouteClosure } from "../map/types";
 
 /* ============================================================================
    WayfindingPanel — the route preference picker and the totals it drives.
@@ -238,6 +238,48 @@ describe("WayfindingPanel — route preference", () => {
     expect(
       screen.getByText("The north elevator is out of service."),
     ).toBeInTheDocument();
+  });
+
+  test("a closure with no reason shows a generic fallback, never the literal \"null\"", async () => {
+    // The backend's `reason` column is nullable — `publicClosure` emits
+    // `reason: row.reason ?? null` verbatim, so this is a real wire shape,
+    // not a hypothetical one.
+    const closure: RouteClosure = {
+      id: "c1",
+      floorId: "f1",
+      reason: null,
+      costMultiplier: null,
+      endsAt: "2026-09-25T15:15:00.000Z",
+      blocked: true,
+    };
+    mockedApi.fetchRoute.mockResolvedValue(makeRoute({ closures: [closure] }));
+    renderPanel();
+
+    await screen.findByTestId("route-stepper");
+    expect(screen.getByText(en.wayfinding.closuresTitle)).toBeInTheDocument();
+    expect(
+      screen.getByText(new RegExp(en.wayfinding.closureReasonUnknown)),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^null/)).toBeNull();
+    expect(screen.queryByText(/\bnull\b/)).toBeNull();
+  });
+
+  test("a closure with neither reason nor an end time still renders a non-empty line", async () => {
+    const closure: RouteClosure = {
+      id: "c1",
+      floorId: "f1",
+      reason: null,
+      costMultiplier: null,
+      endsAt: null,
+      blocked: true,
+    };
+    mockedApi.fetchRoute.mockResolvedValue(makeRoute({ closures: [closure] }));
+    renderPanel();
+
+    await screen.findByTestId("route-stepper");
+    const item = screen.getByText(en.wayfinding.closureReasonUnknown);
+    expect(item).toBeInTheDocument();
+    expect(item.textContent?.trim()).not.toBe("");
   });
 
   test("nearest exit asks for accessible, never a profile", async () => {

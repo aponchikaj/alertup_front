@@ -18,6 +18,12 @@ export interface EmergencyContextValue {
   logs: Array<{ id: string; message: string; type: string; createdAt: string }>;
   counters: EmergencySnapshot["counters"];
   connection: ChannelStatus;
+  /**
+   * Bumped on every `closure_changed` frame. A page that keeps a route on
+   * screen watches this to know when to silently re-request it — the count
+   * itself carries no meaning beyond "something changed".
+   */
+  closureVersion: number;
   /** The user chose "I'm safe" — acknowledges THIS emergency only. */
   bypass: () => void;
   dismissResolvedNotice: () => void;

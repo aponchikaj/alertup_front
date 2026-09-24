@@ -151,8 +151,20 @@ const EmergencyLayer: React.FC<{
 
   if (!emergency) return null;
 
+  // A degraded channel can mean the SSE feed silently died or fell back to
+  // polling — either way the surface stays the same, gated to when it
+  // actually matters: mid-evacuation, not during everyday wayfinding.
+  const isActiveEmergency =
+    emergency.phase === 'emergency' || emergency.phase === 'bypassed';
+
   return (
     <>
+      {emergency.connection === 'degraded' && isActiveEmergency ? (
+        <Alert tone="warning" className="mb-4">
+          {t('emergency.connectionLost')}
+        </Alert>
+      ) : null}
+
       {emergency.phase === 'bypassed' ? (
         <EmergencyBanner onViewRoute={onShowExitRoute} />
       ) : null}
@@ -255,6 +267,19 @@ const RouteHeader: React.FC<{ buildingName: string; floorNumber: number }> = ({
       }
     />
   );
+};
+
+/**
+ * Wraps WayfindingPanel so it can read `closureVersion` off the same
+ * EmergencyProvider the rest of the page shares — WayfindingPanel itself
+ * knows nothing about emergencies, closures, or realtime, it just accepts a
+ * token to refetch on.
+ */
+const RouteWayfindingSlot: React.FC<
+  Omit<React.ComponentProps<typeof WayfindingPanel>, 'refetchToken'>
+> = (props) => {
+  const emergency = useEmergency();
+  return <WayfindingPanel {...props} refetchToken={emergency?.closureVersion} />;
 };
 
 /** Hides the AI launcher while the emergency overlay is demanding attention. */
@@ -597,7 +622,7 @@ const QRScanRoutePageFixed: React.FC = () => {
             destination is picked (search box, tapped marker, or the emergency
             overlay), then the route view in the same place. */}
         <Card id="scan-map" className="mt-8 scroll-mt-24 p-5 sm:p-6">
-          <WayfindingPanel
+          <RouteWayfindingSlot
             buildingId={routeData.buildingId}
             originNodeId={routeData.nodeId}
             originFloorNumber={Number(routeData.floorNumber)}

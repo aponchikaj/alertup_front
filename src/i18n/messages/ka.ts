@@ -546,6 +546,7 @@ export const ka: Messages = {
     messagePlaceholder: "მაგ. ხანძარი მე-2 სართულზე — ისარგებლეთ ჩრდილოეთ კიბით",
     liveLog: "მიმდინარე აქტივობა",
     liveLogEmpty: "აქტივობა ჯერ არ არის.",
+    connectionLost: "კავშირი დაიკარგა — ნაჩვენებია ბოლო ცნობილი მარშრუტი.",
   },
 
   emergencyChallenge: {
@@ -609,6 +610,9 @@ export const ka: Messages = {
     useCompass: "კომპასის გამოყენება",
     compassDenied: "კომპასზე წვდომა უარყოფილია.",
     facing: "მიმართულება {deg}°",
+    closuresTitle: "მარშრუტი შეცვლილია ჩაკეტვების გამო",
+    closureUntil: "{reason} — {time}-მდე",
+    closureReasonUnknown: "დროებითი ჩაკეტვა",
   },
 
   qr: {
