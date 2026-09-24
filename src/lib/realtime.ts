@@ -17,6 +17,7 @@ const SSE_EVENT_TYPES = [
   "emergency_ended",
   "log_appended",
   "counters_updated",
+  "closure_changed",
 ] as const;
 
 const POLL_INTERVAL_MS = 10_000;
@@ -24,14 +25,24 @@ const MAX_SSE_FAILURES_BEFORE_FALLBACK = 4;
 const BACKOFF_BASE_MS = 1_000;
 const BACKOFF_CAP_MS = 30_000;
 const HIDDEN_RESYNC_THRESHOLD_MS = 60_000;
+/** Two missed 25 s heartbeats (plus slack) means the feed behind the socket died. */
+const STALE_AFTER_MS = 55_000;
 
 interface ChannelOptions {
   /** member feed (live logs) instead of the public status stream */
   feed?: boolean;
 }
 
-function statusUrl(buildingId: string, feed: boolean): string {
-  return `${API_BASE_URL}/api/realtime/buildings/${buildingId}/${feed ? "feed" : "status"}`;
+function statusUrl(
+  buildingId: string,
+  feed: boolean,
+  sinceSeq: string | null
+): string {
+  const base = `${API_BASE_URL}/api/realtime/buildings/${buildingId}/${feed ? "feed" : "status"}`;
+  // Browsers only send `Last-Event-ID` on their OWN automatic reconnect; every
+  // reconnect we drive ourselves has to carry the cursor in the query string.
+  // The backend accepts either.
+  return sinceSeq ? `${base}?sinceSeq=${encodeURIComponent(sinceSeq)}` : base;
 }
 
 async function fetchSnapshot(buildingId: string): Promise<EmergencySnapshot | null> {
@@ -61,6 +72,11 @@ class BuildingChannel implements RealtimeChannel {
   private closed = false;
   private hiddenAt: number | null = null;
   private lastSnapshot: EmergencySnapshot | null = null;
+  private staleTimer: ReturnType<typeof setTimeout> | null = null;
+  private heartbeatsSeen = false;
+  private lastEventId: string | null = null;
+  private lastSeqValue: number | null = null;
+  private lastHeartbeatAtValue: number | null = null;
   private onVisibility = () => {
     if (document.visibilityState === "hidden") {
       this.hiddenAt = Date.now();
@@ -98,30 +114,124 @@ class BuildingChannel implements RealtimeChannel {
     if (snapshot && !this.closed) this.emit({ type: "state", data: snapshot });
   }
 
+  /**
+   * Record the cursor carried by a named frame and treat the frame as proof of
+   * life. `id:` values are the backend's monotonic `seq`, so a numeric one also
+   * updates `lastSeq()`; a non-numeric id still resumes correctly because it is
+   * echoed back verbatim as `?sinceSeq=`.
+   */
+  private noteFrame(eventId: string | undefined) {
+    if (eventId) {
+      this.lastEventId = eventId;
+      const seq = Number(eventId);
+      if (Number.isFinite(seq)) this.lastSeqValue = seq;
+    }
+    this.armStaleness();
+  }
+
+  /**
+   * Arm the staleness timer — but ONLY once a named `heartbeat` frame has been
+   * seen on this channel.
+   *
+   * Today's backend sends liveness as a `: hb` SSE *comment*, which EventSource
+   * never surfaces to JavaScript. A building with no emergency therefore
+   * produces zero JS-visible traffic on a perfectly healthy socket: arming on
+   * connect would flip every calm building to "connection lost" after 55 s.
+   * The first named heartbeat (task B15) is what proves the server speaks the
+   * newer protocol; the flag then stays set for the channel's lifetime, so
+   * after a reconnect silence is meaningful again straight away.
+   */
+  private armStaleness() {
+    if (!this.heartbeatsSeen || this.closed) return;
+    if (this.staleTimer) clearTimeout(this.staleTimer);
+    this.staleTimer = setTimeout(() => this.onStale(), STALE_AFTER_MS);
+  }
+
+  private clearStaleness() {
+    if (this.staleTimer) {
+      clearTimeout(this.staleTimer);
+      this.staleTimer = null;
+    }
+  }
+
+  /**
+   * Heartbeats stopped: the socket may still look open (a dead middlebox, a
+   * suspended tab, a server that stopped writing) while the feed behind it is
+   * gone. Report `degraded`, pull a snapshot so state is not silently stale,
+   * drop the socket and re-enter the normal backoff path — which resumes from
+   * `lastEventId`.
+   */
+  private onStale() {
+    this.staleTimer = null;
+    if (this.closed) return;
+    this.setStatus("degraded");
+    void this.resync();
+    this.es?.close();
+    this.es = null;
+    // Keep `degraded` visible during the wait rather than flashing "connecting".
+    this.scheduleReconnect({ announceConnecting: false });
+  }
+
+  private scheduleReconnect({ announceConnecting }: { announceConnecting: boolean }) {
+    this.sseFailures += 1;
+    if (this.sseFailures >= MAX_SSE_FAILURES_BEFORE_FALLBACK) {
+      this.startPolling();
+      return;
+    }
+    // Exponential backoff with full jitter, then retry SSE.
+    const cap = Math.min(BACKOFF_CAP_MS, BACKOFF_BASE_MS * 2 ** this.sseFailures);
+    const delay = Math.random() * cap;
+    if (announceConnecting) this.setStatus("connecting");
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = setTimeout(() => this.connectSse(), delay);
+  }
+
   private connectSse() {
     if (this.closed || typeof EventSource === "undefined") {
       this.startPolling();
       return;
     }
     this.stopPolling();
+    this.clearStaleness();
     this.es?.close();
     this.setStatus("connecting");
 
-    const es = new EventSource(statusUrl(this.buildingId, this.feed), {
-      withCredentials: true,
-    });
+    const es = new EventSource(
+      statusUrl(this.buildingId, this.feed, this.lastEventId),
+      { withCredentials: true }
+    );
     this.es = es;
 
     es.onopen = () => {
       this.sseFailures = 0;
       this.setStatus("open");
       // The server sends a fresh `state` on connect; nothing else needed.
+      this.armStaleness();
     };
+
+    // Heartbeats are liveness only: they update the cursor and the staleness
+    // timer, and lift `degraded`, but they are NOT pushed to subscribers — a
+    // frame every 25 s must not re-render the React tree.
+    es.addEventListener("heartbeat", (raw) => {
+      const frame = raw as MessageEvent;
+      this.heartbeatsSeen = true;
+      this.lastHeartbeatAtValue = Date.now();
+      try {
+        const data = JSON.parse(frame.data) as { seq?: number };
+        if (typeof data.seq === "number") this.lastSeqValue = data.seq;
+      } catch {
+        // Malformed heartbeat body — the frame itself is still proof of life.
+      }
+      if (this.currentStatus === "degraded") this.setStatus("open");
+      this.noteFrame(frame.lastEventId);
+    });
 
     for (const type of SSE_EVENT_TYPES) {
       es.addEventListener(type, (raw) => {
+        const frame = raw as MessageEvent;
+        this.noteFrame(frame.lastEventId);
         try {
-          const data = JSON.parse((raw as MessageEvent).data);
+          const data = JSON.parse(frame.data);
           this.emit({ type, data } as BuildingEvent);
         } catch {
           // malformed frame — ignore
@@ -132,16 +242,8 @@ class BuildingChannel implements RealtimeChannel {
     es.onerror = () => {
       es.close();
       if (this.closed) return;
-      this.sseFailures += 1;
-      if (this.sseFailures >= MAX_SSE_FAILURES_BEFORE_FALLBACK) {
-        this.startPolling();
-        return;
-      }
-      // Exponential backoff with full jitter, then retry SSE.
-      const cap = Math.min(BACKOFF_CAP_MS, BACKOFF_BASE_MS * 2 ** this.sseFailures);
-      const delay = Math.random() * cap;
-      this.setStatus("connecting");
-      this.reconnectTimer = setTimeout(() => this.connectSse(), delay);
+      this.clearStaleness();
+      this.scheduleReconnect({ announceConnecting: true });
     };
   }
 
@@ -186,10 +288,19 @@ class BuildingChannel implements RealtimeChannel {
     return () => this.statusCbs.delete(cb);
   }
 
+  lastHeartbeatAt(): number | null {
+    return this.lastHeartbeatAtValue;
+  }
+
+  lastSeq(): number | null {
+    return this.lastSeqValue;
+  }
+
   close() {
     this.closed = true;
     document.removeEventListener("visibilitychange", this.onVisibility);
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.clearStaleness();
     this.stopPolling();
     this.es?.close();
     this.es = null;
@@ -220,6 +331,8 @@ export function createBuildingChannel(
     subscribe: (h) => inner.subscribe(h),
     status: () => inner.status(),
     onStatusChange: (cb) => inner.onStatusChange(cb),
+    lastHeartbeatAt: () => inner.lastHeartbeatAt(),
+    lastSeq: () => inner.lastSeq(),
     close: () => {
       if (released) return;
       released = true;
