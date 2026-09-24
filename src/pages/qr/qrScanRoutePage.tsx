@@ -415,8 +415,6 @@ const QRScanRoutePageFixed: React.FC = () => {
         setError(response.message || tRef.current('route.loadFailed'));
       }
     } catch (err: unknown) {
-      console.error('Error fetching route data:', err);
-
       if (err instanceof ApiError) {
         if (err.status === 404) {
           setError(tRef.current('route.qrNotFound'));

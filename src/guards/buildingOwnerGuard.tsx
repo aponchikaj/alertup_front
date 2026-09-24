@@ -1,7 +1,7 @@
 import { Navigate, useParams } from "react-router-dom";
 import { getAuthState } from "../apis/me";
 import { getBuilding } from "../apis/building";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { PageShell } from "../components/ui/layout";
 import { Button } from "../components/ui/button";
 import { Skeleton, EmptyState } from "../components/ui/feedback";
@@ -9,64 +9,63 @@ import { AlertTriangleIcon, RefreshIcon } from "../components/ui/icons";
 
 type Status = "loading" | "owner" | "notOwner" | "unauthenticated" | "error";
 
-const BuildingOwnerGuard = ({ children }: { children: any }) => {
-  const [status, setStatus] = useState<Status>("loading");
-  const [errorText, setErrorText] = useState("");
+/** A settled verdict. "loading" is never stored — it is derived in render. */
+type Verdict = { status: Exclude<Status, "loading">; errorText: string };
+
+/**
+ * Pure async check — no React state, so the effect below can be a bare
+ * promise kick-off with nothing running synchronously in its body
+ * (react-hooks/set-state-in-effect).
+ */
+async function checkOwnership(buildingId: string | undefined): Promise<Verdict> {
+  try {
+    const auth = await getAuthState();
+
+    if (auth.state === "error") return { status: "error", errorText: auth.message };
+    if (auth.state === "unauthenticated") {
+      return { status: "unauthenticated", errorText: "" };
+    }
+    if (!buildingId) return { status: "owner", errorText: "" };
+
+    const buildingRes = await getBuilding({ buildingID: buildingId });
+    const isOwner = Boolean(
+      buildingRes?.Success && buildingRes.Message?.owner === auth.user._id,
+    );
+    return { status: isOwner ? "owner" : "notOwner", errorText: "" };
+  } catch {
+    return {
+      status: "error",
+      errorText: "Could not verify access to this building.",
+    };
+  }
+}
+
+const BuildingOwnerGuard = ({ children }: { children: ReactNode }) => {
   const { buildingId } = useParams<{ buildingId: string }>();
+  const [attempt, setAttempt] = useState(0);
+  const [result, setResult] = useState<{ key: string; verdict: Verdict } | null>(null);
 
-  const check = useCallback(
-    async (isCancelled: () => boolean) => {
-      // Reset on every run. Navigating straight from one building to another
-      // reuses this component, and leaving the previous verdict in place let
-      // the next building's page render under the old building's authorization.
-      setStatus("loading");
+  // One key per (building, retry). Navigating straight from one building to
+  // another reuses this component, so a verdict must only count for the key
+  // that produced it — otherwise the next building renders under the previous
+  // building's authorization.
+  const key = `${buildingId ?? ""}#${attempt}`;
 
-      try {
-        const auth = await getAuthState();
-        if (isCancelled()) return;
-
-        if (auth.state === "error") {
-          setErrorText(auth.message);
-          setStatus("error");
-          return;
-        }
-        if (auth.state === "unauthenticated") {
-          setStatus("unauthenticated");
-          return;
-        }
-
-        if (!buildingId) {
-          setStatus("owner");
-          return;
-        }
-
-        const buildingRes = await getBuilding({ buildingID: buildingId });
-        if (isCancelled()) return;
-
-        if (buildingRes?.Success && buildingRes.Message?.owner === auth.user._id) {
-          setStatus("owner");
-        } else {
-          setStatus("notOwner");
-        }
-      } catch (error) {
-        if (isCancelled()) return;
-        console.error("Ownership check failed:", error);
-        setStatus("error");
-        setErrorText("Could not verify access to this building.");
-      }
-    },
-    [buildingId],
-  );
+  // Derived in render, not stored: a result for another key is stale, which by
+  // definition means this key is still loading.
+  const fresh = result?.key === key ? result.verdict : null;
+  const status: Status = fresh?.status ?? "loading";
+  const errorText = fresh?.errorText ?? "";
 
   useEffect(() => {
-    // Guards against an earlier, slower check overwriting a newer verdict when
-    // buildingId changes mid-flight.
     let cancelled = false;
-    check(() => cancelled);
+    checkOwnership(buildingId).then((verdict) => {
+      if (!cancelled) setResult({ key, verdict });
+    });
     return () => {
       cancelled = true;
     };
-  }, [check]);
+  }, [key, buildingId]);
 
   if (status === "loading")
     return (
@@ -96,7 +95,7 @@ const BuildingOwnerGuard = ({ children }: { children: any }) => {
           title="Something went wrong"
           description={errorText || "Could not reach the server."}
           action={
-            <Button type="button" onClick={() => check(() => false)}>
+            <Button type="button" onClick={() => setAttempt((n) => n + 1)}>
               <RefreshIcon size={16} />
               Retry
             </Button>

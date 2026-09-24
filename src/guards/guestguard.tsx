@@ -1,10 +1,10 @@
 // src/guards/GuestGuard.js
 import { Navigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useAuth } from "../auth/useAuth";
 import { SpinnerIcon } from "../components/ui/icons";
 
-const GuestGuard = ({ children }: { children: any }) => {
+const GuestGuard = ({ children }: { children: ReactNode }) => {
   const { status, refresh } = useAuth();
 
   // Re-validate once when the shared context says "authed" at mount time: the

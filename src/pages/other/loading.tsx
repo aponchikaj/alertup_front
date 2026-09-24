@@ -1,6 +1,7 @@
 import { useEffect, useState, type JSX } from "react";
 import { ConnectApis } from "../../apis/connect";
 import { MAIN_API_URL } from "../../apis/APIS";
+import { errorMessage as toErrorMessage } from "../../apis/http";
 import { LogoMark } from "../../components/ui/logo";
 import { Card } from "../../components/ui/card";
 import { Alert } from "../../components/ui/feedback";
@@ -39,9 +40,7 @@ const ServerGate = ({ children }: { children: JSX.Element }) => {
         // Success - server is available
         setLoading(false);
         setServerDown(false);
-      } catch (err: any) {
-        console.error("ServerGate error:", err);
-
+      } catch (err: unknown) {
         if (attempt < MAX_RETRIES) {
           // Retry after delay
           setTimeout(() => {
@@ -51,7 +50,7 @@ const ServerGate = ({ children }: { children: JSX.Element }) => {
           return;
         }
 
-        setErrorMessage(err?.message || "Failed to connect to server");
+        setErrorMessage(toErrorMessage(err, "Failed to connect to server"));
         setServerDown(true);
         setLoading(false);
       }

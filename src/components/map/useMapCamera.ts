@@ -22,6 +22,7 @@ import {
   type MapPoint,
   type ScaleBounds,
 } from './mapSpace';
+import { useLatestRef } from '../../lib/useLatestRef';
 
 /* ============================================================================
    useMapCamera — camera state + gesture wiring for a MapCanvas svg.
@@ -99,16 +100,11 @@ export function useMapCamera(options: UseMapCameraOptions = {}): UseMapCameraRes
 
   // Refs mirror state/props so the natively-bound wheel listener and the
   // pointer handlers stay referentially stable without going stale.
-  const cameraRef = useRef(camera);
-  cameraRef.current = camera;
-  const onTapRef = useRef(onTap);
-  onTapRef.current = onTap;
-  const interactiveRef = useRef(interactive);
-  interactiveRef.current = interactive;
-  const boundsRef = useRef(bounds);
-  boundsRef.current = bounds;
-  const spaceRef = useRef(space);
-  spaceRef.current = space;
+  const cameraRef = useLatestRef(camera);
+  const onTapRef = useLatestRef(onTap);
+  const interactiveRef = useLatestRef(interactive);
+  const boundsRef = useLatestRef(bounds);
+  const spaceRef = useLatestRef(space);
 
   // Gesture state (never rendered, so refs, not state).
   const activePointers = useRef(new Map<number, { x: number; y: number }>());
@@ -138,7 +134,7 @@ export function useMapCamera(options: UseMapCameraOptions = {}): UseMapCameraRes
       if (fit > 0) return 1 / fit;
     }
     return 1;
-  }, []);
+  }, [spaceRef]);
 
   /** Anchor for wheel/pinch zoom; falls back to the viewport centre. */
   const anchorFromClient = useCallback(
@@ -150,7 +146,7 @@ export function useMapCamera(options: UseMapCameraOptions = {}): UseMapCameraRes
       const { width, height } = spaceRef.current;
       return viewToMap(cam, { x: width / 2, y: height / 2 });
     },
-    [],
+    [cameraRef, spaceRef],
   );
 
   // Native non-passive wheel listener. React's synthetic onWheel cannot
@@ -168,7 +164,7 @@ export function useMapCamera(options: UseMapCameraOptions = {}): UseMapCameraRes
 
     svg.addEventListener('wheel', onWheel, { passive: false });
     return () => svg.removeEventListener('wheel', onWheel);
-  }, [anchorFromClient]);
+  }, [anchorFromClient, boundsRef]);
 
   const handlePointerDown = useCallback((e: ReactPointerEvent<SVGSVGElement>) => {
     activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -191,7 +187,7 @@ export function useMapCamera(options: UseMapCameraOptions = {}): UseMapCameraRes
       const [a, b] = Array.from(activePointers.current.values());
       pinchStart.current = { distance: Math.hypot(a.x - b.x, a.y - b.y) };
     }
-  }, []);
+  }, [interactiveRef]);
 
   const handlePointerMove = useCallback(
     (e: ReactPointerEvent<SVGSVGElement>) => {
@@ -228,7 +224,7 @@ export function useMapCamera(options: UseMapCameraOptions = {}): UseMapCameraRes
       g.lastX = e.clientX;
       g.lastY = e.clientY;
     },
-    [anchorFromClient, viewUnitsPerPx],
+    [anchorFromClient, viewUnitsPerPx, boundsRef, interactiveRef],
   );
 
   const handlePointerUp = useCallback((e: ReactPointerEvent<SVGSVGElement>) => {
@@ -248,7 +244,7 @@ export function useMapCamera(options: UseMapCameraOptions = {}): UseMapCameraRes
         if (point) onTapRef.current(point);
       }
     }
-  }, []);
+  }, [cameraRef, onTapRef]);
 
   const handlers = useMemo<MapCameraHandlers>(
     () => ({
@@ -276,7 +272,7 @@ export function useMapCamera(options: UseMapCameraOptions = {}): UseMapCameraRes
       centerOn: (point: MapPoint) =>
         setCamera((c) => centerOn(c, point, spaceRef.current)),
     };
-  }, []);
+  }, [boundsRef, spaceRef]);
 
   return { camera, setCamera, svgRef, handlers, controls, isDragging };
 }

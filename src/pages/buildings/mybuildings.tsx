@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { deactivateBuilding, deleteBuilding, getMyBuildings } from "../../apis/building";
+import { errorMessage } from "../../apis/http";
 import { Link } from "react-router-dom";
 import { usePageAnimations } from "../../lib/animations";
 import { PageHeader, PageShell } from "../../components/ui/layout";
@@ -56,8 +57,8 @@ const Mybuildings = () => {
         const res = await getMyBuildings();
         if (res.Success) setBuildings(res.Message);
         else setServerError(res.Message || t("common.error"));
-      } catch (err: any) {
-        setServerError(err.message || t("common.error"));
+      } catch (err: unknown) {
+        setServerError(errorMessage(err, t("common.error")));
       } finally {
         setLoading(false);
       }
@@ -80,9 +81,8 @@ const Mybuildings = () => {
       } else {
         alert(res.Message || t("common.error"));
       }
-    } catch (err) {
-      console.error(err);
-      alert(t("common.error"));
+    } catch (err: unknown) {
+      alert(errorMessage(err, t("common.error")));
     } finally {
       setActionLoading(null);
     }
@@ -95,15 +95,13 @@ const Mybuildings = () => {
     try {
       setActionLoading(id);
       const res = await deleteBuilding(id);
-      console.log(res)
       if (res.Success) {
         setBuildings((prev) => prev.filter((b) => b._id !== id));
       } else {
         alert(res.Message || t("common.error"));
       }
-    } catch (err) {
-      console.error(err);
-      alert(t("common.error"));
+    } catch (err: unknown) {
+      alert(errorMessage(err, t("common.error")));
     } finally {
       setActionLoading(null);
     }

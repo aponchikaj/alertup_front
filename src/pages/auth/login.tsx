@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/useAuth";
 import { LoginUser, Login2faUser } from "../../apis/auth";
+import { errorMessage } from "../../apis/http";
 import { usePageAnimations } from "../../lib/animations";
 import { PageShell } from "../../components/ui/layout";
 import { Card } from "../../components/ui/card";
@@ -83,9 +84,8 @@ const Login = () => {
 
       await refresh();
       navigate("/dashboard", { replace: true });
-    } catch (err) {
-      console.error(err);
-      setServerError("Something went wrong.");
+    } catch (err: unknown) {
+      setServerError(errorMessage(err, "Something went wrong."));
     } finally {
       setLoading(false);
     }
@@ -114,9 +114,8 @@ const Login = () => {
 
       await refresh();
       navigate("/dashboard", { replace: true });
-    } catch {
-      console.error("Something went wrong.");
-      setServerError("Something went wrong.");
+    } catch (err: unknown) {
+      setServerError(errorMessage(err, "Something went wrong."));
     } finally {
       setLoading(false);
     }

@@ -83,7 +83,6 @@ const Building = () => {
       setLoading(true);
       try {
         const res = await getBuilding({ buildingID: buildingID! });
-        // console.log(res)
 
         if (!res || res.Success === false) {
           setServerError(res?.Message || t("common.error"));

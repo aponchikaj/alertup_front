@@ -89,21 +89,38 @@ export const PermissionGuard = ({ permission, children }: PermissionGuardProps) 
     Boolean(buildingId) &&
     !allowedByContext;
 
-  const [fallback, setFallback] = useState<FallbackStatus>("idle");
+  // null when no fallback check is warranted; otherwise identifies the exact
+  // (building, user) pair a stored verdict belongs to.
+  const fallbackKey = needsFallback && buildingId ? `${buildingId}|${userId}` : null;
+  const [fallbackResult, setFallbackResult] = useState<{
+    key: string;
+    owner: boolean;
+  } | null>(null);
+
+  // Derived in render rather than written from the effect: "idle" and
+  // "checking" are facts about the current key, not state to store, so the
+  // effect only has to kick off the promise
+  // (react-hooks/set-state-in-effect). A verdict under a stale key reads as
+  // "checking", so a building switch can never inherit the previous verdict.
+  const fallback: FallbackStatus =
+    fallbackKey === null
+      ? "idle"
+      : fallbackResult?.key === fallbackKey
+        ? fallbackResult.owner
+          ? "owner"
+          : "denied"
+        : "checking";
+
   useEffect(() => {
-    if (!needsFallback || !buildingId) {
-      setFallback("idle");
-      return;
-    }
+    if (!fallbackKey || !buildingId) return;
     let cancelled = false;
-    setFallback("checking");
     legacyOwnershipCheck(buildingId, userId).then((isOwner) => {
-      if (!cancelled) setFallback(isOwner ? "owner" : "denied");
+      if (!cancelled) setFallbackResult({ key: fallbackKey, owner: isOwner });
     });
     return () => {
       cancelled = true;
     };
-  }, [needsFallback, buildingId, userId]);
+  }, [fallbackKey, buildingId, userId]);
 
   if (status === "loading" || revalidating) return <GuardSkeleton />;
 

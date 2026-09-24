@@ -134,12 +134,18 @@ const Navbar = () => {
 
   const accountInitial = accountName.trim().charAt(0).toUpperCase() || "?";
 
-  // Close both overlays on navigation.
-  useEffect(() => {
-    isClosingRef.current = false;
+  /* Close both overlays on navigation. Derived during render rather than in an
+     effect: React re-runs the render with the adjusted state before committing,
+     so the drawer never paints for a frame on the new route
+     (react-hooks/set-state-in-effect). isClosingRef is unlatched by the drawer
+     effect below — refs must not be written during render
+     (react-hooks/refs). */
+  const [lastPath, setLastPath] = useState(location.pathname);
+  if (lastPath !== location.pathname) {
+    setLastPath(location.pathname);
     setDrawerOpen(false);
     setAccountOpen(false);
-  }, [location.pathname]);
+  }
 
   /* A full-bleed bar needs a boundary once the page moves under it, otherwise
      content slides beneath a floating row of text with nothing separating them. */
@@ -276,7 +282,12 @@ const Navbar = () => {
 
   // Scroll lock + Escape while the drawer is open.
   useEffect(() => {
-    if (!drawerOpen) return;
+    if (!drawerOpen) {
+      // Force-closed (navigation, logout) — possibly mid close-animation, so
+      // unlatch the guard or closeDrawer() would refuse to run again.
+      isClosingRef.current = false;
+      return;
+    }
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { getFloor } from "../../apis/building";
+import { errorMessage } from "../../apis/http";
 import { usePageAnimations } from "../../lib/animations";
 import {
   buildPrintDocument,
@@ -46,7 +47,6 @@ const Floor = () => {
     const fetchFloorData = async () => {
       try {
         const res: ApiResponse = await getFloor({ id: id!, floor: floor! });
-        console.log("Floor API response:", res);
 
         if (!res ) {
           setServerError(t("common.error"));
@@ -74,9 +74,8 @@ const Floor = () => {
         setFloorData(data);
         setBuildingName(res.Message.buildingName);
         setScannedCount(res.Message.scannedCount);
-      } catch (err) {
-        console.error(err);
-        setServerError(t("common.error"));
+      } catch (err: unknown) {
+        setServerError(errorMessage(err, t("common.error")));
       } finally {
         setLoading(false);
       }

@@ -9,6 +9,7 @@ import {
   type RefObject,
 } from 'react';
 import { cn } from '../../lib/cn';
+import { useLatestRef } from '../../lib/useLatestRef';
 import {
   DEFAULT_FLOOR_SPACE,
   IDENTITY_CAMERA,
@@ -91,10 +92,8 @@ export const MapCanvas = ({
   const internalSvgRef = useRef<SVGSVGElement>(null);
   const resolvedSvgRef = svgRef ?? internalSvgRef;
 
-  const cameraRef = useRef(camera);
-  cameraRef.current = camera;
-  const onResizeRef = useRef(onContainerResize);
-  onResizeRef.current = onContainerResize;
+  const cameraRef = useLatestRef(camera);
+  const onResizeRef = useLatestRef(onContainerResize);
 
   const [, setContainerSize] = useState({ width: 0, height: 0 });
 
@@ -131,7 +130,9 @@ export const MapCanvas = ({
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();
-  }, []);
+    // useLatestRef's object identity is stable; listed so the compiler's
+    // inferred dependencies match the written ones.
+  }, [onResizeRef]);
 
   // Click-vs-drag guard for onMapClick: a click that follows a pan would
   // otherwise fire with whatever point the pointer was released on.
@@ -156,7 +157,7 @@ export const MapCanvas = ({
       const point = screenToMap(e.clientX, e.clientY, svg, cameraRef.current);
       if (point) onMapClick(point);
     },
-    [onMapClick, resolvedSvgRef],
+    [onMapClick, resolvedSvgRef, cameraRef],
   );
 
   return (

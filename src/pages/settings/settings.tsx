@@ -44,6 +44,24 @@ const LANGUAGE_OPTIONS: ReadonlyArray<{ value: Language; label: string }> = [
   { value: "ka", label: "ქართული" },
 ];
 
+/**
+ * The subset of /api/settings the page reads and writes. getSettings() returns
+ * an ApiResponse whose `Message` is untyped, so the shape is asserted here —
+ * every field is optional because the backend omits the ones that do not apply
+ * to the account type.
+ */
+interface UserSettings {
+  name?: string;
+  lastname?: string;
+  company?: string;
+  phone?: string;
+  country?: string;
+  email?: string;
+  userType?: string;
+  verified?: boolean;
+  TwoFactorEnabled?: boolean;
+}
+
 const Settings = () => {
   const { t, lang, setLang } = useI18n();
   const rootRef = usePageAnimations();
@@ -51,7 +69,7 @@ const Settings = () => {
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
 
-  const [userData, setUserData] = useState<any>(null);
+  const [userData, setUserData] = useState<UserSettings | null>(null);
 
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -78,12 +96,12 @@ const Settings = () => {
 
     const getUserSettings = async () => {
       try {
-        const res: any = await getSettings();
+        const res = await getSettings();
         if (!res || res.Success === false) {
           setServerError(res?.Message || "Something went wrong.");
           return;
         }
-        setUserData(res.Message);
+        setUserData(res.Message as UserSettings);
       } catch {
         setServerError("Something went wrong.");
       } finally {
@@ -115,7 +133,7 @@ const Settings = () => {
       setTwoFaMode("deactivate")
       setTwoFaSent(true)
       return;
-    }catch{console.log("Something went wrong.");setServerError("Something went wrong.")}
+    }catch{setServerError("Something went wrong.")}
   }
 
   const verify2FA = async()=>{
@@ -127,7 +145,6 @@ const Settings = () => {
       window.location.reload();
       return;
     }catch{
-      console.log("Something went wrong.")
       setServerError("Something went wrong.")
     }
   }
@@ -259,7 +276,6 @@ const Settings = () => {
     setServerError("");
     try {
       const res = await logoutFromAccount();
-      console.log(res)
       if (!res || res.Success === false) {
         setServerError(res?.Message || "Something went wrong.");
         return;
@@ -376,8 +392,7 @@ const Settings = () => {
                         <TextField
                           label="Verification Code"
                           value={accountVerificationCode}
-                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                          onChange={(e:any) => setAccountVerificationCode(e.target.value)}
+                          onChange={(e) => setAccountVerificationCode(e.target.value)}
                         />
                       )}
                       <Button onClick={verifyAccount} fullWidth>
@@ -410,31 +425,31 @@ const Settings = () => {
                           <TextField
                             label="Name"
                             value={userData.name}
-                            onChange={(e:any) => setUserData({ ...userData, name: e.target.value })}
+                            onChange={(e) => setUserData({ ...userData, name: e.target.value })}
                           />
                           <TextField
                             label="Lastname"
                             value={userData.lastname}
-                            onChange={(e:any) => setUserData({ ...userData, lastname: e.target.value })}
+                            onChange={(e) => setUserData({ ...userData, lastname: e.target.value })}
                           />
                         </div>
                       ) : (
                         <TextField
                           label="Company"
                           value={userData.company}
-                          onChange={(e:any) => setUserData({ ...userData, company: e.target.value })}
+                          onChange={(e) => setUserData({ ...userData, company: e.target.value })}
                         />
                       )
                     }
                     <TextField
                       label="Phone"
                       value={userData.phone}
-                      onChange={(e:any) => setUserData({ ...userData, phone: e.target.value })}
+                      onChange={(e) => setUserData({ ...userData, phone: e.target.value })}
                     />
                     <TextField
                       label="Country"
                       value={userData.country}
-                      onChange={(e:any) => setUserData({ ...userData, country: e.target.value })}
+                      onChange={(e) => setUserData({ ...userData, country: e.target.value })}
                     />
 
                     <Button onClick={saveUserSettings} fullWidth>
@@ -472,7 +487,7 @@ const Settings = () => {
                     {
                       twoFaSent == true && (
                         <>
-                        <TextField maxLength={6} label="Code" type="number" value={twoFaCode} onChange={(e:any)=>{
+                        <TextField maxLength={6} label="Code" type="number" value={twoFaCode} onChange={(e)=>{
                           setTwoFaCode(e.target.value)
                         }} />
                         <Button onClick={verify2FA} fullWidth>Submit</Button>
@@ -501,12 +516,12 @@ const Settings = () => {
                     <PasswordField
                       label="Old Password"
                       value={oldPassword}
-                      onChange={(e:any) => setOldPassword(e.target.value)}
+                      onChange={(e) => setOldPassword(e.target.value)}
                     />
                     <PasswordField
                       label="New Password"
                       value={newPassword}
-                      onChange={(e:any) => setNewPassword(e.target.value)}
+                      onChange={(e) => setNewPassword(e.target.value)}
                     />
                     <Button onClick={changePassword} fullWidth>
                       Change Password
@@ -535,7 +550,7 @@ const Settings = () => {
                         label="New Email"
                         value={newEmail}
                         type={"email"}
-                        onChange={(e:any) => setNewEmail(e.target.value)}
+                        onChange={(e) => setNewEmail(e.target.value)}
                       />
                     )}
                     {newEmailStep === 2 && (
@@ -543,7 +558,7 @@ const Settings = () => {
                         label="Verification Code"
                         value={newEmailCode}
                         type={"number"}
-                        onChange={(e:any) => setNewEmailCode(e.target.value)}
+                        onChange={(e) => setNewEmailCode(e.target.value)}
                       />
                     )}
                     <Button onClick={NewEmail} fullWidth>
@@ -571,7 +586,7 @@ const Settings = () => {
                     <PasswordField
                       label="Password"
                       value={userPassword}
-                      onChange={(e:any) => setUserPassword(e.target.value)}
+                      onChange={(e) => setUserPassword(e.target.value)}
                     />
                     <Button onClick={deleteUserAccount} variant="danger" fullWidth>
                       <TrashIcon size={16} />

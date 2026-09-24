@@ -28,7 +28,6 @@ export default function Logs(){
     const fetchLogs = async()=>{
         try{
             const res = await GETBUILDINGLOGS(buildingId!)
-            console.log(res)
             if(!res) {
                 setServerError(t("common.error"))
                 setLoading(false)

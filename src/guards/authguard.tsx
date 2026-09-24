@@ -1,13 +1,13 @@
 // src/guards/AuthGuard.js
 import { Navigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useAuth } from "../auth/useAuth";
 import { PageShell } from "../components/ui/layout";
 import { Button } from "../components/ui/button";
 import { Skeleton, EmptyState } from "../components/ui/feedback";
 import { AlertTriangleIcon, RefreshIcon } from "../components/ui/icons";
 
-const AuthGuard = ({ children }: { children: any }) => {
+const AuthGuard = ({ children }: { children: ReactNode }) => {
   const { status, error, refresh } = useAuth();
 
   // Re-validate once when the shared context says "guest" at mount time: the

@@ -64,7 +64,6 @@ const Register = () => {
   const handleSubmit = async () => {
     setServerError("");
     setLoading(true);
-    console.log(newUserData)
 
     if (newUserData.password !== repeatPassword) {
       setServerError("Passwords do not match");
@@ -85,7 +84,6 @@ const Register = () => {
 
     try {
       const res = await RegisterUser(newUserData);
-      console.log(res)
       if (!res) {
         setServerError("Something went wrong.");
         setLoading(false);

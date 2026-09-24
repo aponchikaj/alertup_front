@@ -35,6 +35,7 @@ import { Button } from "../ui/button";
 import { SpinnerIcon } from "../ui/icons";
 import { useI18n } from "../../i18n/LanguageProvider";
 import { cn } from "../../lib/cn";
+import { useLatestRef } from "../../lib/useLatestRef";
 import type { AssembledRoute, FloorSummary, MapNode } from "../map/types";
 
 /* ============================================================================
@@ -175,11 +176,10 @@ export const WayfindingPanel = ({
   }, [externalSelection, loadRoute]);
 
   const routeActive = Boolean(route && !loading);
-  const onRouteActiveRef = useRef(onRouteActive);
-  onRouteActiveRef.current = onRouteActive;
+  const onRouteActiveRef = useLatestRef(onRouteActive);
   useEffect(() => {
     onRouteActiveRef.current?.(routeActive);
-  }, [routeActive]);
+  }, [routeActive, onRouteActiveRef]);
 
   // Floors the route actually crosses, in walking order.
   const floors = useMemo<FloorSummary[]>(() => {
