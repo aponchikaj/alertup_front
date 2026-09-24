@@ -3,7 +3,7 @@ import { LanguageProvider } from "../../i18n/LanguageProvider";
 import { en } from "../../i18n/messages/en";
 import * as wayfindingApi from "../../apis/wayfindingApi";
 import { WayfindingPanel } from "./WayfindingPanel";
-import type { AssembledRoute } from "../map/types";
+import type { AssembledRoute, RouteAlternative } from "../map/types";
 
 /* ============================================================================
    WayfindingPanel — the route preference picker and the totals it drives.
@@ -124,6 +124,16 @@ const EXIT_SELECTION = {
   name: "Nearest exit",
   token: 1,
 };
+
+const makeAlternative = (overrides: Partial<RouteAlternative> = {}): RouteAlternative => ({
+  exitNodeId: "e1",
+  label: "North exit",
+  floorNumber: 1,
+  distanceM: 80,
+  durationSec: 90,
+  route: makeRoute(),
+  ...overrides,
+});
 
 const renderPanel = (
   selection: (typeof POI_SELECTION | typeof EXIT_SELECTION) = POI_SELECTION,
@@ -326,5 +336,167 @@ describe("WayfindingPanel — route preference", () => {
     // The superseded response must not resurrect the route the user dismissed.
     expect(screen.queryByTestId("route-stepper")).toBeNull();
     expect(sessionStorage.getItem("alertup-route-dest:b1")).toBeNull();
+  });
+});
+
+describe("WayfindingPanel — alternative exits", () => {
+  test("shows at most two alternative exits with distance and ETA in evacuation mode", async () => {
+    mockedApi.fetchEvacuationRoute.mockResolvedValue(
+      makeRoute({
+        mode: "EVACUATION",
+        alternatives: [
+          // Matches route.destination.nodeId ("n9") — must be excluded.
+          makeAlternative({ exitNodeId: "n9", label: "Main exit" }),
+          makeAlternative({
+            exitNodeId: "e1",
+            label: "North exit",
+            floorNumber: 1,
+            distanceM: 80,
+            durationSec: 90,
+          }),
+          makeAlternative({
+            exitNodeId: "e2",
+            label: "South exit",
+            floorNumber: 1,
+            distanceM: 120,
+            durationSec: 150,
+          }),
+          makeAlternative({
+            exitNodeId: "e3",
+            label: "East exit",
+            floorNumber: 3,
+            distanceM: 200,
+            durationSec: 240,
+          }),
+        ],
+      }),
+    );
+
+    renderPanel(EXIT_SELECTION);
+    await screen.findByTestId("route-stepper");
+
+    expect(screen.getByText(en.wayfinding.alternativeExits)).toBeInTheDocument();
+
+    const northExit = screen.getByRole("button", { name: /North exit/ });
+    expect(northExit).toHaveAccessibleName(/North exit/);
+    expect(northExit).toHaveAccessibleName(/Floor 1/);
+    expect(northExit).toHaveAccessibleName(/80 m/);
+    expect(northExit).toHaveAccessibleName(/2 min/);
+
+    // At most two, and never the one that matches the primary destination.
+    expect(screen.getByRole("button", { name: /South exit/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /East exit/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Main exit/ })).not.toBeInTheDocument();
+  });
+
+  test("tapping an alternative exit routes to that exit node with profile emergency", async () => {
+    mockedApi.fetchEvacuationRoute.mockResolvedValue(
+      makeRoute({
+        mode: "EVACUATION",
+        alternatives: [makeAlternative({ exitNodeId: "e1", label: "North exit" })],
+      }),
+    );
+    mockedApi.fetchRoute.mockResolvedValue(makeRoute({ mode: "EVACUATION" }));
+
+    renderPanel(EXIT_SELECTION);
+    await screen.findByTestId("route-stepper");
+
+    fireEvent.click(screen.getByRole("button", { name: /North exit/ }));
+
+    // The exit node id is a plain node, routed via fetchRoute + profile
+    // "emergency" — never /evacuate, which the exit id was not built for.
+    await waitFor(() =>
+      expect(mockedApi.fetchRoute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fromNodeId: "n1",
+          toNodeId: "e1",
+          profile: "emergency",
+        }),
+      ),
+    );
+    expect(mockedApi.fetchEvacuationRoute).toHaveBeenCalledTimes(1);
+  });
+
+  test("keeps requesting the emergency profile when a heading refetch follows an exit pick", async () => {
+    // No heading yet at mount — the initial nearest-exit route must not fire one.
+    mockHeading = null;
+    mockedApi.fetchEvacuationRoute.mockResolvedValue(
+      makeRoute({
+        mode: "EVACUATION",
+        alternatives: [makeAlternative({ exitNodeId: "e1", label: "North exit" })],
+      }),
+    );
+    mockedApi.fetchRoute.mockResolvedValue(makeRoute({ mode: "EVACUATION" }));
+
+    renderPanel(EXIT_SELECTION);
+    await screen.findByTestId("route-stepper");
+
+    fireEvent.click(screen.getByRole("button", { name: /North exit/ }));
+    await waitFor(() =>
+      expect(mockedApi.fetchRoute).toHaveBeenCalledWith(
+        expect.objectContaining({ toNodeId: "e1", profile: "emergency" }),
+      ),
+    );
+    expect(mockedApi.fetchRoute).toHaveBeenCalledTimes(1);
+
+    // The compass reading arrives only now — after the exit route already
+    // committed — and the visitor's saved preference is a non-emergency
+    // profile, exactly the downgrade that would hide EMERGENCY_ONLY edges.
+    localStorage.setItem("alertup-route-profile", "walk");
+    mockHeading = 90;
+    // A UI interaction unrelated to routing (advancing the stepper) is enough
+    // to re-render RouteStepper, which is where the mocked compass hook is
+    // actually read.
+    fireEvent.click(screen.getByRole("button", { name: en.common.next }));
+
+    await waitFor(() => expect(mockedApi.fetchRoute).toHaveBeenCalledTimes(2));
+    expect(mockedApi.fetchRoute).toHaveBeenLastCalledWith(
+      expect.objectContaining({ toNodeId: "e1", heading: 90, profile: "emergency" }),
+    );
+  });
+
+  test("picking an alternative exit keeps the current route on screen while the new one loads", async () => {
+    mockedApi.fetchEvacuationRoute.mockResolvedValue(
+      makeRoute({
+        mode: "EVACUATION",
+        alternatives: [makeAlternative({ exitNodeId: "e1", label: "North exit" })],
+      }),
+    );
+    renderPanel(EXIT_SELECTION);
+    await screen.findByTestId("route-stepper");
+
+    let resolvePending: (route: AssembledRoute) => void = () => {};
+    mockedApi.fetchRoute.mockImplementationOnce(
+      () =>
+        new Promise<AssembledRoute>((resolve) => {
+          resolvePending = resolve;
+        }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /North exit/ }));
+
+    // The static fail-safe: the route (and its stepper) already on screen
+    // must stay up while the new one loads, exactly like a profile change or
+    // a heading refetch — this matters most mid-evacuation.
+    expect(screen.getByTestId("route-stepper")).toBeInTheDocument();
+
+    await act(async () => {
+      resolvePending(makeRoute({ mode: "EVACUATION" }));
+    });
+    expect(screen.getByTestId("route-stepper")).toBeInTheDocument();
+  });
+
+  test("does not show an alternatives section for wayfinding routes", async () => {
+    mockedApi.fetchRoute.mockResolvedValue(
+      makeRoute({
+        mode: "WAYFINDING",
+        alternatives: [makeAlternative()],
+      }),
+    );
+
+    renderPanel();
+    await screen.findByTestId("route-stepper");
+
+    expect(screen.queryByText(en.wayfinding.alternativeExits)).not.toBeInTheDocument();
   });
 });

@@ -24,6 +24,8 @@ import {
 } from "../map/viewPreference";
 import { useMap3dSupport } from "../map3d/useMap3dSupport";
 import { DestinationSearch, type DestinationSelection } from "./DestinationSearch";
+import { AlternativeExits } from "./AlternativeExits";
+import { isEmergencyRoute } from "./emergencyRoute";
 import { FloorSwitcher } from "./FloorSwitcher";
 import { RouteStepper } from "./RouteStepper";
 import { useRouteProgress } from "./useRouteProgress";
@@ -43,7 +45,7 @@ import { useI18n } from "../../i18n/LanguageProvider";
 import { cn } from "../../lib/cn";
 import { formatDistance, formatDistanceAndEta, formatDuration } from "../../lib/format";
 import { useLatestRef } from "../../lib/useLatestRef";
-import type { AssembledRoute, FloorSummary, MapNode } from "../map/types";
+import type { AssembledRoute, FloorSummary, MapNode, RouteProfile } from "../map/types";
 
 /* ============================================================================
    WayfindingPanel — everyday navigation on top of the scan page.
@@ -163,12 +165,19 @@ export const WayfindingPanel = ({
     async (
       selection: DestinationSelection,
       options: {
-        profile?: SelectableRouteProfile;
+        // A visitor only ever picks a SelectableRouteProfile, but routing to
+        // an alternative exit forces "emergency" — a profile the picker
+        // itself never offers — so this accepts the full RouteProfile union.
+        profile?: RouteProfile;
         heading?: number;
         silent?: boolean;
       } = {},
     ) => {
-      const requestedProfile = options.profile ?? profile;
+      // `selection.profile` beats the visitor's saved preference: an
+      // alternative exit pins "emergency" on the selection itself so that
+      // every later refetch of it — a heading, a closure update — keeps
+      // asking for the emergency profile, not whatever the picker has saved.
+      const requestedProfile = options.profile ?? selection.profile ?? profile;
       const seq = ++requestSeqRef.current;
       inFlightRef.current?.abort();
       const controller = new AbortController();
@@ -287,6 +296,27 @@ export const WayfindingPanel = ({
     [loadRoute],
   );
 
+  /**
+   * A tap on one of the up-to-two alternative exits `AlternativeExits` shows.
+   * Routed through the very same `loadRoute` path as any other destination —
+   * a plain node id on the normal route endpoint, pinned to the emergency
+   * profile on the *selection* (not just this call) so EMERGENCY_ONLY edges
+   * stay visible on every later refetch too — a heading, a closure update —
+   * never `/evacuate` (the exit is already chosen, so there is nothing left
+   * for the server to pick). Silent: the route already on screen (and its own
+   * alternatives) must stay up while the new one loads, same as a profile
+   * change or a heading refetch — this matters most mid-evacuation.
+   */
+  const onSelectAlternativeExit = useCallback(
+    (exitNodeId: string, label: string) => {
+      void loadRoute(
+        { kind: "exit", nodeId: exitNodeId, name: label, profile: "emergency" },
+        { silent: true },
+      );
+    },
+    [loadRoute],
+  );
+
   const clearRoute = useCallback(() => {
     // Bump the sequence first: any request still in flight is now stale and
     // its response will be dropped rather than undoing this.
@@ -345,9 +375,7 @@ export const WayfindingPanel = ({
 
   /** Evacuation reads red — whether the mode or the profile says so. */
   const routeTone =
-    route && (route.mode === "EVACUATION" || route.profile === "emergency")
-      ? ("danger" as const)
-      : ("brand" as const);
+    route && isEmergencyRoute(route) ? ("danger" as const) : ("brand" as const);
 
   const warnings = route?.warnings ?? [];
 
@@ -445,6 +473,8 @@ export const WayfindingPanel = ({
               </ul>
             </Alert>
           ) : null}
+
+          <AlternativeExits route={route} onSelect={onSelectAlternativeExit} />
 
           <div className="flex flex-wrap items-center gap-2">
             <RouteProfilePicker

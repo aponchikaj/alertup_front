@@ -601,6 +601,7 @@ export const ka: Messages = {
     profileElevatorFirst: "ლიფტის უპირატესობა",
     profileMinFloorChanges: "ნაკლები სართულის ცვლილება",
     warningsTitle: "გაითვალისწინეთ",
+    alternativeExits: "სხვა გასასვლელები",
     segmentNotAccessible: "საფეხურებით",
     landmark: "{name} თქვენს {side}",
     sideLeft: "მარცხნივ",

@@ -600,6 +600,7 @@ export const en = {
     profileElevatorFirst: "Prefer elevators",
     profileMinFloorChanges: "Fewest floor changes",
     warningsTitle: "Heads-up",
+    alternativeExits: "Other exits",
     segmentNotAccessible: "Not step-free",
     landmark: "{name} on your {side}",
     sideLeft: "left",

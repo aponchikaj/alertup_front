@@ -3,6 +3,7 @@ import { searchPois, type PoiSearchResult } from "../../apis/wayfindingApi";
 import { useI18n } from "../../i18n/LanguageProvider";
 import { cn } from "../../lib/cn";
 import { SearchIcon, ExitDoorIcon, SpinnerIcon } from "../ui/icons";
+import type { RouteProfile } from "../map/types";
 
 /* ============================================================================
    DestinationSearch — "where do you want to go?"
@@ -12,10 +13,23 @@ import { SearchIcon, ExitDoorIcon, SpinnerIcon } from "../ui/icons";
    ========================================================================= */
 
 export interface DestinationSelection {
-  kind: "poi" | "nearest-exit";
+  /**
+   * "exit" is a specific alternative evacuation exit (from `route.alternatives`,
+   * routed via `nodeId` on the normal wayfinding endpoint with the emergency
+   * profile) — distinct from "nearest-exit", which asks `/evacuate` to pick
+   * the exit itself.
+   */
+  kind: "poi" | "nearest-exit" | "exit";
   poiId?: string;
   nodeId?: string;
   name: string;
+  /**
+   * Pins the routing profile to this selection rather than the visitor's
+   * saved preference — e.g. an alternative exit always forces "emergency" so
+   * that EVERY later refetch of it (a compass heading, a closure update)
+   * still asks for the emergency profile, not whatever profile is stored.
+   */
+  profile?: RouteProfile;
 }
 
 export interface DestinationSearchProps {
