@@ -17,6 +17,7 @@
 import { ApiError, del, get, post, put, request } from './http';
 import { parseDrawing, type FloorDrawing } from '../components/map/drawing';
 import type {
+  EdgeDirection,
   FloorRecord,
   MapEdge,
   MapNode,
@@ -67,6 +68,11 @@ export interface RawEdge {
   weight: number | string | null;
   accessible: boolean | null;
   transitType: string | null;
+  /** Relative to `sourceNodeId` → `targetNodeId` as returned here, never the
+   *  order the two nodes happened to be posted in. Missing on rows created
+   *  before this column existed. */
+  direction?: string | null;
+  tags?: string[] | null;
 }
 
 /** Raw `Poi` row. */
@@ -77,6 +83,35 @@ export interface RawPoi {
   category: string | null;
   description: string | null;
   keywords: string[] | null;
+  /** Integrator-supplied stable code, unique per building. */
+  externalId?: string | null;
+  /** Localized display names/aliases; the JSON column is `null` until saved. */
+  names?: { en?: string; ka?: string; aliases?: string[] } | null;
+}
+
+/** Raw `Closure` row, as the map-editor's closure routes return it (the
+ *  public projection plus the operational detail an owner needs to manage
+ *  the row). Dates already arrive as ISO strings — the route hand-serializes
+ *  them rather than leaving `Date` objects for `res.json` to touch. */
+export interface RawClosure {
+  id: string;
+  floorId: string | null;
+  edgeIds: string[] | null;
+  nodeIds: string[] | null;
+  /** `null` is the BLOCKED sentinel; a number is a cost penalty (>= 1). */
+  costMultiplier: number | string | null;
+  reason: string | null;
+  startsAt: string;
+  endsAt: string | null;
+  createdById?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  /** Precomputed by the server (`costMultiplier === null`) — kept rather than
+   *  re-derived so a future server-side rule change does not silently drift
+   *  from what the client displays. */
+  blocked?: boolean;
+  /** Editor list only: whether the closure is in force right now. */
+  active?: boolean;
 }
 
 /** The `{ success, message, data }` envelope every route returns. */
@@ -106,6 +141,10 @@ export interface EditorNode extends MapNode {
 
 export interface EditorEdge extends MapEdge {
   buildingId: string;
+  /** Always present on an editor edge — never undefined the way a plain
+   *  `MapEdge` (which may come from a leaner route payload) allows. */
+  direction: EdgeDirection;
+  tags: string[];
 }
 
 export type EditorPoi = Poi;
@@ -115,6 +154,33 @@ export interface EditorGraph {
   nodes: EditorNode[];
   edges: EditorEdge[];
   pois: EditorPoi[];
+}
+
+/**
+ * A routing restriction as the map-editor's closure routes return it.
+ *
+ * `floorId` and `reason` are nullable — a closure scoped to bare `edgeIds`
+ * legitimately has neither. `costMultiplier === null` is the BLOCKED
+ * sentinel; `blocked` mirrors that server-side so no consumer has to
+ * re-derive it. Deliberately does NOT match the F11 brief's literal field
+ * list (`buildingId`, no `blocked`/`active`/`createdById`/`updatedAt`) —
+ * see the task report for why this follows the backend's actual
+ * `editorClosure` projection instead.
+ */
+export interface Closure {
+  id: string;
+  floorId: string | null;
+  edgeIds: string[];
+  nodeIds: string[];
+  costMultiplier: number | null;
+  reason: string | null;
+  startsAt: string;
+  endsAt: string | null;
+  createdById: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  blocked: boolean;
+  active: boolean;
 }
 
 export type ValidationSeverity = 'error' | 'warning' | 'info';
@@ -148,6 +214,8 @@ const TRANSIT_TYPES: readonly TransitType[] = [
   'STAIRS',
 ];
 
+const EDGE_DIRECTIONS: readonly EdgeDirection[] = ['BOTH', 'FORWARD', 'REVERSE'];
+
 const num = (value: unknown, fallback = 0): number => {
   const n = typeof value === 'number' ? value : Number(value);
   return Number.isFinite(n) ? n : fallback;
@@ -169,6 +237,11 @@ const asNodeType = (value: unknown): NodeType =>
 
 const asTransitType = (value: unknown): TransitType =>
   TRANSIT_TYPES.includes(value as TransitType) ? (value as TransitType) : 'WALKWAY';
+
+/** A row with no direction column (or an unrecognised value) is untethered —
+ *  `BOTH` is the safe default, matching the Prisma column's own default. */
+const asEdgeDirection = (value: unknown): EdgeDirection =>
+  EDGE_DIRECTIONS.includes(value as EdgeDirection) ? (value as EdgeDirection) : 'BOTH';
 
 /* --- mappers ------------------------------------------------------------- */
 
@@ -209,6 +282,8 @@ export const toEditorEdge = (row: RawEdge): EditorEdge => ({
   accessible: row.accessible !== false,
   distance: nullableNum(row.distance) ?? undefined,
   weight: nullableNum(row.weight) ?? undefined,
+  direction: asEdgeDirection(row.direction),
+  tags: Array.isArray(row.tags) ? row.tags : [],
 });
 
 export const toEditorPoi = (row: RawPoi): EditorPoi => ({
@@ -218,6 +293,27 @@ export const toEditorPoi = (row: RawPoi): EditorPoi => ({
   category: nullableStr(row.category),
   description: nullableStr(row.description),
   keywords: Array.isArray(row.keywords) ? row.keywords : [],
+  externalId: nullableStr(row.externalId) ?? undefined,
+  aliases: Array.isArray(row.names?.aliases) ? row.names.aliases : [],
+});
+
+/** `costMultiplier === null` on the wire is the BLOCKED sentinel, not "no
+ *  value set" — `blocked` is read straight off the server's own derivation
+ *  rather than re-computed, so the two can never disagree. */
+export const toEditorClosure = (row: RawClosure): Closure => ({
+  id: row.id,
+  floorId: nullableStr(row.floorId),
+  edgeIds: Array.isArray(row.edgeIds) ? row.edgeIds : [],
+  nodeIds: Array.isArray(row.nodeIds) ? row.nodeIds : [],
+  costMultiplier: nullableNum(row.costMultiplier),
+  reason: nullableStr(row.reason),
+  startsAt: row.startsAt,
+  endsAt: nullableStr(row.endsAt),
+  createdById: nullableStr(row.createdById),
+  createdAt: nullableStr(row.createdAt),
+  updatedAt: nullableStr(row.updatedAt),
+  blocked: row.blocked === true || row.costMultiplier === null,
+  active: row.active === true,
 });
 
 /** `{ success: false }` with a 200 status is still a failure. */
@@ -433,6 +529,11 @@ export interface CreateEdgeInput {
   /** Omit to let the server derive the cost from the distance. */
   weight?: number | null;
   accessible?: boolean;
+  /** Relative to the edge's stored `sourceNodeId` → `targetNodeId` — which,
+   *  after the server normalizes the pair, is not necessarily the order
+   *  `sourceNodeId`/`targetNodeId` were posted in above. Omit for `BOTH`. */
+  direction?: EdgeDirection;
+  tags?: string[];
 }
 
 export const createEdge = async (input: CreateEdgeInput): Promise<EditorEdge> => {
@@ -448,6 +549,10 @@ export interface UpdateEdgeInput {
   /** `null` clears the override and restores the derived cost. */
   weight?: number | null;
   accessible?: boolean;
+  /** Same relative-to-`sourceNodeId→targetNodeId` semantics as on create —
+   *  PATCHing back the `direction` a create/read returned is a no-op. */
+  direction?: EdgeDirection;
+  tags?: string[];
 }
 
 export const updateEdge = async (
@@ -494,20 +599,41 @@ export interface PoiInput {
   category?: string | null;
   description?: string | null;
   keywords?: string[];
+  /** Integrator-supplied stable code, unique per building. Omit to leave it
+   *  unchanged; `null` clears it. Unlike every other field on this input,
+   *  the server does NOT reset this on an ordinary save — it is the one
+   *  exception to the route's whole-row PUT semantics. */
+  externalId?: string | null;
+  /** Search aliases, folded into the wire `names.aliases`. Omit to leave the
+   *  POI's localized names untouched (the server replaces the whole `names`
+   *  column wholesale whenever the key is present at all, so an accidental
+   *  `names: {}` on a plain rename would silently erase them); `null` clears
+   *  them outright. */
+  aliases?: string[] | null;
 }
 
 /** Upsert — also flips the node's type to POI server-side. */
 export const savePoi = async (nodeId: string, input: PoiInput): Promise<EditorPoi> => {
+  const body: Record<string, unknown> = {
+    buildingId: input.buildingId,
+    name: input.name,
+    category: input.category ?? null,
+    description: input.description ?? null,
+    keywords: input.keywords ?? [],
+  };
+  // `externalId`/`names` are only ever added to the body when the caller
+  // actually set them — sending either key at all (even `{}`) tells the
+  // server to overwrite it, so "the caller didn't touch this" must mean the
+  // key is absent, not present-with-a-default.
+  if (input.externalId !== undefined) body.externalId = input.externalId;
+  if (input.aliases !== undefined) {
+    body.names = input.aliases === null ? null : { aliases: input.aliases };
+  }
+
   const data = unwrap(
     await put<Envelope<{ poi: RawPoi }>>(
       `/api/map-editor/nodes/${encodeURIComponent(nodeId)}/poi`,
-      {
-        buildingId: input.buildingId,
-        name: input.name,
-        category: input.category ?? null,
-        description: input.description ?? null,
-        keywords: input.keywords ?? [],
-      },
+      body,
     ),
   );
   return toEditorPoi(data.poi);
@@ -516,6 +642,69 @@ export const savePoi = async (nodeId: string, input: PoiInput): Promise<EditorPo
 export const deletePoi = async (nodeId: string): Promise<void> => {
   await del<Envelope<unknown>>(
     `/api/map-editor/nodes/${encodeURIComponent(nodeId)}/poi`,
+  );
+};
+
+/* --- closures -------------------------------------------------------------
+   Routing restrictions ("this corridor is shut for the incident"). Nested
+   under /buildings/:buildingId/... to match requireBuildingPermission's
+   shape on the backend (see closure.routes.js) — there is no bare
+   /closures/:closureId route to call.
+   ========================================================================= */
+
+export const listClosures = async (buildingId: string): Promise<Closure[]> => {
+  const data = unwrap(
+    await get<Envelope<{ closures?: RawClosure[] }>>(
+      `/api/map-editor/buildings/${encodeURIComponent(buildingId)}/closures`,
+    ),
+  );
+  return asArray(data.closures).map(toEditorClosure);
+};
+
+export interface CreateClosureInput {
+  edgeIds?: string[];
+  nodeIds?: string[];
+  /** A floorId alone closes every edge whose both endpoints are on that
+   *  floor. Ignored by the server entirely once `edgeIds`/`nodeIds` name
+   *  anything — naming ids overrides scoping by floor, it does not add to it. */
+  floorId?: string | null;
+  /**
+   * `null` = BLOCKED outright; a number >= 1 = a cost penalty (routes still
+   * cross it, just less willingly).
+   *
+   * Required here — not optional — on purpose. The wire's own sentinel for
+   * "blocked" is an ABSENT field resolving server-side to `null`, which
+   * means a caller who simply forgets to set this would silently publish a
+   * hard block. Making it mandatory at the TypeScript boundary forces every
+   * call site to say `null` on purpose rather than by omission.
+   */
+  costMultiplier: number | null;
+  /** Trimmed and capped at 200 chars server-side; empty/whitespace becomes
+   *  null there. */
+  reason?: string | null;
+  startsAt?: string;
+  endsAt?: string | null;
+}
+
+export const createClosure = async (
+  buildingId: string,
+  input: CreateClosureInput,
+): Promise<Closure> => {
+  const data = unwrap(
+    await post<Envelope<{ closure: RawClosure }>>(
+      `/api/map-editor/buildings/${encodeURIComponent(buildingId)}/closures`,
+      input,
+    ),
+  );
+  return toEditorClosure(data.closure);
+};
+
+export const deleteClosure = async (
+  buildingId: string,
+  closureId: string,
+): Promise<void> => {
+  await del<Envelope<unknown>>(
+    `/api/map-editor/buildings/${encodeURIComponent(buildingId)}/closures/${encodeURIComponent(closureId)}`,
   );
 };
 
