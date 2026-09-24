@@ -42,6 +42,7 @@ export default defineConfig([
       'src/components/map3d/theme3d.ts',
       'src/components/map3d/picking.ts',
       'src/components/map3d/routeScene.ts',
+      'src/components/map/routeGeometry.ts',
     ],
     rules: {
       '@typescript-eslint/no-restricted-imports': [

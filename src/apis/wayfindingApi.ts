@@ -1,5 +1,5 @@
 import { get } from "./http";
-import type { AssembledRoute } from "../components/map/types";
+import type { AssembledRoute, RouteProfile } from "../components/map/types";
 
 /* ============================================================================
    Wayfinding API — POI search and route calculation.
@@ -69,45 +69,142 @@ export async function fetchDirectory(buildingId: string): Promise<DirectoryEntry
   return Array.isArray(res.data?.entries) ? res.data.entries : [];
 }
 
+/** A single `to` destination: a node id, a POI id, or an external code —
+ *  exactly one should be set. */
+export interface RouteTarget {
+  nodeId?: string;
+  poiId?: string;
+  externalId?: string;
+}
+
 export interface RouteRequest {
   fromNodeId: string;
   /** A node id, or a POI id which the server resolves to its node. */
   toNodeId?: string;
   toPoiId?: string;
+  toExternalId?: string;
+  /** Multiple destinations (multi-stop routing); overrides the single
+   *  to*Id fields above when non-empty. */
+  targets?: RouteTarget[];
+  profile?: RouteProfile;
+  /** Compass heading in degrees; normalised to an integer 0-359. */
+  heading?: number;
   accessible?: boolean;
   signal?: AbortSignal;
+}
+
+const encodeTarget = (target: RouteTarget): string | undefined => {
+  if (target.poiId) return `poi:${target.poiId}`;
+  if (target.externalId) return `ext:${target.externalId}`;
+  return target.nodeId;
+};
+
+/** Wrap a heading into 0-359 and round to an integer; NaN stays NaN. */
+const normalizeHeading = (heading: number): number =>
+  Math.round(((heading % 360) + 360) % 360);
+
+/**
+ * Build the query params shared by `fetchRoute` and `fetchEvacuationRoute`.
+ * Pure and exported so the exact wire shape (from/to/profile/accessible/
+ * heading) is unit-testable without a network mock.
+ */
+export function buildRouteParams(req: RouteRequest): URLSearchParams {
+  const params = new URLSearchParams();
+  params.set("from", req.fromNodeId);
+
+  const targets: RouteTarget[] =
+    req.targets && req.targets.length > 0
+      ? req.targets
+      : [{ nodeId: req.toNodeId, poiId: req.toPoiId, externalId: req.toExternalId }];
+
+  for (const target of targets) {
+    const encoded = encodeTarget(target);
+    if (encoded) params.append("to", encoded);
+  }
+
+  if (req.profile) {
+    params.set("profile", req.profile);
+  } else if (req.accessible) {
+    params.set("accessible", "true");
+  }
+
+  if (req.heading !== undefined) {
+    const heading = normalizeHeading(req.heading);
+    if (!Number.isNaN(heading)) params.set("heading", String(heading));
+  }
+
+  return params;
+}
+
+/**
+ * Fill in what an older backend (or a malformed response) might omit: array
+ * fields default to `[]` rather than undefined, `totalDistanceM` falls back
+ * to the legacy `totalDistanceMeters`, and instructions missing their
+ * bilingual `text` are dropped rather than rendered blank.
+ */
+export function normalizeRoute(raw: AssembledRoute): AssembledRoute {
+  const instructions = (raw.instructions ?? []).filter(
+    (instruction) => Boolean((instruction as { text?: unknown }).text),
+  );
+
+  return {
+    ...raw,
+    segments: raw.segments ?? [],
+    transitions: raw.transitions ?? [],
+    steps: raw.steps ?? [],
+    warnings: raw.warnings ?? [],
+    alternatives: raw.alternatives ?? [],
+    closures: raw.closures ?? [],
+    instructions,
+    totalDistanceM: raw.totalDistanceM ?? raw.totalDistanceMeters ?? undefined,
+  };
 }
 
 export async function fetchRoute({
   fromNodeId,
   toNodeId,
   toPoiId,
+  toExternalId,
+  targets,
+  profile,
+  heading,
   accessible = false,
   signal,
 }: RouteRequest): Promise<AssembledRoute> {
-  const to = toPoiId ? `poi:${toPoiId}` : toNodeId;
-  const params = new URLSearchParams({ from: fromNodeId, to: to ?? "" });
-  if (accessible) params.set("accessible", "true");
+  const params = buildRouteParams({
+    fromNodeId,
+    toNodeId,
+    toPoiId,
+    toExternalId,
+    targets,
+    profile,
+    heading,
+    accessible,
+  });
 
   const res = await get<Envelope<{ route: AssembledRoute }>>(
     `/api/wayfinding/route?${params.toString()}`,
     { signal },
   );
-  return res.data.route;
+  return normalizeRoute(res.data.route);
 }
 
 export async function fetchEvacuationRoute(
   fromNodeId: string,
-  options: { accessible?: boolean; signal?: AbortSignal } = {},
+  options: { accessible?: boolean; profile?: RouteProfile; heading?: number; signal?: AbortSignal } = {},
 ): Promise<AssembledRoute> {
-  const params = new URLSearchParams({ from: fromNodeId });
-  if (options.accessible) params.set("accessible", "true");
+  const params = buildRouteParams({
+    fromNodeId,
+    accessible: options.accessible,
+    profile: options.profile,
+    heading: options.heading,
+  });
 
   const res = await get<Envelope<{ route: AssembledRoute }>>(
     `/api/wayfinding/evacuate?${params.toString()}`,
     { signal: options.signal },
   );
-  return res.data.route;
+  return normalizeRoute(res.data.route);
 }
 
 /* --------------------------------------------------------------------------

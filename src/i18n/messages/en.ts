@@ -591,6 +591,10 @@ export const en = {
     startOver: "Start over",
     barometerPrompt: "Looks like you changed floors. Are you on floor {floor}?",
     barometerConfirm: "Yes, I'm here",
+    eta: "{minutes} min",
+    distanceAndEta: "{meters} m · {minutes} min",
+    remaining: "{distance} left",
+    remainingTime: "about {minutes} min left",
   },
 
   qr: {

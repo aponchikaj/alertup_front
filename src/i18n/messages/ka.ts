@@ -592,6 +592,10 @@ export const ka: Messages = {
     startOver: "თავიდან დაწყება",
     barometerPrompt: "როგორც ჩანს, სართული შეიცვალა. {floor} სართულზე ხარ?",
     barometerConfirm: "დიახ, აქ ვარ",
+    eta: "{minutes} წთ",
+    distanceAndEta: "{meters} მ · {minutes} წთ",
+    remaining: "დარჩა {distance}",
+    remainingTime: "დაახლოებით {minutes} წთ დარჩა",
   },
 
   qr: {
