@@ -15,7 +15,7 @@ import {
 } from "../../components/ui/card";
 import { Alert, EmptyState, Skeleton } from "../../components/ui/feedback";
 import { Button, ButtonLink } from "../../components/ui/button";
-import { useToast } from "../../components/ui/toast";
+import { useToast } from "../../components/ui/toastContext";
 import { AlertTriangleIcon, MailIcon, RefreshIcon } from "../../components/ui/icons";
 
 /* ============================================================================

@@ -1,5 +1,4 @@
 import {
-  createContext,
   useCallback,
   useEffect,
   useMemo,
@@ -14,8 +13,8 @@ import {
   initialEmergencyState,
   readAck,
   writeAck,
-  type EmergencyPhase,
 } from "./emergencyMachine";
+import { EmergencyContext, type EmergencyContextValue } from "./emergencyContext";
 import type { BuildingEvent, ChannelStatus, EmergencySnapshot } from "./types";
 
 /* ============================================================================
@@ -24,24 +23,9 @@ import type { BuildingEvent, ChannelStatus, EmergencySnapshot } from "./types";
    Mounted only by pages that have a building context (the scan route page,
    building admin pages), so a visitor reading the marketing site never opens a
    realtime connection. The reducer owns the phase; this component owns the
-   transport and the sessionStorage acknowledgement.
+   transport and the sessionStorage acknowledgement. The context and its value
+   type live in ./emergencyContext so this file exports only components.
    ========================================================================= */
-
-export interface EmergencyContextValue {
-  phase: EmergencyPhase;
-  emergencyId: string | null;
-  message: string | null;
-  startedAt: string | null;
-  /** Live activity feed — only populated when `feed` is enabled. */
-  logs: Array<{ id: string; message: string; type: string; createdAt: string }>;
-  counters: EmergencySnapshot["counters"];
-  connection: ChannelStatus;
-  /** The user chose "I'm safe" — acknowledges THIS emergency only. */
-  bypass: () => void;
-  dismissResolvedNotice: () => void;
-}
-
-export const EmergencyContext = createContext<EmergencyContextValue | null>(null);
 
 export interface EmergencyProviderProps {
   buildingId: string | null;
@@ -88,8 +72,10 @@ export const EmergencyProvider = ({
     if (!buildingId) return;
 
     const channel = createBuildingChannel(buildingId, { feed });
-    setConnection(channel.status());
 
+    // onStatusChange replays the current status synchronously, so there is no
+    // separate setConnection(channel.status()) — which would be a setState
+    // straight from the effect body (react-hooks/set-state-in-effect).
     const unsubscribeStatus = channel.onStatusChange(setConnection);
     const unsubscribe = channel.subscribe((event: BuildingEvent) => {
       switch (event.type) {

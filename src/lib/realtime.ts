@@ -178,6 +178,11 @@ class BuildingChannel implements RealtimeChannel {
 
   onStatusChange(cb: (s: ChannelStatus) => void): () => void {
     this.statusCbs.add(cb);
+    // Replay the current status, mirroring subscribe()'s snapshot replay. A
+    // subscriber then never has to read status() separately — which in React
+    // would be a setState straight from an effect body — and cannot miss a
+    // transition that lands between reading status() and subscribing.
+    cb(this.currentStatus);
     return () => this.statusCbs.delete(cb);
   }
 

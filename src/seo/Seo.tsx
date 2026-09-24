@@ -6,8 +6,8 @@
  * the result into <head>: title, description, canonical, robots, Open Graph,
  * Twitter cards and JSON-LD.
  *
- * Managed tags carry `data-seo` so a page transition can atomically replace the
- * previous page's tags without touching the static ones in index.html.
+ * The head-writing half lives in ./applySeo; this file resolves props against
+ * the registry and drives it from an effect.
  */
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
@@ -20,10 +20,9 @@ import {
   robotsValue,
 } from './seo.config';
 import { baseGraph, graph, webPageJsonLd } from './structuredData';
+import { applySeo, type ResolvedSeo } from './applySeo';
 import type { JsonLd } from './structuredData';
 import type { RouteSeo } from './seo.config';
-
-const MANAGED_ATTR = 'data-seo';
 
 export type SeoProps = {
   title?: string;
@@ -61,18 +60,6 @@ export type SeoProps = {
  */
 let claimedPath: string | null = null;
 
-type ResolvedSeo = {
-  title: string;
-  description: string;
-  keywords: string[];
-  canonicalUrl: string;
-  imageUrl: string;
-  imageAlt: string;
-  robots: string;
-  type: string;
-  jsonLd: JsonLd | null;
-};
-
 function resolve(props: SeoProps, pathname: string): ResolvedSeo {
   const route: RouteSeo | undefined = getRouteSeo(pathname);
 
@@ -107,74 +94,6 @@ function resolve(props: SeoProps, pathname: string): ResolvedSeo {
   };
 }
 
-function createMeta(
-  doc: Document,
-  keyAttr: 'name' | 'property',
-  key: string,
-  content: string,
-): HTMLMetaElement {
-  const el = doc.createElement('meta');
-  el.setAttribute(keyAttr, key);
-  el.setAttribute('content', content);
-  el.setAttribute(MANAGED_ATTR, '');
-  return el;
-}
-
-/**
- * Writes the resolved metadata into `doc.head`, replacing anything a previous
- * call left behind. Exported so it can be unit tested without React.
- */
-export function applySeo(seo: ResolvedSeo, doc: Document = document): void {
-  doc.title = seo.title;
-
-  doc.querySelectorAll(`[${MANAGED_ATTR}]`).forEach((el) => el.remove());
-
-  const fragment = doc.createDocumentFragment();
-
-  fragment.append(
-    createMeta(doc, 'name', 'description', seo.description),
-    createMeta(doc, 'name', 'robots', seo.robots),
-    createMeta(doc, 'name', 'googlebot', seo.robots),
-
-    createMeta(doc, 'property', 'og:site_name', SITE.name),
-    createMeta(doc, 'property', 'og:type', seo.type),
-    createMeta(doc, 'property', 'og:locale', SITE.locale),
-    createMeta(doc, 'property', 'og:title', seo.title),
-    createMeta(doc, 'property', 'og:description', seo.description),
-    createMeta(doc, 'property', 'og:url', seo.canonicalUrl),
-    createMeta(doc, 'property', 'og:image', seo.imageUrl),
-    createMeta(doc, 'property', 'og:image:alt', seo.imageAlt),
-    createMeta(doc, 'property', 'og:image:width', '1200'),
-    createMeta(doc, 'property', 'og:image:height', '630'),
-
-    createMeta(doc, 'name', 'twitter:card', 'summary_large_image'),
-    createMeta(doc, 'name', 'twitter:title', seo.title),
-    createMeta(doc, 'name', 'twitter:description', seo.description),
-    createMeta(doc, 'name', 'twitter:image', seo.imageUrl),
-    createMeta(doc, 'name', 'twitter:image:alt', seo.imageAlt),
-  );
-
-  if (seo.keywords.length) {
-    fragment.append(createMeta(doc, 'name', 'keywords', seo.keywords.join(', ')));
-  }
-
-  const canonical = doc.createElement('link');
-  canonical.setAttribute('rel', 'canonical');
-  canonical.setAttribute('href', seo.canonicalUrl);
-  canonical.setAttribute(MANAGED_ATTR, '');
-  fragment.append(canonical);
-
-  if (seo.jsonLd) {
-    const script = doc.createElement('script');
-    script.setAttribute('type', 'application/ld+json');
-    script.setAttribute(MANAGED_ATTR, '');
-    script.textContent = JSON.stringify(seo.jsonLd);
-    fragment.append(script);
-  }
-
-  doc.head.append(fragment);
-}
-
 const Seo = (props: SeoProps) => {
   const { pathname } = useLocation();
 
@@ -193,6 +112,12 @@ const Seo = (props: SeoProps) => {
     rawTitle,
     fallback,
   } = props;
+
+  // Compared by serialised value so callers can pass inline literals without
+  // causing an effect loop; extracted so the dependency array stays statically
+  // checkable (react-hooks/exhaustive-deps).
+  const keywordsKey = JSON.stringify(keywords);
+  const jsonLdKey = JSON.stringify(jsonLd);
 
   useEffect(() => {
     if (fallback) {
@@ -221,8 +146,8 @@ const Seo = (props: SeoProps) => {
         pathname,
       ),
     );
-    // `keywords` and `jsonLd` are compared by serialised value so callers can
-    // pass inline literals without causing an effect loop.
+    // `keywords` and `jsonLd` themselves are intentionally absent: their
+    // serialised keys above stand in for them.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     pathname,
@@ -237,8 +162,8 @@ const Seo = (props: SeoProps) => {
     skipBaseGraph,
     rawTitle,
     fallback,
-    JSON.stringify(keywords),
-    JSON.stringify(jsonLd),
+    keywordsKey,
+    jsonLdKey,
   ]);
 
   return null;

@@ -31,6 +31,7 @@ export type ChannelStatus = "connecting" | "open" | "degraded" | "closed";
 export interface RealtimeChannel {
   subscribe(handler: (evt: BuildingEvent) => void): () => void;
   status(): ChannelStatus;
+  /** Calls `cb` immediately with the current status, then on every change. */
   onStatusChange(cb: (status: ChannelStatus) => void): () => void;
   close(): void;
 }

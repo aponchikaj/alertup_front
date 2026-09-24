@@ -1,5 +1,4 @@
 import {
-  createContext,
   useCallback,
   useEffect,
   useMemo,
@@ -7,41 +6,18 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { getAuthState } from "../apis/me";
+import { getAuthState, type AuthState } from "../apis/me";
+import { AuthContext, type AuthContextValue, type AuthStatus, type MeUser } from "./authContext";
 import type { Membership, Permission } from "./permissions";
 
 /* ============================================================================
    App-wide auth context. One /api/me round-trip at mount replaces the
    per-guard and per-navigation fetches; guards and the navbar consume the
    shared state and call refresh() when they need a fresh verdict.
+
+   The context and its types live in ./authContext so this file exports only
+   components (react-refresh/only-export-components).
    ========================================================================= */
-
-export type AuthStatus = "loading" | "guest" | "authed" | "error";
-
-/** Deliberately loose — /api/me's user shape is still evolving. */
-export interface MeUser {
-  id?: string;
-  _id?: string;
-  email?: string;
-  name?: string;
-  lastname?: string;
-  company?: string;
-  userType?: string;
-  verified?: boolean;
-  [key: string]: unknown;
-}
-
-export interface AuthContextValue {
-  status: AuthStatus;
-  user: MeUser | null;
-  memberships: Record<string, Membership>;
-  ownedBuildingIds: string[];
-  /** Human-readable failure text when status === "error". */
-  error: string;
-  refresh: () => Promise<void>;
-}
-
-export const AuthContext = createContext<AuthContextValue | null>(null);
 
 /**
  * /api/me does not return memberships yet — tolerate absence and coerce
@@ -89,11 +65,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // verdict of a newer refresh() (e.g. right after login).
   const seqRef = useRef(0);
 
-  const refresh = useCallback(async () => {
-    const seq = ++seqRef.current;
-    setStatus("loading");
-
-    const result = await getAuthState();
+  /**
+   * Commit one /api/me verdict, unless a newer request has since started.
+   * Split out of refresh() so the mount effect can resolve the promise
+   * without any synchronous setState in the effect body
+   * (react-hooks/set-state-in-effect).
+   */
+  const applyResult = useCallback((result: AuthState, seq: number) => {
     if (seq !== seqRef.current) return;
 
     if (result.state === "authenticated") {
@@ -119,9 +97,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const refresh = useCallback(async () => {
+    const seq = ++seqRef.current;
+    setStatus("loading");
+    applyResult(await getAuthState(), seq);
+  }, [applyResult]);
+
+  // Mount: status already starts at "loading", so the initial probe only has
+  // to resolve — no setState runs synchronously inside the effect body.
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    const seq = ++seqRef.current;
+    getAuthState().then((result) => applyResult(result, seq));
+  }, [applyResult]);
 
   const value = useMemo<AuthContextValue>(
     () => ({ status, user, memberships, ownedBuildingIds, error, refresh }),

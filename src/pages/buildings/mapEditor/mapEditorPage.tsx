@@ -48,7 +48,7 @@ import { Button } from '../../../components/ui/button';
 import { PageHeader, PageShell } from '../../../components/ui/layout';
 import { Select } from '../../../components/ui/select';
 import { Sheet } from '../../../components/ui/sheet';
-import { useToast } from '../../../components/ui/toast';
+import { useToast } from '../../../components/ui/toastContext';
 import {
   AlertTriangleIcon,
   ExitDoorIcon,

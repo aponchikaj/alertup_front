@@ -27,6 +27,7 @@ import { DestinationSearch, type DestinationSelection } from "./DestinationSearc
 import { FloorSwitcher } from "./FloorSwitcher";
 import { RouteStepper } from "./RouteStepper";
 import { useRouteProgress } from "./useRouteProgress";
+import { writeStoredDestination } from "./storedDestination";
 import { fetchRoute, fetchEvacuationRoute } from "../../apis/wayfindingApi";
 import { errorMessage } from "../../apis/http";
 import { Alert } from "../ui/feedback";
@@ -48,41 +49,10 @@ import type { AssembledRoute, FloorSummary, MapNode } from "../map/types";
    journey instead of starting over.
    ========================================================================= */
 
-const DESTINATION_STORAGE_PREFIX = "alertup-route-dest:";
-
 /** The 3D route view — three.js stays in its lazy chunk. */
 const Map3DRouteLazy = lazy(() =>
   import("../map3d").then((m) => ({ default: m.Map3DRoute })),
 );
-
-export interface StoredDestination {
-  kind: DestinationSelection["kind"];
-  poiId?: string;
-  nodeId?: string;
-  name: string;
-}
-
-export function readStoredDestination(buildingId: string): StoredDestination | null {
-  try {
-    const raw = sessionStorage.getItem(DESTINATION_STORAGE_PREFIX + buildingId);
-    return raw ? (JSON.parse(raw) as StoredDestination) : null;
-  } catch {
-    return null;
-  }
-}
-
-export function writeStoredDestination(
-  buildingId: string,
-  destination: StoredDestination | null,
-): void {
-  try {
-    const key = DESTINATION_STORAGE_PREFIX + buildingId;
-    if (destination) sessionStorage.setItem(key, JSON.stringify(destination));
-    else sessionStorage.removeItem(key);
-  } catch {
-    /* storage unavailable — the journey just won't survive a rescan */
-  }
-}
 
 export interface WayfindingPanelProps {
   buildingId: string;
