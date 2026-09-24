@@ -28,6 +28,12 @@ import { FloorSwitcher } from "./FloorSwitcher";
 import { RouteStepper } from "./RouteStepper";
 import { useRouteProgress } from "./useRouteProgress";
 import { writeStoredDestination } from "./storedDestination";
+import { RouteProfilePicker } from "./RouteProfilePicker";
+import {
+  readRouteProfile,
+  writeRouteProfile,
+  type SelectableRouteProfile,
+} from "./routeProfile";
 import { fetchRoute, fetchEvacuationRoute } from "../../apis/wayfindingApi";
 import { errorMessage } from "../../apis/http";
 import { Alert } from "../ui/feedback";
@@ -35,6 +41,7 @@ import { Button } from "../ui/button";
 import { SpinnerIcon } from "../ui/icons";
 import { useI18n } from "../../i18n/LanguageProvider";
 import { cn } from "../../lib/cn";
+import { formatDistance, formatDistanceAndEta, formatDuration } from "../../lib/format";
 import { useLatestRef } from "../../lib/useLatestRef";
 import type { AssembledRoute, FloorSummary, MapNode } from "../map/types";
 
@@ -95,11 +102,26 @@ export const WayfindingPanel = ({
   hideSearch = false,
   className,
 }: WayfindingPanelProps) => {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [route, setRoute] = useState<AssembledRoute | null>(null);
   const [destinationName, setDestinationName] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  /** A profile-change refetch: the route stays on screen while it runs. */
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Lazy init: one localStorage read on mount, not one per render.
+  const [profile, setProfile] = useState<SelectableRouteProfile>(readRouteProfile);
+  /** The destination currently being walked to — what a refetch re-requests. */
+  const lastSelectionRef = useRef<DestinationSelection | null>(null);
+  /**
+   * Monotonic id of the newest route request. Every load captures its own id
+   * and drops its response if the id has moved on — that is what stops a
+   * refetch that was in flight during "Start over" (or one overtaken by a
+   * marker tap) from resurrecting a route the user already dismissed.
+   */
+  const requestSeqRef = useRef(0);
+  /** Abort handle for the in-flight request, so a superseded fetch stops. */
+  const inFlightRef = useRef<AbortController | null>(null);
   const supports3d = useMap3dSupport();
   const [viewMode, setViewMode] = useState<MapViewMode>(readMapViewPreference);
   const view3d = supports3d && viewMode === "3d";
@@ -115,21 +137,60 @@ export const WayfindingPanel = ({
     maxScale: 3,
   });
 
+  /**
+   * Fetch (or refetch) the route to `selection`.
+   *
+   * `silent` is what makes a profile change feel safe: the map keeps showing
+   * the route you are standing in while the new one loads, and if the new one
+   * never arrives you are left with the old one plus an error rather than an
+   * empty screen. That "last good route stays put" behaviour is the static
+   * fail-safe the emergency surfaces lean on.
+   */
   const loadRoute = useCallback(
-    async (selection: DestinationSelection) => {
-      setLoading(true);
+    async (
+      selection: DestinationSelection,
+      options: {
+        profile?: SelectableRouteProfile;
+        heading?: number;
+        silent?: boolean;
+      } = {},
+    ) => {
+      const requestedProfile = options.profile ?? profile;
+      const seq = ++requestSeqRef.current;
+      inFlightRef.current?.abort();
+      const controller = new AbortController();
+      inFlightRef.current = controller;
+
+      if (options.silent) setRefreshing(true);
+      else setLoading(true);
       setError(null);
       try {
         const next =
           selection.kind === "nearest-exit"
-            ? await fetchEvacuationRoute(originNodeId)
+            ? // /evacuate takes `accessible`, not `profile`: a non-emergency
+              // profile there reads as a downgrade and would hide the
+              // EMERGENCY_ONLY edges this route exists to use.
+              await fetchEvacuationRoute(originNodeId, {
+                accessible: requestedProfile === "wheelchair",
+                heading: options.heading,
+                signal: controller.signal,
+              })
             : await fetchRoute({
                 fromNodeId: originNodeId,
                 toPoiId: selection.poiId,
                 toNodeId: selection.nodeId,
+                profile: requestedProfile,
+                heading: options.heading,
+                signal: controller.signal,
               });
 
+        // Superseded while we waited — the newer request owns the screen.
+        if (requestSeqRef.current !== seq) return;
+
         setRoute(next);
+        // Only now: a destination that never loaded must not become the one a
+        // later profile change silently re-requests.
+        lastSelectionRef.current = selection;
         setDestinationName(selection.name);
         progress.reset();
         writeStoredDestination(buildingId, {
@@ -144,19 +205,45 @@ export const WayfindingPanel = ({
           progress.syncToFloorNumber(originFloorNumber);
         }
       } catch (err) {
+        if (requestSeqRef.current !== seq) return;
+        // Deliberately does NOT clear `route`: a stale route still gets the
+        // visitor to the door, an empty panel gets them nowhere.
         setError(errorMessage(err));
-        setRoute(null);
       } finally {
-        setLoading(false);
+        // `finally` runs even on the early returns above; only the newest
+        // request may take the spinners down.
+        if (requestSeqRef.current === seq) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
-    [buildingId, originNodeId, originFloorNumber, progress],
+    [buildingId, originNodeId, originFloorNumber, profile, progress],
+  );
+
+  /** Remember the preference, then re-route the journey already on screen. */
+  const onProfileChange = useCallback(
+    (next: SelectableRouteProfile) => {
+      setProfile(next);
+      writeRouteProfile(next);
+      const selection = lastSelectionRef.current;
+      if (selection) void loadRoute(selection, { profile: next, silent: true });
+    },
+    [loadRoute],
   );
 
   const clearRoute = useCallback(() => {
+    // Bump the sequence first: any request still in flight is now stale and
+    // its response will be dropped rather than undoing this.
+    requestSeqRef.current += 1;
+    inFlightRef.current?.abort();
+    inFlightRef.current = null;
     setRoute(null);
     setDestinationName(null);
     setError(null);
+    setLoading(false);
+    setRefreshing(false);
+    lastSelectionRef.current = null;
     writeStoredDestination(buildingId, null);
   }, [buildingId]);
 
@@ -180,6 +267,33 @@ export const WayfindingPanel = ({
   useEffect(() => {
     onRouteActiveRef.current?.(routeActive);
   }, [routeActive, onRouteActiveRef]);
+
+  /**
+   * The headline under the destination name. Prefers the server's metre/second
+   * totals; falls back through whichever half exists, then to the legacy
+   * metres-only line so an older backend still says something useful.
+   */
+  const totalsLine = useMemo(() => {
+    if (!route) return null;
+    const { totalDistanceM, totalDurationSec } = route;
+    if (totalDistanceM !== undefined && totalDurationSec !== undefined) {
+      return formatDistanceAndEta(totalDistanceM, totalDurationSec, lang);
+    }
+    if (totalDistanceM !== undefined) return formatDistance(totalDistanceM, lang);
+    if (totalDurationSec !== undefined) return formatDuration(totalDurationSec, lang);
+    if (route.totalDistanceMeters !== null) {
+      return t("wayfinding.distanceMeters", { meters: route.totalDistanceMeters });
+    }
+    return null;
+  }, [route, lang, t]);
+
+  /** Evacuation reads red — whether the mode or the profile says so. */
+  const routeTone =
+    route && (route.mode === "EVACUATION" || route.profile === "emergency")
+      ? ("danger" as const)
+      : ("brand" as const);
+
+  const warnings = route?.warnings ?? [];
 
   // Floors the route actually crosses, in walking order.
   const floors = useMemo<FloorSummary[]>(() => {
@@ -257,17 +371,41 @@ export const WayfindingPanel = ({
               <p className="truncate font-semibold text-ink">
                 {t("wayfinding.routeTo", { name: destinationName ?? "" })}
               </p>
-              {route.totalDistanceMeters !== null ? (
-                <p className="text-sm text-ink-muted">
-                  {t("wayfinding.distanceMeters", {
-                    meters: route.totalDistanceMeters,
-                  })}
-                </p>
+              {totalsLine ? (
+                <p className="text-sm text-ink-muted">{totalsLine}</p>
               ) : null}
             </div>
             <Button variant="ghost" size="sm" onClick={clearRoute}>
               {t("wayfinding.startOver")}
             </Button>
+          </div>
+
+          {warnings.length > 0 ? (
+            <Alert tone="warning" title={t("wayfinding.warningsTitle")}>
+              <ul className="space-y-0.5">
+                {warnings.map((warning, index) => (
+                  <li key={`${warning.code}-${index}`}>{warning.message}</li>
+                ))}
+              </ul>
+            </Alert>
+          ) : null}
+
+          <div className="flex flex-wrap items-center gap-2">
+            <RouteProfilePicker
+              value={profile}
+              onChange={onProfileChange}
+              busy={refreshing}
+              className="min-w-44 flex-1 sm:max-w-56 sm:flex-none"
+            />
+            {refreshing ? (
+              <span
+                role="status"
+                className="flex items-center gap-2 text-sm text-ink-muted"
+              >
+                <SpinnerIcon className="size-4" aria-hidden="true" />
+                {t("common.loading")}
+              </span>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -296,7 +434,7 @@ export const WayfindingPanel = ({
                 <Map3DRouteLazy
                   route={route}
                   activeStepIndex={progress.activeIndex}
-                  tone={route.mode === "EVACUATION" ? "danger" : "brand"}
+                  tone={routeTone}
                   userDot={
                     !progress.isPreviewing &&
                     progress.activeSegment?.nodes[0] &&
@@ -340,7 +478,7 @@ export const WayfindingPanel = ({
             <DrawingLayer drawing={displayedDrawing} scale={camera.scale} />
             <RouteLayer
               segment={displayedSegment}
-              tone={route.mode === "EVACUATION" ? "danger" : "brand"}
+              tone={routeTone}
             />
             <NodeLayer nodes={displayedNodes} scale={camera.scale} />
             <UserDotLayer position={userPosition} label={t("wayfinding.yourLocation")} />

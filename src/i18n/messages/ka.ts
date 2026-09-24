@@ -596,6 +596,12 @@ export const ka: Messages = {
     distanceAndEta: "{meters} მ · {minutes} წთ",
     remaining: "დარჩა {distance}",
     remainingTime: "დაახლოებით {minutes} წთ დარჩა",
+    profileLabel: "მარშრუტის ტიპი",
+    profileWalk: "უსწრაფესი",
+    profileElevatorFirst: "ლიფტის უპირატესობა",
+    profileMinFloorChanges: "ნაკლები სართულის ცვლილება",
+    warningsTitle: "გაითვალისწინეთ",
+    segmentNotAccessible: "საფეხურებით",
   },
 
   qr: {

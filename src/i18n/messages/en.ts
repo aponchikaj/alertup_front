@@ -595,6 +595,12 @@ export const en = {
     distanceAndEta: "{meters} m · {minutes} min",
     remaining: "{distance} left",
     remainingTime: "about {minutes} min left",
+    profileLabel: "Route preference",
+    profileWalk: "Fastest",
+    profileElevatorFirst: "Prefer elevators",
+    profileMinFloorChanges: "Fewest floor changes",
+    warningsTitle: "Heads-up",
+    segmentNotAccessible: "Not step-free",
   },
 
   qr: {

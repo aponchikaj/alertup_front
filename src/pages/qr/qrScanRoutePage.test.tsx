@@ -256,7 +256,10 @@ describe('scan page — directory first, map one tap away', () => {
     fireEvent.click(screen.getByRole('button', { name: new RegExp(en.route.guideMe) }));
 
     await waitFor(() =>
-      expect(mockedWayfinding.fetchEvacuationRoute).toHaveBeenCalledWith('n1'),
+      expect(mockedWayfinding.fetchEvacuationRoute).toHaveBeenCalledWith(
+        'n1',
+        expect.objectContaining({}),
+      ),
     );
     // The route view replaces the idle slot; the exit strip folds away.
     await waitFor(() =>

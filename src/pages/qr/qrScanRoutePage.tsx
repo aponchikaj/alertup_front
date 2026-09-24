@@ -32,6 +32,7 @@ import { DirectoryPanel } from './DirectoryPanel';
 import { fetchDirectory, type DirectoryEntry } from '../../apis/wayfindingApi';
 import { WayfinderAgentLauncher } from '../../components/ai/WayfinderAgentLauncher';
 import { useI18n } from '../../i18n/LanguageProvider';
+import { formatDistanceAndEta } from '../../lib/format';
 
 interface FloorNode {
   id: string;
@@ -280,7 +281,7 @@ const AiLayer: React.FC<{
 const QRScanRoutePageFixed: React.FC = () => {
   const { qrId } = useParams<{ qrId: string }>();
   const rootRef = usePageAnimations();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
 
   // Held in a ref so the fetch effect keeps its empty dependency list. Listing
   // `t` there would re-run the scan request — and flash the loading screen —
@@ -684,13 +685,23 @@ const QRScanRoutePageFixed: React.FC = () => {
                         t('route.emergencyExit')}
                       <span className="font-normal text-ink-muted">
                         {' · '}
-                        {routeData.route?.totalDistanceMeters != null
-                          ? t('wayfinding.distanceMeters', {
-                              meters: routeData.route.totalDistanceMeters,
-                            })
-                          : t('route.steps', {
-                              count: routeData.emergencyRoute.distance,
-                            })}
+                        {/* "How far and how long" beats "how far" when the
+                            building is on fire. Falls back through metres to
+                            the legacy hop count. */}
+                        {routeData.route?.totalDistanceM != null &&
+                        routeData.route.totalDurationSec != null
+                          ? formatDistanceAndEta(
+                              routeData.route.totalDistanceM,
+                              routeData.route.totalDurationSec,
+                              lang,
+                            )
+                          : routeData.route?.totalDistanceMeters != null
+                            ? t('wayfinding.distanceMeters', {
+                                meters: routeData.route.totalDistanceMeters,
+                              })
+                            : t('route.steps', {
+                                count: routeData.emergencyRoute.distance,
+                              })}
                       </span>
                     </p>
                   </div>

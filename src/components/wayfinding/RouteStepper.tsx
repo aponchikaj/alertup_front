@@ -1,8 +1,9 @@
 import { Button } from "../ui/button";
-import { Alert } from "../ui/feedback";
+import { Alert, Badge } from "../ui/feedback";
 import { ArrowRightIcon, CheckCircleIcon, RouteIcon, ScanIcon } from "../ui/icons";
 import { useI18n } from "../../i18n/LanguageProvider";
 import { cn } from "../../lib/cn";
+import { durationMinutes, formatDistance } from "../../lib/format";
 import type { RouteProgress } from "./useRouteProgress";
 import type { TransitType } from "../map/types";
 
@@ -30,13 +31,29 @@ export interface RouteStepperProps {
 }
 
 export const RouteStepper = ({ progress, onRescan, className }: RouteStepperProps) => {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { route, activeStep, activeSegment, activeTransition, atEnd } = progress;
 
   if (!route || !activeStep) return null;
 
   const walkSteps = route.steps.filter((s) => s.kind !== "arrive").length;
   const stepNumber = Math.min(progress.activeIndex + 1, walkSteps || 1);
+
+  // What's left of the whole journey from this step onward — the number a
+  // visitor actually wants mid-walk ("am I nearly there?"), not the leg length.
+  const remainingDistance =
+    activeStep.distanceUntilM !== undefined
+      ? t("wayfinding.remaining", {
+          distance: formatDistance(activeStep.distanceUntilM, lang),
+        })
+      : null;
+  const remainingTime =
+    activeStep.timeUntilSec !== undefined
+      ? t("wayfinding.remainingTime", {
+          minutes: durationMinutes(activeStep.timeUntilSec),
+        })
+      : null;
+  const notStepFree = activeSegment?.accessible === false;
 
   return (
     <div
@@ -58,6 +75,19 @@ export const RouteStepper = ({ progress, onRescan, className }: RouteStepperProp
           </p>
         ) : null}
       </div>
+
+      {remainingDistance || remainingTime || notStepFree ? (
+        <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-muted">
+          {remainingDistance ? <span>{remainingDistance}</span> : null}
+          {remainingDistance && remainingTime ? (
+            <span aria-hidden="true">·</span>
+          ) : null}
+          {remainingTime ? <span>{remainingTime}</span> : null}
+          {notStepFree ? (
+            <Badge tone="warning">{t("wayfinding.segmentNotAccessible")}</Badge>
+          ) : null}
+        </div>
+      ) : null}
 
       {route.accessibleRouteUnavailable ? (
         <Alert tone="warning" className="mb-3">
