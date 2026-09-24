@@ -125,6 +125,7 @@ import { useEditorCollab, type EditorOp } from './useEditorCollab';
 import { PeerCursorsLayer, PresenceAvatars } from './collabUi';
 import { ToolMenu, type ToolMenuItem } from './toolMenu';
 import { EditorAiPanel } from './editorAiPanel';
+import { AgentChatPanel } from '../../../components/ai/AgentChatPanel';
 import { LinkFloorsDialog } from './linkFloorsDialog';
 import { ValidationPanel } from './validationPanel';
 
@@ -317,6 +318,7 @@ export const MapEditorPage = () => {
 
   // AI design assistant drawer.
   const [aiOpen, setAiOpen] = useState(false);
+  const [auditOpen, setAuditOpen] = useState(false);
 
   // Link-floors dialog: the primary flow for cross-floor links. The map-tap
   // gesture still works underneath for people who prefer pointing.
@@ -2563,6 +2565,15 @@ export const MapEditorPage = () => {
             <ZapIcon size={16} />
             {t('editorAi.launcher')}
           </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setAuditOpen(true)}
+            title={t('auditAi.title')}
+          >
+            <ZapIcon size={16} />
+            {t('auditAi.launcher')}
+          </Button>
           <PresenceAvatars peers={collab.peers} label={t('mapEditor.peersEditing')} />
           <Button
             variant="secondary"
@@ -2860,6 +2871,28 @@ export const MapEditorPage = () => {
         activeFloorId={editor.activeFloorId}
         submitting={linkSubmitting}
         onCreate={createTransitLinkFromDialog}
+      />
+
+      <AgentChatPanel
+        open={auditOpen}
+        onClose={() => setAuditOpen(false)}
+        agentId="auditor"
+        namespace="auditAi"
+        buildingId={buildingId}
+        knownActions={['auto_connect_floor']}
+        onFallbackAction={() => void runValidation()}
+        onRunAction={(action) => {
+          if (action.name !== 'auto_connect_floor') return;
+          const floorId = typeof action.args.floorId === 'string' ? action.args.floorId : null;
+          if (!floorId) return;
+          // The auditor names a floor; auto-connect always runs on the active
+          // one, so switch first. Both go through the editor's normal paths,
+          // which means one Ctrl+Z still undoes it.
+          dispatch({ type: 'SET_FLOOR', floorId });
+          setNodesMode(true);
+          void runAutoConnectRef.current();
+          toast({ title: t('auditAi.actionDone'), tone: 'success' });
+        }}
       />
 
       <EditorAiPanel

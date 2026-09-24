@@ -25,6 +25,12 @@ export interface EmergencyOverlayProps {
   onShowRoute: () => void;
   /** "I'm safe" — acknowledges this emergency and returns to normal browsing. */
   onBypass: () => void;
+  /**
+   * One sentence naming the nearest exit, phrased from the route the server
+   * already computed. Optional and best-effort: the overlay is complete
+   * without it, and it must never be waited on.
+   */
+  brief?: string | null;
 }
 
 export const EmergencyOverlay = ({
@@ -32,6 +38,7 @@ export const EmergencyOverlay = ({
   message,
   onShowRoute,
   onBypass,
+  brief,
 }: EmergencyOverlayProps) => {
   const { t } = useI18n();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -81,6 +88,11 @@ export const EmergencyOverlay = ({
             <p id="emergency-overlay-body" className="text-base leading-relaxed text-ink">
               {message?.trim() ? message : t("emergency.overlayBodyDefault")}
             </p>
+            {brief?.trim() ? (
+              <p className="rounded-lg bg-surface px-3 py-2 text-sm text-ink" data-testid="evacuation-brief">
+                {brief}
+              </p>
+            ) : null}
             <p className="text-sm font-semibold text-danger-text">
               {t("emergency.doNotUseElevators")}
             </p>

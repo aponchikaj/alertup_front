@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 import { Container } from "../ui/layout";
 import { Logo } from "../ui/logo";
-import Sponsors from "../marketing/Sponsors";
 import { useI18n } from "../../i18n/LanguageProvider";
 
 const footerLinkClass =
@@ -52,7 +51,6 @@ const Footer = () => {
             <p className="max-w-xs text-sm leading-relaxed text-ink-muted">
               {t("footer.tagline")}
             </p>
-            <Sponsors />
           </div>
 
           {linkGroups.map((group) => (
