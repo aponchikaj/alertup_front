@@ -354,6 +354,40 @@ describe('scan page — connection status and closures', () => {
     expect(screen.queryByText(en.emergency.connectionLost)).toBeNull();
   });
 
+  test('the connection-lost notice lands in a live region that was already mounted', async () => {
+    // A screen reader only announces a change INSIDE a region it is already
+    // watching. Mounting the whole role=status alert at the moment the channel
+    // dies means the one person who most needs to know the route is frozen is
+    // the one person who is never told. The region is therefore permanent and
+    // only its content changes.
+    renderPage();
+    await screen.findByText(/Tbilisi Mall/);
+
+    const region = screen.getByTestId('connection-status');
+    expect(region).toHaveAttribute('aria-live', 'polite');
+    expect(region).toHaveAttribute('aria-atomic', 'true');
+    expect(region).toBeEmptyDOMElement();
+
+    act(() => realtimeMock.__setStatus('degraded'));
+    act(() =>
+      realtimeMock.__emit({
+        type: 'state',
+        data: {
+          isEmergency: true,
+          emergencyId: 'e1',
+          message: 'Fire on level 2',
+          startedAt: new Date().toISOString(),
+        },
+      }),
+    );
+
+    // Same node, now carrying the notice — not a replacement node.
+    expect(screen.getByTestId('connection-status')).toBe(region);
+    expect(region).toHaveTextContent(en.emergency.connectionLost);
+    // And exactly one live region: the Alert inside must not open a second.
+    expect(region.querySelectorAll('[aria-live]')).toHaveLength(0);
+  });
+
   test('a closure_changed frame refetches the currently displayed route', async () => {
     mockedWayfinding.fetchRoute.mockResolvedValue(scanPayload.route as never);
     renderPage();

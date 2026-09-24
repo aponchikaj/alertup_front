@@ -52,7 +52,10 @@ export const AlternativeExits = ({ route, onSelect, className }: AlternativeExit
               <span className="truncate">{label}</span>
               <span className="text-xs font-normal text-ink-muted">
                 {t("wayfinding.floor", { number: alt.floorNumber })}
-                {" · "}
+                {/* Sighted punctuation only — the accessible name reads
+                    "North exit Floor 1 80 m · 3 min" without it, and a
+                    "middle dot" announced mid-evacuation is pure noise. */}
+                <span aria-hidden="true">{" · "}</span>
                 {formatDistanceAndEta(alt.distanceM, alt.durationSec, lang)}
               </span>
             </Button>

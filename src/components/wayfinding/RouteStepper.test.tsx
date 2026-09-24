@@ -195,7 +195,7 @@ beforeEach(() => {
 });
 
 describe("RouteStepper", () => {
-  test("renders the server instruction in the active language with its landmark", () => {
+  test("renders the server instruction in the active language", () => {
     localStorage.setItem("alertup-lang", "ka");
     renderStepper(narratedRoute);
 
@@ -209,19 +209,58 @@ describe("RouteStepper", () => {
     expect(screen.getByTestId("instruction-title")).toHaveTextContent(
       instructions[1].text.ka,
     );
-    expect(
-      screen.getByText(
-        ka.wayfinding.landmark
-          .replace("{name}", "Coffee Bar")
-          .replace("{side}", ka.wayfinding.sideLeft),
-      ),
-    ).toBeInTheDocument();
     // 10 m · 1 min, from the instruction's own distance/duration.
     expect(
       screen.getByText(
         ka.wayfinding.distanceAndEta
           .replace("{meters}", "10")
           .replace("{minutes}", "1"),
+      ),
+    ).toBeInTheDocument();
+  });
+
+  test("names a landmark the server text already mentions exactly once", () => {
+    // B10 landed and the authored line reads "Turn right at the Coffee Bar" —
+    // it already carries the landmark. Adding the client's own "Coffee Bar on
+    // your left" underneath prints it twice on screen and, worse, says it
+    // twice inside one aria-live announcement.
+    renderStepper(narratedRoute);
+    fireEvent.click(screen.getByRole("button", { name: en.common.next }));
+
+    const card = screen.getByTestId("route-stepper");
+    expect(card).toHaveTextContent(instructions[1].text.en);
+    expect(screen.queryAllByText(/Coffee Bar/)).toHaveLength(1);
+    for (const side of [en.wayfinding.sideLeft, en.wayfinding.sideRight]) {
+      expect(
+        screen.queryByText(
+          en.wayfinding.landmark
+            .replace("{name}", "Coffee Bar")
+            .replace("{side}", side),
+        ),
+      ).toBeNull();
+    }
+  });
+
+  test("still adds the landmark line when the server text leaves it out", () => {
+    // The other half of the same rule: an authored line that does not name the
+    // landmark would otherwise lose it entirely.
+    const quiet = {
+      ...narratedRoute,
+      instructions: [
+        {
+          ...instructions[1],
+          text: { en: "Turn right", ka: "შეუხვიე მარჯვნივ" },
+        },
+      ],
+    } as AssembledRoute;
+
+    renderStepper(quiet);
+
+    expect(
+      screen.getByText(
+        en.wayfinding.landmark
+          .replace("{name}", "Coffee Bar")
+          .replace("{side}", en.wayfinding.sideLeft),
       ),
     ).toBeInTheDocument();
   });
@@ -249,6 +288,39 @@ describe("RouteStepper", () => {
       "aria-hidden",
       "true",
     );
+  });
+
+  test("keeps ONE live region across walk, transit and arrive", () => {
+    // A live region only announces changes to a region the screen reader was
+    // already watching. Mounting a fresh <p aria-live> per card kind means the
+    // transit line and the arrival line are announced to nobody — so the SAME
+    // DOM node has to survive every step kind.
+    renderStepper(narratedRoute);
+
+    const first = screen.getByTestId("instruction-title");
+    expect(first).toHaveTextContent(instructions[0].text.en);
+
+    fireEvent.click(screen.getByRole("button", { name: en.common.next }));
+    fireEvent.click(screen.getByRole("button", { name: en.common.next }));
+
+    // Now on the transit card.
+    const onTransit = screen.getByTestId("instruction-title");
+    expect(onTransit).toHaveTextContent(instructions[2].text.en);
+    expect(onTransit).toBe(first);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: en.wayfinding.arrivedOnFloor.replace("{floor}", "4"),
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: en.common.next }));
+
+    // ...and on the arrival card.
+    const onArrival = screen.getByTestId("instruction-title");
+    expect(onArrival).toHaveTextContent(instructions[4].text.en);
+    expect(onArrival).toBe(first);
+    // Exactly one region, never two racing each other.
+    expect(screen.getAllByTestId("instruction-title")).toHaveLength(1);
   });
 
   test("a route that changes under the stepper restarts at its own first instruction", () => {

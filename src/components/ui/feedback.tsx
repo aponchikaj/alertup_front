@@ -47,6 +47,17 @@ const ALERT_TONES: Record<AlertTone, { wrap: string; icon: typeof InfoIcon }> = 
 export interface AlertProps extends HTMLAttributes<HTMLDivElement> {
   tone?: AlertTone;
   title?: string;
+  /**
+   * Whether this Alert is its own live region. Default true.
+   *
+   * Set it false for two cases, and only those:
+   *  - standing instructional copy that happens to want the Alert's look but
+   *    never changes ("Tap connections on the map…"), which a live region
+   *    would make compete with the real status message beside it;
+   *  - an Alert rendered INSIDE a live region the caller already owns, where
+   *    nesting a second one is undefined behaviour in most screen readers.
+   */
+  live?: boolean;
   children?: ReactNode;
 }
 
@@ -57,6 +68,7 @@ export interface AlertProps extends HTMLAttributes<HTMLDivElement> {
 export const Alert = ({
   tone = "info",
   title,
+  live = true,
   className,
   children,
   ...props
@@ -65,8 +77,8 @@ export const Alert = ({
 
   return (
     <div
-      role={tone === "danger" ? "alert" : "status"}
-      aria-live={tone === "danger" ? "assertive" : "polite"}
+      role={live ? (tone === "danger" ? "alert" : "status") : undefined}
+      aria-live={live ? (tone === "danger" ? "assertive" : "polite") : undefined}
       className={cn(
         "flex items-start gap-3 rounded-lg border px-4 py-3 text-sm",
         wrap,

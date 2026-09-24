@@ -159,11 +159,25 @@ const EmergencyLayer: React.FC<{
 
   return (
     <>
-      {emergency.connection === 'degraded' && isActiveEmergency ? (
-        <Alert tone="warning" className="mb-4">
-          {t('emergency.connectionLost')}
-        </Alert>
-      ) : null}
+      {/* The region is permanent; only its contents come and go.
+          A screen reader announces changes INSIDE a live region it was already
+          watching — mounting the whole role=status alert at the moment the
+          channel dies is the one case where it may announce nothing at all,
+          and the person who needs to know the route has stopped updating is
+          exactly the person who would never be told. The Alert inside opts out
+          of being its own region so the two do not nest. */}
+      <div
+        data-testid="connection-status"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {emergency.connection === 'degraded' && isActiveEmergency ? (
+          <Alert tone="warning" live={false} className="mb-4">
+            {t('emergency.connectionLost')}
+          </Alert>
+        ) : null}
+      </div>
 
       {emergency.phase === 'bypassed' ? (
         <EmergencyBanner onViewRoute={onShowExitRoute} />

@@ -264,6 +264,49 @@ describe("WayfindingPanel — route preference", () => {
     expect(screen.queryByText(/\bnull\b/)).toBeNull();
   });
 
+  test("a closure appearing on a silent refetch lands in a region already there", async () => {
+    // The realtime closure_changed path refetches under the visitor's feet.
+    // If the "Route adjusted for closures" alert IS the live region, it is
+    // created at the same instant as its text and a screen reader watching the
+    // page has nothing to notice. The region is therefore permanent for as
+    // long as a route is on screen; only its contents change.
+    mockedApi.fetchRoute.mockResolvedValue(makeRoute());
+    renderPanel();
+    await screen.findByTestId("route-stepper");
+
+    const region = screen.getByTestId("route-notices");
+    expect(region).toHaveAttribute("aria-live", "polite");
+    expect(region).toBeEmptyDOMElement();
+    // Empty, but never display:none — that would take the region out of the
+    // accessibility tree and undo the whole point of keeping it mounted.
+    expect(region.className).not.toMatch(/\bhidden\b/);
+
+    // A refetch (here driven by the profile picker, exactly as the closure
+    // event drives one) brings a route that is routed around a closure.
+    mockedApi.fetchRoute.mockResolvedValue(
+      makeRoute({
+        closures: [
+          {
+            id: "c1",
+            floorId: "f1",
+            reason: "Burst pipe",
+            costMultiplier: null,
+            endsAt: null,
+            blocked: true,
+          },
+        ],
+      }),
+    );
+    fireEvent.change(profilePicker(), { target: { value: "wheelchair" } });
+
+    await screen.findByText(en.wayfinding.closuresTitle);
+    // Same node, now carrying the notice.
+    expect(screen.getByTestId("route-notices")).toBe(region);
+    expect(region).toHaveTextContent("Burst pipe");
+    // One region, not two: the Alert inside must not open its own.
+    expect(region.querySelectorAll("[aria-live]")).toHaveLength(0);
+  });
+
   test("a closure with neither reason nor an end time still renders a non-empty line", async () => {
     const closure: RouteClosure = {
       id: "c1",
@@ -424,6 +467,17 @@ describe("WayfindingPanel — alternative exits", () => {
     expect(northExit).toHaveAccessibleName(/Floor 1/);
     expect(northExit).toHaveAccessibleName(/80 m/);
     expect(northExit).toHaveAccessibleName(/2 min/);
+
+    // The "·" this component puts between the floor and the distance is
+    // sighted punctuation and is hidden. (The one inside "80 m · 2 min" comes
+    // from the shared distance+ETA format string, which is one quantity pair
+    // spoken as a unit everywhere in the product and is left alone.)
+    expect(
+      northExit.querySelector('[aria-hidden="true"]')?.textContent,
+    ).toContain("·");
+    // So: two dots on screen, one in the accessible name.
+    expect(northExit.textContent).toMatch(/·[^·]*·/);
+    expect(northExit).not.toHaveAccessibleName(/·[^·]*·/);
 
     // At most two, and never the one that matches the primary destination.
     expect(screen.getByRole("button", { name: /South exit/ })).toBeInTheDocument();

@@ -522,25 +522,46 @@ export const WayfindingPanel = ({
             </Button>
           </div>
 
-          {warnings.length > 0 ? (
-            <Alert tone="warning" title={t("wayfinding.warningsTitle")}>
-              <ul className="space-y-0.5">
-                {warnings.map((warning, index) => (
-                  <li key={`${warning.code}-${index}`}>{warning.message}</li>
-                ))}
-              </ul>
-            </Alert>
-          ) : null}
+          {/* One permanent region for both notices, for as long as a route is
+              on screen. Warnings and closures can appear on a SILENT refetch —
+              a profile change, or the realtime closure_changed event — and a
+              live region created at the same instant as its own text is a
+              region nothing was watching, so the alert would reach a screen
+              reader only if the user happened to browse back over it. The
+              Alerts inside opt out of being regions so the two do not nest. */}
+          <div
+            data-testid="route-notices"
+            role="status"
+            aria-live="polite"
+            // `sr-only` and NOT `hidden` while empty: display:none takes the
+            // element out of the accessibility tree, which would undo the very
+            // thing the permanent region is for. sr-only keeps it rendered and
+            // observed while costing no layout.
+            className={cn(
+              "space-y-4",
+              warnings.length === 0 && closureLabels.length === 0 && "sr-only",
+            )}
+          >
+            {warnings.length > 0 ? (
+              <Alert tone="warning" live={false} title={t("wayfinding.warningsTitle")}>
+                <ul className="space-y-0.5">
+                  {warnings.map((warning, index) => (
+                    <li key={`${warning.code}-${index}`}>{warning.message}</li>
+                  ))}
+                </ul>
+              </Alert>
+            ) : null}
 
-          {closureLabels.length > 0 ? (
-            <Alert tone="info" title={t("wayfinding.closuresTitle")}>
-              <ul className="space-y-0.5">
-                {closureLabels.map((closure) => (
-                  <li key={closure.id}>{closure.text}</li>
-                ))}
-              </ul>
-            </Alert>
-          ) : null}
+            {closureLabels.length > 0 ? (
+              <Alert tone="info" live={false} title={t("wayfinding.closuresTitle")}>
+                <ul className="space-y-0.5">
+                  {closureLabels.map((closure) => (
+                    <li key={closure.id}>{closure.text}</li>
+                  ))}
+                </ul>
+              </Alert>
+            ) : null}
+          </div>
 
           <AlternativeExits route={route} onSelect={onSelectAlternativeExit} />
 

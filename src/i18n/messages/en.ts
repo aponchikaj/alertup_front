@@ -688,7 +688,12 @@ export const en = {
     edgeWeightInvalid: "Must be a positive number.",
     edgeDirection: "Direction",
     edgeDirectionBoth: "Both ways",
-    edgeDirectionForward: "{from} → {to}",
+    // Spelled out rather than "{from} → {to}": an <option>'s text is the one
+    // place aria-hidden cannot reach, and a screen reader either says
+    // "right arrow" or skips the glyph, leaving the operator guessing which
+    // end "forward" points at.
+    edgeDirectionForward: "One way: {from} to {to}",
+    edgeEndpoints: "{from} and {to}",
     edgeTags: "Tags",
     edgeTagsHint: "Press Enter to add, e.g. outdoor, narrow.",
     autoConnect: "Auto-connect",
@@ -732,8 +737,21 @@ export const en = {
     closures: "Closures",
     closuresEmpty: "No active closures.",
     closureAdd: "Add closure",
-    closurePickEdges: "Tap connections on the map to close them.",
+    closurePickEdges: "Tap connections on the map, or tick them in the list below.",
     closureSelectedCount: "{count} connections selected",
+    closureSelectedCountOne: "1 connection selected",
+
+    // The keyboard path. Edge picking shipped as a map gesture only, and
+    // EdgeLayer's edges are bare SVG lines with no tabIndex and no role, so
+    // without this list a keyboard-only operator can fill in every field of a
+    // closure and never enable Save.
+    closureEdgeList: "Connections on this floor",
+    closureEdgeSearch: "Find a connection",
+    closureEdgeSearchHint: "Type part of the name at either end.",
+    closureEdgeOption: "{from} to {to}",
+    closureEdgeNone: "No connections match that search.",
+    closureEdgeMore: "Showing {shown} of {total}. Narrow the search to reach the rest.",
+    closureEdgeHighlighted: "In the closure being drafted",
     closureReason: "Reason",
     closureDuration: "Duration",
     closureHours: "{hours} h",
@@ -747,6 +765,7 @@ export const en = {
     closureBlocked: "Block completely",
     closureSlowed: "Slow down",
     closureSlowFactor: "Slow-down factor",
+    closureSlowFactorOption: "{factor}× slower",
 
     pickTransitTarget: "Now pick the matching node on another floor.",
     cancelHint: "Press Escape to cancel.",

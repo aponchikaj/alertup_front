@@ -133,7 +133,15 @@ import { EditorAiPanel } from './editorAiPanel';
 import { AgentChatPanel } from '../../../components/ai/AgentChatPanel';
 import { LinkFloorsDialog } from './linkFloorsDialog';
 import { ValidationPanel } from './validationPanel';
-import { ClosuresPanel, type ClosureDraftInput } from './closuresPanel';
+import {
+  ClosuresPanel,
+  type ClosureDraftInput,
+  type ClosureEdgeOption,
+} from './closuresPanel';
+import { endpointLabel } from './edgeLabels';
+
+/** Stable empty list — a fresh [] would re-run the panel's own memo. */
+const NO_EDGE_OPTIONS: ClosureEdgeOption[] = [];
 
 /* ============================================================================
    Map editor page (F3).
@@ -1329,6 +1337,34 @@ export const MapEditorPage = () => {
     () => (closureDraft === null ? undefined : new Set(closureDraft)),
     [closureDraft],
   );
+
+  /**
+   * The active floor's connections, named, for the closures panel's keyboard
+   * picker. Scoped by `nodesById` exactly as EdgeLayer is, so the list and the
+   * drawing hold the same set — a cross-floor transit link has no endpoint to
+   * draw here and equally has no row.
+   *
+   * Built only while a draft is open: on a dense floor this is a few hundred
+   * string concatenations that nobody is looking at the rest of the time.
+   */
+  const closureDrafting = closureDraft !== null;
+  const closureEdgeOptions = useMemo<ClosureEdgeOption[]>(() => {
+    if (!closureDrafting) return NO_EDGE_OPTIONS;
+    const rows: ClosureEdgeOption[] = [];
+    for (const edge of graph.edges) {
+      const source = nodesById.get(edge.sourceNodeId);
+      const target = nodesById.get(edge.targetNodeId);
+      if (!source || !target) continue;
+      rows.push({
+        id: edge.id,
+        fromLabel: endpointLabel(source, edge.sourceNodeId),
+        toLabel: endpointLabel(target, edge.targetNodeId),
+      });
+    }
+    return rows;
+    // Keyed on whether a draft is OPEN, never on its contents: rebuilding a
+    // few hundred labels on every tick of a checkbox would be pure waste.
+  }, [closureDrafting, graph.edges, nodesById]);
 
   const activeDrawing = activeFloor?.drawing ?? EMPTY_DRAWING;
 
@@ -2829,6 +2865,7 @@ export const MapEditorPage = () => {
           inaccessibleLabel={t('mapEditor.edgeAccessible')}
           selectedEdgeId={editor.selectedEdgeId}
           highlightedEdgeIds={closureDraftSet}
+          highlightedLabel={t('mapEditor.closureEdgeHighlighted')}
           // While a closure draft is open every tool defers to edge picking —
           // otherwise the operator would have to arm Select first.
           onEdgeClick={
@@ -2970,6 +3007,10 @@ export const MapEditorPage = () => {
               closures={closures}
               loading={closuresLoading}
               draftEdgeIds={closureDraft}
+              edgeOptions={closureEdgeOptions}
+              // The same call a map tap makes, so the two pickers are one
+              // picker with two front doors.
+              onToggleEdge={toggleClosureEdge}
               onStartDraft={() => {
                 // Picking happens on the routing graph, which only renders in
                 // Nodes mode — arming the draft in Draw mode would show a hint

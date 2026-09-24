@@ -6,6 +6,7 @@ import { Select } from '../../../components/ui/select';
 import { Badge } from '../../../components/ui/feedback';
 import { CloseIcon, PlusIcon, TrashIcon } from '../../../components/ui/icons';
 import { useI18n } from '../../../i18n/LanguageProvider';
+import { endpointLabel } from './edgeLabels';
 import type { TransitType } from '../../../components/map';
 import type { EdgeDirection } from '../../../components/map/types';
 import type { EditorEdge, EditorNode, UpdateEdgeInput } from '../../../apis/mapEditorApi';
@@ -43,13 +44,12 @@ export interface EdgeInspectorProps {
   /**
    * Adds the edge the inspector is pointed at to the open closure draft.
    *
-   * NOT a keyboard path, despite being a button: it only renders for a
-   * SELECTED edge, and the only way to select one today is clicking a bare
-   * <line> in EdgeLayer that has neither tabIndex nor a role. So closure
-   * picking is pointer-driven end to end; this button just saves a second trip
-   * to the canvas once an edge is already selected. A real keyboard path needs
-   * a focusable list of the floor's connections — routed to the accessibility
-   * sweep (F13).
+   * A pointer shortcut, not the keyboard path: it only renders for a SELECTED
+   * edge, and the only way to select one is clicking a bare <line> in
+   * EdgeLayer, which has neither tabIndex nor a role. The keyboard path is the
+   * connection list in ClosuresPanel (F13), which writes to the same draft;
+   * this button just saves a second trip to the canvas once an edge is already
+   * selected.
    */
   onAddToClosure?: () => void;
 }
@@ -92,9 +92,6 @@ export const EdgeInspector = ({
     edge.direction,
     edge.tags,
   ]);
-
-  const endpointLabel = (node: EditorNode | null, fallbackId: string): string =>
-    node?.label || node?.type || fallbackId.slice(0, 8);
 
   const fromLabel = endpointLabel(source, edge.sourceNodeId);
   const toLabel = endpointLabel(target, edge.targetNodeId);
@@ -151,10 +148,18 @@ export const EdgeInspector = ({
         )}
       </div>
 
-      <p className="text-sm text-ink-muted">
-        {fromLabel}
-        <span className="px-1.5 text-ink-subtle">↔</span>
-        {toLabel}
+      {/* "Lobby ↔ Corridor" reads to a screen reader as two names with either
+          "left right arrow" or nothing at all between them. The sentence is
+          the real content; the glyph is the sighted shorthand for it. */}
+      <p className="text-sm text-ink-muted" data-testid="edge-endpoints">
+        <span className="sr-only">
+          {t('mapEditor.edgeEndpoints', { from: fromLabel, to: toLabel })}
+        </span>
+        <span aria-hidden="true">
+          {fromLabel}
+          <span className="px-1.5 text-ink-subtle">↔</span>
+          {toLabel}
+        </span>
       </p>
 
       {closureDraftActive && onAddToClosure && (

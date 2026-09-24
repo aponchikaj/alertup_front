@@ -1076,7 +1076,16 @@ describe('MapEditorPage — closures', () => {
       .querySelector('line[stroke="transparent"]') as Element;
 
   const count = (n: number) =>
-    en.mapEditor.closureSelectedCount.replace('{count}', String(n));
+    n === 1
+      ? en.mapEditor.closureSelectedCountOne
+      : en.mapEditor.closureSelectedCount.replace('{count}', String(n));
+
+  const edgeRow = () =>
+    screen.getByRole('checkbox', {
+      name: en.mapEditor.closureEdgeOption
+        .replace('{from}', 'Lobby')
+        .replace('{to}', 'Corridor'),
+    });
 
   test('tapping an edge while drafting toggles it in and out of the closure', async () => {
     const { container } = await openDraft();
@@ -1091,6 +1100,36 @@ describe('MapEditorPage — closures', () => {
     expect(await screen.findByText(count(0))).toBeInTheDocument();
   });
 
+  test('the draft lists the floor connections, so picking needs no pointer', async () => {
+    // The map's edges are bare SVG lines: no tabIndex, no role. Without this
+    // list an operator on a keyboard could fill the whole form and never
+    // enable Save.
+    const { container } = await openDraft();
+
+    fireEvent.click(edgeRow());
+
+    expect(await screen.findByText(count(1))).toBeInTheDocument();
+    // ...and the map agrees, from the same draft state.
+    await waitFor(() =>
+      expect(
+        container.querySelector('[data-edge-id="e9"] line[data-closure-draft="true"]'),
+      ).toBeInTheDocument(),
+    );
+    expect(edgeRow()).toBeChecked();
+  });
+
+  test('an edge picked on the map shows as ticked in the list', async () => {
+    const { container } = await openDraft();
+
+    fireEvent.click(hitLine(container));
+
+    await waitFor(() => expect(edgeRow()).toBeChecked());
+
+    // And the list can undo what the map did.
+    fireEvent.click(edgeRow());
+    expect(await screen.findByText(count(0))).toBeInTheDocument();
+  });
+
   test('a picked edge is painted as highlighted on the map', async () => {
     const { container } = await openDraft();
 
@@ -1100,6 +1139,22 @@ describe('MapEditorPage — closures', () => {
       expect(
         container.querySelector('[data-edge-id="e9"] line[data-closure-draft="true"]'),
       ).toBeInTheDocument(),
+    );
+  });
+
+  test('a picked edge says what it is in text, not only in red', async () => {
+    // Red-plus-thicker is two cues, but both are visual. A <title> gives the
+    // state a name a pointer user can surface and a screen reader can reach.
+    const { container } = await openDraft();
+
+    fireEvent.click(edgeRow());
+
+    await waitFor(() =>
+      expect(
+        container.querySelector(
+          '[data-edge-id="e9"] line[data-closure-draft="true"] title',
+        )?.textContent,
+      ).toBe(en.mapEditor.closureEdgeHighlighted),
     );
   });
 

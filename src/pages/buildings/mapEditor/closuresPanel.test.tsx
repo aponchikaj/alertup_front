@@ -1,7 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { LanguageProvider } from '../../../i18n/LanguageProvider';
 import { en } from '../../../i18n/messages/en';
-import { ClosuresPanel, type ClosuresPanelProps } from './closuresPanel';
+import {
+  ClosuresPanel,
+  type ClosureEdgeOption,
+  type ClosuresPanelProps,
+} from './closuresPanel';
 import type { Closure } from '../../../apis/mapEditorApi';
 
 /* ============================================================================
@@ -33,6 +37,19 @@ const closure = (over: Partial<Closure> = {}): Closure => ({
   ...over,
 });
 
+/** The floor's connections, as the page hands them over. */
+const edgeOption = (
+  id: string,
+  fromLabel: string,
+  toLabel: string,
+): ClosureEdgeOption => ({ id, fromLabel, toLabel });
+
+const EDGES: ClosureEdgeOption[] = [
+  edgeOption('e1', 'Main hall', 'North stairs'),
+  edgeOption('e2', 'North stairs', 'Food court'),
+  edgeOption('e3', 'Food court', 'Service door'),
+];
+
 const renderPanel = (props: Partial<ClosuresPanelProps> = {}) => {
   const onCreate = jest
     .fn<Promise<boolean>, [Parameters<ClosuresPanelProps['onCreate']>[0]]>()
@@ -40,22 +57,29 @@ const renderPanel = (props: Partial<ClosuresPanelProps> = {}) => {
   const onDelete = jest.fn<Promise<void>, [string]>().mockResolvedValue();
   const onStartDraft = jest.fn();
   const onCancelDraft = jest.fn();
+  const onToggleEdge = jest.fn();
 
   const view = render(
     <LanguageProvider>
       <ClosuresPanel
         closures={[]}
         draftEdgeIds={null}
+        edgeOptions={EDGES}
         onStartDraft={onStartDraft}
         onCancelDraft={onCancelDraft}
+        onToggleEdge={onToggleEdge}
         onCreate={onCreate}
         onDelete={onDelete}
         {...props}
       />
     </LanguageProvider>,
   );
-  return { ...view, onCreate, onDelete, onStartDraft, onCancelDraft };
+  return { ...view, onCreate, onDelete, onStartDraft, onCancelDraft, onToggleEdge };
 };
+
+/** The accessible name of one connection's checkbox. */
+const edgeName = (from: string, to: string) =>
+  en.mapEditor.closureEdgeOption.replace('{from}', from).replace('{to}', to);
 
 /** Fill everything the save button waits on, minus whatever the test omits. */
 const fillDraft = (opts: { reason?: string; effect?: string } = {}) => {
@@ -131,6 +155,8 @@ describe('ClosuresPanel — the draft', () => {
       <LanguageProvider>
         <ClosuresPanel
           closures={[]}
+          edgeOptions={EDGES}
+          onToggleEdge={jest.fn()}
           draftEdgeIds={['e1', 'e2', 'e3']}
           onStartDraft={jest.fn()}
           onCancelDraft={jest.fn()}
@@ -159,6 +185,8 @@ describe('ClosuresPanel — the draft', () => {
       <LanguageProvider>
         <ClosuresPanel
           closures={[]}
+          edgeOptions={EDGES}
+          onToggleEdge={jest.fn()}
           draftEdgeIds={['e1']}
           onStartDraft={jest.fn()}
           onCancelDraft={jest.fn()}
@@ -293,5 +321,147 @@ describe('ClosuresPanel — the draft', () => {
     const { onCancelDraft } = renderPanel({ draftEdgeIds: ['e1'] });
     fireEvent.click(screen.getByRole('button', { name: en.common.cancel }));
     expect(onCancelDraft).toHaveBeenCalledTimes(1);
+  });
+});
+
+/* ============================================================================
+   The keyboard path (F13).
+   ----------------------------------------------------------------------------
+   F12 shipped edge picking as a map gesture only: EdgeLayer's edges are bare
+   SVG <line> elements with no tabIndex and no role, so an operator without a
+   pointer could fill in every field of a closure and never enable Save. The
+   draft therefore also lists the floor's connections as checkboxes — one tab
+   stop per visible row, a search box to narrow a dense floor, and the same
+   `draftEdgeIds` the map paints, so the two pickers can never disagree.
+   ========================================================================= */
+describe('ClosuresPanel — picking connections without a pointer', () => {
+  test('the draft lists the floor connections as checkboxes', () => {
+    renderPanel({ draftEdgeIds: [] });
+
+    const list = screen.getByRole('group', { name: en.mapEditor.closureEdgeList });
+    expect(list).toBeInTheDocument();
+    for (const edge of EDGES) {
+      expect(
+        screen.getByRole('checkbox', { name: edgeName(edge.fromLabel, edge.toLabel) }),
+      ).toBeInTheDocument();
+    }
+  });
+
+  test('no list until a draft is open — there is nothing to pick into', () => {
+    renderPanel();
+    expect(
+      screen.queryByRole('group', { name: en.mapEditor.closureEdgeList }),
+    ).not.toBeInTheDocument();
+  });
+
+  test('ticking a connection reports it upstream, the same call a map tap makes', () => {
+    const { onToggleEdge } = renderPanel({ draftEdgeIds: [] });
+
+    fireEvent.click(
+      screen.getByRole('checkbox', { name: edgeName('North stairs', 'Food court') }),
+    );
+
+    expect(onToggleEdge).toHaveBeenCalledWith('e2');
+  });
+
+  test('edges picked on the map show as ticked here', () => {
+    renderPanel({ draftEdgeIds: ['e3'] });
+
+    expect(
+      screen.getByRole('checkbox', { name: edgeName('Food court', 'Service door') }),
+    ).toBeChecked();
+    expect(
+      screen.getByRole('checkbox', { name: edgeName('Main hall', 'North stairs') }),
+    ).not.toBeChecked();
+  });
+
+  test('unticking a picked connection removes it, so the list can undo a map tap', () => {
+    const { onToggleEdge } = renderPanel({ draftEdgeIds: ['e3'] });
+
+    fireEvent.click(
+      screen.getByRole('checkbox', { name: edgeName('Food court', 'Service door') }),
+    );
+
+    expect(onToggleEdge).toHaveBeenCalledWith('e3');
+  });
+
+  test('the search box narrows a dense floor to the connection being looked for', () => {
+    renderPanel({ draftEdgeIds: [] });
+
+    fireEvent.change(screen.getByLabelText(en.mapEditor.closureEdgeSearch), {
+      target: { value: 'service' },
+    });
+
+    expect(
+      screen.getByRole('checkbox', { name: edgeName('Food court', 'Service door') }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('checkbox', { name: edgeName('Main hall', 'North stairs') }),
+    ).not.toBeInTheDocument();
+  });
+
+  test('a filter never hides an already-picked connection — it must stay unpickable', () => {
+    // Picked on the map, then filtered out by a search for something else. If
+    // the row vanished, the only way to undo the pick would be the pointer.
+    renderPanel({ draftEdgeIds: ['e1'] });
+
+    fireEvent.change(screen.getByLabelText(en.mapEditor.closureEdgeSearch), {
+      target: { value: 'service' },
+    });
+
+    expect(
+      screen.getByRole('checkbox', { name: edgeName('Main hall', 'North stairs') }),
+    ).toBeChecked();
+  });
+
+  test('says so when nothing matches, rather than showing an empty box', () => {
+    renderPanel({ draftEdgeIds: [] });
+
+    fireEvent.change(screen.getByLabelText(en.mapEditor.closureEdgeSearch), {
+      target: { value: 'nowhere' },
+    });
+
+    expect(screen.getByText(en.mapEditor.closureEdgeNone)).toBeInTheDocument();
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+  });
+
+  test('caps the unpicked rows on a dense floor and says how many are left', () => {
+    // A tab stop per edge is its own regression: 40 connections would bury the
+    // reason field 40 tabs deep. The list shows a window and points at search.
+    const many = Array.from({ length: 40 }, (_, i) =>
+      edgeOption(`x${i}`, `Room ${i}`, `Corridor ${i}`),
+    );
+    renderPanel({ draftEdgeIds: [], edgeOptions: many });
+
+    const boxes = screen.getAllByRole('checkbox');
+    expect(boxes.length).toBeLessThan(many.length);
+    expect(
+      screen.getByText(
+        en.mapEditor.closureEdgeMore
+          .replace('{shown}', String(boxes.length))
+          .replace('{total}', String(many.length)),
+      ),
+    ).toBeInTheDocument();
+  });
+
+  test('the count is a status region, announced whole', () => {
+    renderPanel({ draftEdgeIds: ['e1'] });
+
+    const live = screen.getByRole('status');
+    expect(live).toHaveAttribute('aria-live', 'polite');
+    expect(live).toHaveAttribute('aria-atomic', 'true');
+    // One connection is not "1 connections".
+    expect(live).toHaveTextContent(en.mapEditor.closureSelectedCountOne);
+  });
+
+  test('the slow-down factors say what the number means, not just "2×"', () => {
+    renderPanel({ draftEdgeIds: ['e1'] });
+    fillDraft({ effect: en.mapEditor.closureSlowed });
+
+    expect(
+      screen.getByRole('option', {
+        name: en.mapEditor.closureSlowFactorOption.replace('{factor}', '2'),
+      }),
+    ).toBeInTheDocument();
   });
 });

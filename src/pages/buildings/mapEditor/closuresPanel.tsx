@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Alert, Badge } from '../../../components/ui/feedback';
 import { Button } from '../../../components/ui/button';
 import { ConfirmDialog } from '../../../components/ui/confirmDialog';
@@ -23,8 +23,15 @@ import type { Closure } from '../../../apis/mapEditorApi';
      button that cannot work.
 
    Picking which connections a closure covers is a map gesture, owned by the
-   page: this panel only reports the running count (in a live region, because
-   the change happens somewhere else on screen) and hands back the rest.
+   page: this panel reports the running count (in a live region, because the
+   change happens somewhere else on screen) and hands back the rest.
+
+   It is ALSO a list, because the map gesture is pointer-only. EdgeLayer draws
+   edges as bare SVG <line> elements with neither tabIndex nor a role, so
+   without the list below a keyboard-only operator can open a draft, type a
+   reason, choose block-vs-slow — and never enable Save. Both pickers write to
+   the same `draftEdgeIds` the page owns, so they cannot disagree: a tap on the
+   map ticks a row here, and a row ticked here lights up on the map.
    ========================================================================= */
 
 /** Preset closure lengths, in hours. `custom` opens a datetime-local instead. */
@@ -35,6 +42,18 @@ const HOUR_MS = 60 * 60 * 1000;
 /** Slow-down penalties offered for a non-blocking closure. All >= 1, which is
  *  what the backend requires of a non-null `costMultiplier`. */
 const SLOW_FACTORS = ['1.5', '2', '3', '4'] as const;
+
+/**
+ * How many UNPICKED connections the list offers at once.
+ *
+ * One tab stop per edge would be its own accessibility regression — a floor
+ * with forty connections would bury the reason field forty tabs deep — so the
+ * list is a window onto the search results, and the count of what is hidden is
+ * stated rather than silent. Picked rows are exempt from the cap: whatever is
+ * in the draft must always be un-pickable without a mouse, including the rows
+ * a later search would otherwise filter away.
+ */
+const EDGE_WINDOW = 12;
 
 /** `datetime-local` wants a LOCAL wall-clock string, not an ISO instant. */
 const toDateTimeLocal = (ms: number): string => {
@@ -56,12 +75,25 @@ export interface ClosureDraftInput {
   costMultiplier: number | null;
 }
 
+/** One connection of the active floor, already named for a human. */
+export interface ClosureEdgeOption {
+  id: string;
+  /** The `sourceNodeId` end, labelled exactly as the direction Select does. */
+  fromLabel: string;
+  /** The `targetNodeId` end. */
+  toLabel: string;
+}
+
 export interface ClosuresPanelProps {
   closures: Closure[];
   /** Suppresses the empty state until the first fetch settles. */
   loading?: boolean;
   /** The edges picked so far, or null when no draft is open. */
   draftEdgeIds: readonly string[] | null;
+  /** Every connection on the active floor, for the keyboard picker. */
+  edgeOptions: readonly ClosureEdgeOption[];
+  /** Same handler a map tap fires — picks or unpicks one connection. */
+  onToggleEdge: (edgeId: string) => void;
   onStartDraft: () => void;
   onCancelDraft: () => void;
   /**
@@ -118,6 +150,8 @@ export const ClosuresPanel = ({
   closures,
   loading = false,
   draftEdgeIds,
+  edgeOptions,
+  onToggleEdge,
   onStartDraft,
   onCancelDraft,
   onCreate,
@@ -126,6 +160,7 @@ export const ClosuresPanel = ({
   const { t } = useI18n();
 
   const [reason, setReason] = useState('');
+  const [edgeQuery, setEdgeQuery] = useState('');
   const [duration, setDuration] = useState<DurationChoice>('1');
   const [customEndsAt, setCustomEndsAt] = useState('');
   // No default: blocking a corridor must be something the operator chose.
@@ -136,6 +171,48 @@ export const ClosuresPanel = ({
 
   const drafting = draftEdgeIds !== null;
   const selectedCount = draftEdgeIds?.length ?? 0;
+
+  const pickedIds = useMemo(() => new Set(draftEdgeIds ?? []), [draftEdgeIds]);
+
+  const optionLabel = (option: ClosureEdgeOption) =>
+    t('mapEditor.closureEdgeOption', {
+      from: option.fromLabel,
+      to: option.toLabel,
+    });
+
+  /**
+   * Picked rows first and always, then the search hits, then the cap.
+   *
+   * The ordering is the accessibility requirement, not a nicety: an edge
+   * picked on the map and then filtered out by a search for something else
+   * would otherwise only be removable with the pointer that put it there.
+   */
+  const edgeRows = useMemo(() => {
+    const query = edgeQuery.trim().toLowerCase();
+    const picked: ClosureEdgeOption[] = [];
+    const matches: ClosureEdgeOption[] = [];
+
+    for (const option of edgeOptions) {
+      if (pickedIds.has(option.id)) {
+        picked.push(option);
+        continue;
+      }
+      if (
+        query === '' ||
+        `${option.fromLabel} ${option.toLabel}`.toLowerCase().includes(query)
+      ) {
+        matches.push(option);
+      }
+    }
+
+    return {
+      rows: [...picked, ...matches.slice(0, EDGE_WINDOW)],
+      // What the window is a window onto — picked rows are never hidden, so
+      // they are not part of the "and N more" arithmetic.
+      matched: matches.length,
+      hidden: Math.max(matches.length - EDGE_WINDOW, 0),
+    };
+  }, [edgeOptions, edgeQuery, pickedIds]);
 
   /**
    * The draft's end instant, resolved at the moment it is asked for.
@@ -164,6 +241,7 @@ export const ClosuresPanel = ({
 
   const resetDraft = () => {
     setReason('');
+    setEdgeQuery('');
     setDuration('1');
     setCustomEndsAt('');
     setEffect(null);
@@ -192,8 +270,13 @@ export const ClosuresPanel = ({
     if (created) resetDraft();
   };
 
+  // "1 connections selected" is the sort of thing that makes an operator
+  // distrust the rest of the panel. One key per grammatical number; Georgian
+  // uses the same noun form for both, and says so in its own dictionary.
   const countLabel = (count: number) =>
-    t('mapEditor.closureSelectedCount', { count });
+    count === 1
+      ? t('mapEditor.closureSelectedCountOne')
+      : t('mapEditor.closureSelectedCount', { count });
 
   return (
     <section
@@ -265,13 +348,77 @@ export const ClosuresPanel = ({
 
       {drafting && (
         <div className="flex flex-col gap-3 border-t border-line pt-3">
-          <Alert tone="info">{t('mapEditor.closurePickEdges')}</Alert>
+          {/* Standing instructions, not a status: as a live region it would
+              race the selection count below it for the same announcement. */}
+          <Alert tone="info" live={false}>
+            {t('mapEditor.closurePickEdges')}
+          </Alert>
 
           {/* The count changes when the user taps the canvas, far from this
-              panel — so it is announced rather than merely redrawn. */}
-          <p aria-live="polite" className="text-sm font-medium text-ink">
+              panel — so it is announced rather than merely redrawn. Mounted
+              with the draft and kept mounted for its whole life, because a
+              live region inserted at the same moment as its text is a region
+              nothing was watching. aria-atomic so "2 connections selected"
+              arrives as one sentence rather than a bare changed number. */}
+          <p
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            className="text-sm font-medium text-ink"
+          >
             {countLabel(selectedCount)}
           </p>
+
+          {/* The keyboard path. See the header comment: without this the map
+              is the only way to pick an edge, and the map has no tab stops. */}
+          <div className="flex flex-col gap-2">
+            <TextField
+              label={t('mapEditor.closureEdgeSearch')}
+              hint={t('mapEditor.closureEdgeSearchHint')}
+              type="search"
+              value={edgeQuery}
+              onChange={(e) => setEdgeQuery(e.target.value)}
+            />
+
+            {edgeRows.rows.length === 0 ? (
+              <p className="text-sm text-ink-muted">
+                {t('mapEditor.closureEdgeNone')}
+              </p>
+            ) : (
+              <div
+                role="group"
+                aria-label={t('mapEditor.closureEdgeList')}
+                className="max-h-64 overflow-y-auto rounded-xl border border-line bg-surface-2 p-2"
+              >
+                <ul className="flex flex-col">
+                  {edgeRows.rows.map((option) => (
+                    <li key={option.id}>
+                      <label className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm text-ink hover:bg-surface-hover">
+                        <input
+                          type="checkbox"
+                          checked={pickedIds.has(option.id)}
+                          onChange={() => onToggleEdge(option.id)}
+                          className="h-4 w-4 shrink-0 rounded border-line accent-[var(--brand)]"
+                        />
+                        <span className="min-w-0 break-words">
+                          {optionLabel(option)}
+                        </span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {edgeRows.hidden > 0 && (
+              <p className="text-xs text-ink-subtle">
+                {t('mapEditor.closureEdgeMore', {
+                  shown: edgeRows.rows.length,
+                  total: edgeRows.matched,
+                })}
+              </p>
+            )}
+          </div>
 
           <TextField
             label={t('mapEditor.closureReason')}
@@ -328,7 +475,12 @@ export const ClosuresPanel = ({
               label={t('mapEditor.closureSlowFactor')}
               value={slowFactor}
               onChange={(e) => setSlowFactor(e.target.value)}
-              options={SLOW_FACTORS.map((value) => ({ value, label: `${value}×` }))}
+              // "2×" alone leaves the reader to supply the noun — and a
+              // screen reader reads the glyph as "multiplication sign".
+              options={SLOW_FACTORS.map((value) => ({
+                value,
+                label: t('mapEditor.closureSlowFactorOption', { factor: value }),
+              }))}
             />
           )}
 

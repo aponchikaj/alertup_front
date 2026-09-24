@@ -79,3 +79,63 @@ describe("Dynamic Type ladder", () => {
     expect(type).toMatch(/@media \(prefers-reduced-motion: reduce\)/);
   });
 });
+
+/* ============================================================================
+   The rules above are only worth anything if the Georgian strings reach the
+   screen under `lang="ka"` — that attribute is what switches off the SF-tuned
+   tracking and the uppercasing. Slice 1 added a lot of new copy, so one of its
+   new keys is rendered here for real rather than diffed as a string.
+   ========================================================================= */
+
+import { render, screen } from "@testing-library/react";
+import { LanguageProvider } from "./LanguageProvider";
+import { ka } from "./messages/ka";
+import { en } from "./messages/en";
+import { ClosuresPanel } from "../pages/buildings/mapEditor/closuresPanel";
+
+describe("slice 1 copy in Georgian", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.documentElement.lang = "";
+  });
+
+  it("renders a new slice-1 key in Georgian, under lang=ka", () => {
+    localStorage.setItem("alertup-lang", "ka");
+
+    render(
+      <LanguageProvider>
+        <ClosuresPanel
+          closures={[]}
+          draftEdgeIds={[]}
+          edgeOptions={[{ id: "e1", fromLabel: "დარბაზი", toLabel: "კიბე" }]}
+          onToggleEdge={() => {}}
+          onStartDraft={() => {}}
+          onCancelDraft={() => {}}
+          onCreate={async () => true}
+          onDelete={async () => {}}
+        />
+      </LanguageProvider>,
+    );
+
+    // The heading is Georgian, not the English fallback.
+    expect(screen.getByText(ka.mapEditor.closures)).toBeInTheDocument();
+    expect(screen.queryByText(en.mapEditor.closures)).toBeNull();
+    // Without this attribute the [lang="ka"] rules above never apply.
+    expect(document.documentElement.lang).toBe("ka");
+  });
+
+  it("uses typographic punctuation in the new Georgian strings", () => {
+    // Straight quotes and hyphen-as-dash are the two things a translation
+    // round-trip through a spreadsheet reliably ruins.
+    const strings = [
+      ...Object.values(ka.mapEditor),
+      ...Object.values(ka.wayfinding),
+      ka.emergency.connectionLost,
+    ].filter((value): value is string => typeof value === "string");
+
+    for (const value of strings) {
+      expect(value).not.toMatch(/["']/);
+      expect(value).not.toMatch(/\s-\s/);
+    }
+  });
+});

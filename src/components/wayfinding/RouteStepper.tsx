@@ -58,8 +58,12 @@ const INSTRUCTION_ROTATION: Record<InstructionKind, number> = {
 
 /**
  * The headline of whichever card is showing, and the route's only live region.
- * One region, always mounted in exactly one place, so a screen reader announces
- * each new instruction once instead of racing three regions against each other.
+ *
+ * Rendered ONCE, from a single place in the tree, so React keeps the same DOM
+ * node across walk → transit → arrive. That identity is the whole mechanism: a
+ * live region only announces changes to a region the screen reader was already
+ * watching, so mounting a fresh <p aria-live> per card kind announced the
+ * first instruction and then went silent for the rest of the journey.
  */
 const InstructionTitle = ({ children }: { children: string }) => (
   <p
@@ -122,8 +126,44 @@ export const RouteStepper = ({
       : landmark?.side === "right"
         ? "wayfinding.sideRight"
         : null;
+  /**
+   * The headline for whichever card is showing: the authored server line when
+   * there is one, otherwise the client template for this step kind. Resolved
+   * here rather than per branch so the live region below has exactly one
+   * source of truth — and so the landmark check underneath can read it.
+   */
+  const titleText =
+    serverText ??
+    (activeStep.kind === "walk" && activeSegment
+      ? t("wayfinding.stepWalk", {
+          target: activeSegment.nodes.at(-1)?.label ?? t("wayfinding.destination"),
+        })
+      : activeStep.kind === "transit" && activeTransition
+        ? t("wayfinding.takeTransit", {
+            transit: t(TRANSIT_LABEL_KEYS[activeTransition.transitType]),
+            floor: activeTransition.toFloorNumber,
+          })
+        : t("wayfinding.stepArrive"));
+
+  /**
+   * The server's authored line usually NAMES the landmark already — B10 emits
+   * "Turn right at Shop B" alongside `landmark: {name: "Shop B", …}`. Printing
+   * "Shop B on your right" underneath it then says the same thing twice on
+   * screen, and twice inside a single aria-live announcement.
+   *
+   * The rule: the separate line exists to rescue a landmark the sentence above
+   * it dropped, so it renders only when the title does not already contain the
+   * landmark's name — a plain case-insensitive substring test, which is honest
+   * about what it can check. It costs a duplicate only where the server names
+   * the landmark in some declined or transliterated form the title does not
+   * literally contain; it never loses the landmark.
+   */
+  const landmarkAlreadySaid =
+    landmark !== null &&
+    titleText.toLowerCase().includes(landmark.name.trim().toLowerCase());
+
   const landmarkLine =
-    landmark && sideKey
+    landmark && sideKey && !landmarkAlreadySaid
       ? t("wayfinding.landmark", { name: landmark.name, side: t(sideKey) })
       : null;
 
@@ -161,6 +201,48 @@ export const RouteStepper = ({
   // Only the opening instruction changes with which way you are facing, and a
   // permission prompt is worth showing exactly once.
   const offerCompass = progress.activeIndex === 0 && headingState === "idle";
+
+  /**
+   * The icon beside the title. Decoration in every case — `aria-hidden`, with
+   * the direction it draws carried by `titleText` — so it is free to change
+   * shape between card kinds without costing the live region its identity.
+   */
+  const headIcon = atEnd ? (
+    <CheckCircleIcon className="mt-0.5 size-5 shrink-0 text-success" aria-hidden="true" />
+  ) : activeStep.kind === "transit" && activeTransition ? (
+    <ArrowRightIcon
+      className={cn(
+        "mt-0.5 size-5 shrink-0 text-info",
+        activeTransition.direction === "up" && "-rotate-90",
+        activeTransition.direction === "down" && "rotate-90",
+      )}
+      aria-hidden="true"
+    />
+  ) : activeInstruction ? (
+    <ArrowRightIcon
+      data-testid="instruction-arrow"
+      className="mt-0.5 size-5 shrink-0 text-brand"
+      style={{
+        transform: `rotate(${INSTRUCTION_ROTATION[activeInstruction.kind]}deg)`,
+      }}
+      aria-hidden="true"
+    />
+  ) : (
+    <RouteIcon className="mt-0.5 size-5 shrink-0 text-brand" aria-hidden="true" />
+  );
+
+  /** The supporting line under the title, per card kind. */
+  const subLine =
+    activeStep.kind === "transit"
+      ? (activeTransition?.label ?? null)
+      : activeStep.kind === "walk"
+        ? (instructionTotals ??
+          (activeSegment && activeSegment.distanceMeters !== null
+            ? t("wayfinding.distanceMeters", {
+                meters: activeSegment.distanceMeters,
+              })
+            : null))
+        : null;
 
   return (
     <div
@@ -203,69 +285,22 @@ export const RouteStepper = ({
         </Alert>
       ) : null}
 
-      {activeStep.kind === "walk" && activeSegment ? (
-        <div className="flex items-start gap-3">
-          {activeInstruction ? (
-            <ArrowRightIcon
-              data-testid="instruction-arrow"
-              className="mt-0.5 size-5 shrink-0 text-brand"
-              style={{
-                transform: `rotate(${INSTRUCTION_ROTATION[activeInstruction.kind]}deg)`,
-              }}
-              aria-hidden="true"
-            />
-          ) : (
-            <RouteIcon className="mt-0.5 size-5 shrink-0 text-brand" aria-hidden="true" />
-          )}
-          <div className="min-w-0">
-            <InstructionTitle>
-              {serverText ??
-                t("wayfinding.stepWalk", {
-                  target:
-                    activeSegment.nodes.at(-1)?.label ?? t("wayfinding.destination"),
-                })}
-            </InstructionTitle>
-            {landmarkLine ? (
-              <p className="text-sm text-ink-muted">{landmarkLine}</p>
-            ) : null}
-            {instructionTotals ? (
-              <p className="text-sm text-ink-muted">{instructionTotals}</p>
-            ) : activeSegment.distanceMeters !== null ? (
-              <p className="text-sm text-ink-muted">
-                {t("wayfinding.distanceMeters", {
-                  meters: activeSegment.distanceMeters,
-                })}
-              </p>
-            ) : null}
-          </div>
+      {/* ONE headline block for all three card kinds. The icon and the lines
+          under the title change; the title element itself never unmounts, so
+          the live region keeps its identity across the whole walk. */}
+      <div className="flex items-start gap-3">
+        {headIcon}
+        <div className="min-w-0">
+          <InstructionTitle>{titleText}</InstructionTitle>
+          {landmarkLine ? (
+            <p className="text-sm text-ink-muted">{landmarkLine}</p>
+          ) : null}
+          {subLine ? <p className="text-sm text-ink-muted">{subLine}</p> : null}
         </div>
-      ) : null}
+      </div>
 
       {activeStep.kind === "transit" && activeTransition ? (
-        <div className="space-y-3">
-          <div className="flex items-start gap-3">
-            <ArrowRightIcon
-              className={cn(
-                "mt-0.5 size-5 shrink-0 text-info",
-                activeTransition.direction === "up" && "-rotate-90",
-                activeTransition.direction === "down" && "rotate-90",
-              )}
-              aria-hidden="true"
-            />
-            <div className="min-w-0">
-              <InstructionTitle>
-                {serverText ??
-                  t("wayfinding.takeTransit", {
-                    transit: t(TRANSIT_LABEL_KEYS[activeTransition.transitType]),
-                    floor: activeTransition.toFloorNumber,
-                  })}
-              </InstructionTitle>
-              {activeTransition.label ? (
-                <p className="text-sm text-ink-muted">{activeTransition.label}</p>
-              ) : null}
-            </div>
-          </div>
-
+        <div className="mt-3 space-y-3">
           {/* The confirmation that drives floor tracking. */}
           <Button onClick={progress.next} className="w-full">
             {t("wayfinding.arrivedOnFloor", { floor: activeTransition.toFloorNumber })}
@@ -282,13 +317,6 @@ export const RouteStepper = ({
               </p>
             </div>
           ) : null}
-        </div>
-      ) : null}
-
-      {atEnd ? (
-        <div className="flex items-center gap-3">
-          <CheckCircleIcon className="size-5 shrink-0 text-success" aria-hidden="true" />
-          <InstructionTitle>{serverText ?? t("wayfinding.stepArrive")}</InstructionTitle>
         </div>
       ) : null}
 

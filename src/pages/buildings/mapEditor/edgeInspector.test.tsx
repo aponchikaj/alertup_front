@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { LanguageProvider } from '../../../i18n/LanguageProvider';
 import { en } from '../../../i18n/messages/en';
+import { ka } from '../../../i18n/messages/ka';
 import { EdgeInspector } from './edgeInspector';
 import type { EditorEdge, EditorNode } from '../../../apis/mapEditorApi';
 
@@ -68,9 +69,33 @@ describe('EdgeInspector — direction', () => {
     const labels = Array.from(select.options).map((o) => o.textContent);
     expect(labels).toEqual([
       en.mapEditor.edgeDirectionBoth,
-      'Lobby → Corridor',
-      'Corridor → Lobby',
+      en.mapEditor.edgeDirectionForward
+        .replace('{from}', 'Lobby')
+        .replace('{to}', 'Corridor'),
+      en.mapEditor.edgeDirectionForward
+        .replace('{from}', 'Corridor')
+        .replace('{to}', 'Lobby'),
     ]);
+  });
+
+  test('says which way round in words — an <option> cannot hide an arrow glyph', () => {
+    // A screen reader reading "Lobby right-arrow Corridor" (or skipping the
+    // glyph entirely, which is the common punctuation setting) leaves the
+    // operator guessing which end "forward" points at. Option text is the one
+    // place aria-hidden cannot help, so the direction has to be a word.
+    expect(en.mapEditor.edgeDirectionForward).not.toMatch(/[→←↔⇄]/);
+    expect(ka.mapEditor.edgeDirectionForward).not.toMatch(/[→←↔⇄]/);
+  });
+
+  test('the endpoint line reads as a pair, with the glyph hidden', () => {
+    renderInspector();
+
+    const pair = screen.getByTestId('edge-endpoints');
+    expect(pair).toHaveTextContent(
+      en.mapEditor.edgeEndpoints.replace('{from}', 'Lobby').replace('{to}', 'Corridor'),
+    );
+    // The ↔ is decoration on top of that sentence, never the only connector.
+    expect(pair.querySelector('[aria-hidden="true"]')?.textContent).toContain('↔');
   });
 
   test('saves the chosen direction alongside the existing fields', async () => {
