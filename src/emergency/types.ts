@@ -36,6 +36,17 @@ export type BuildingEvent =
         reason: string | null;
         endsAt: string | null;
       };
+    }
+  | {
+      /**
+       * The server truncated a replay — either the backlog exceeded its row
+       * cap or the requested resume point fell outside the retention window.
+       * Frames up to `atSeq` were skipped and will never be replayed: the
+       * client's cached state is no longer trustworthy and must be rebuilt
+       * from a fresh snapshot rather than assumed caught up.
+       */
+      type: "resync_required";
+      data: { reason: string; atSeq: number };
     };
 
 export type ChannelStatus = "connecting" | "open" | "degraded" | "closed";
@@ -47,7 +58,12 @@ export interface RealtimeChannel {
   onStatusChange(cb: (status: ChannelStatus) => void): () => void;
   /** Epoch ms of the last named `heartbeat` frame, or null if none has arrived. */
   lastHeartbeatAt(): number | null;
-  /** Latest stream sequence seen (`id:` value or heartbeat `seq`), or null. */
+  /**
+   * Latest resumable frame `id:` seen as a number, or null if none has
+   * arrived yet. This is the connection's own received position — a
+   * heartbeat's body `seq` (the building's wider high-water mark) is read
+   * only to detect a gap and never populates this value.
+   */
   lastSeq(): number | null;
   close(): void;
 }

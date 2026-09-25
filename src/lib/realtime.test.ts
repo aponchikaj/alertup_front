@@ -49,6 +49,14 @@ describe("createBuildingChannel().onStatusChange", () => {
    installed. FakeEventSource is that stand-in: it records every instance (so a
    reconnect is observable as a second instance with a different URL) and lets a
    test push a named frame with an optional `id:` value.
+
+   `lastEventId` is STICKY, per the SSE spec: a browser's EventSource keeps one
+   "last event ID buffer" per connection, and every dispatched event reports
+   that buffer's current value — including a frame that carries no `id:` of
+   its own, which reports whatever the last id-bearing frame set. The real
+   backend never puts an `id:` on `heartbeat` or `resync_required` frames, so
+   tests must dispatch those without an id and let this stand-in carry the
+   previous value forward, exactly as a real EventSource would.
    ========================================================================= */
 
 type FakeListener = (evt: MessageEvent) => void;
@@ -66,6 +74,8 @@ class FakeEventSource {
   onopen: (() => void) | null = null;
   onerror: (() => void) | null = null;
   private listeners = new Map<string, FakeListener[]>();
+  /** The connection's sticky "last event ID buffer" — starts empty, like a real EventSource. */
+  private lastId = "";
 
   constructor(url: string, init?: { withCredentials?: boolean }) {
     this.url = url;
@@ -108,6 +118,10 @@ class FakeEventSource {
    * throws rather than quietly running listeners that a real browser would have
    * detached. Without this a test can "pass" by driving a socket the production
    * code already dropped.
+   *
+   * Omitting `id` does NOT mean the delivered event reports an empty
+   * `lastEventId` — per spec it reports the sticky buffer, i.e. whatever the
+   * last id-bearing frame on this connection set (or "" if none ever has).
    */
   dispatch(type: string, data: unknown, id?: string) {
     if (this.closed) {
@@ -115,9 +129,10 @@ class FakeEventSource {
         `FakeEventSource: dispatch("${type}") on a closed stream (${this.url}) — a real EventSource delivers nothing after close()`
       );
     }
+    if (id !== undefined) this.lastId = id;
     const evt = {
       data: JSON.stringify(data),
-      lastEventId: id ?? "",
+      lastEventId: this.lastId,
     } as MessageEvent;
     (this.listeners.get(type) ?? []).slice().forEach((fn) => fn(evt));
   }
@@ -147,21 +162,47 @@ describe("createBuildingChannel() realtime hardening", () => {
     jest.restoreAllMocks();
   });
 
-  it("records heartbeat seq and time without emitting an event to subscribers", () => {
+  it("records heartbeat time without emitting an event to subscribers, and does not let its body seq overwrite the resumable cursor", () => {
     const channel = createBuildingChannel(nextBuildingId());
     const events: BuildingEvent[] = [];
     channel.subscribe((e) => events.push(e));
 
     const es = FakeEventSource.last;
     es.open();
+    // A real named frame establishes the resumable cursor. The backend
+    // never puts an `id:` on a heartbeat frame itself, so it is dispatched
+    // with none — the fake's sticky `lastEventId` then carries this frame's
+    // id forward, exactly as a real EventSource would.
+    const payload = { scanned: 0, evacuated: 0, calledEmergency: 0 };
+    es.dispatch("counters_updated", payload, "7");
     const at = Date.now();
-    es.dispatch("heartbeat", { seq: 7, serverTime: new Date(at).toISOString() }, "7");
+    es.dispatch("heartbeat", { seq: 7, serverTime: new Date(at).toISOString() });
 
-    // A 25 s timer must not push React state around.
-    expect(events).toEqual([]);
+    // A 25 s timer must not push React state around, and its own body must
+    // not be what set the cursor to 7 — the counters_updated frame already did.
+    expect(events).toEqual([{ type: "counters_updated", data: payload }]);
     expect(channel.lastSeq()).toBe(7);
     expect(channel.lastHeartbeatAt()).toBe(at);
     expect(channel.status()).toBe("open");
+
+    channel.close();
+  });
+
+  it("keeps a heartbeat's body seq out of the resumable cursor even when it is the very first frame received", () => {
+    // The one case where a leak would NOT be silently corrected by the next
+    // `noteFrame` call: no real frame has arrived yet, so the sticky
+    // `lastEventId` is still "" — and `noteFrame`'s `if (eventId)` guard
+    // skips an empty id entirely, leaving whatever `lastSeqValue` already
+    // holds untouched. A variant that reintroduces
+    // `this.lastSeqValue = data.seq` leaks the heartbeat's building-wide
+    // seq straight through, uncorrected, and is caught here.
+    const channel = createBuildingChannel(nextBuildingId());
+    const es = FakeEventSource.last;
+    es.open();
+
+    es.dispatch("heartbeat", { seq: 50, serverTime: "2026-09-25T00:00:00.000Z" });
+
+    expect(channel.lastSeq()).toBeNull();
 
     channel.close();
   });
@@ -186,7 +227,11 @@ describe("createBuildingChannel() realtime hardening", () => {
     const channel = createBuildingChannel(nextBuildingId());
     const first = FakeEventSource.last;
     first.open();
-    first.dispatch("heartbeat", { seq: 1, serverTime: "2026-09-25T00:00:00.000Z" }, "1");
+    // A real named frame sets the resumable cursor; the heartbeat that
+    // follows carries no id of its own (the backend never puts one on a
+    // heartbeat) but still proves liveness and arms the staleness timer.
+    first.dispatch("counters_updated", { scanned: 0, evacuated: 0, calledEmergency: 0 }, "1");
+    first.dispatch("heartbeat", { seq: 1, serverTime: "2026-09-25T00:00:00.000Z" });
 
     jest.advanceTimersByTime(STALE_AFTER_MS);
 
@@ -209,7 +254,8 @@ describe("createBuildingChannel() realtime hardening", () => {
     second.open();
     expect(channel.status()).toBe("open");
 
-    second.dispatch("heartbeat", { seq: 2, serverTime: "2026-09-25T00:01:00.000Z" }, "2");
+    second.dispatch("counters_updated", { scanned: 0, evacuated: 0, calledEmergency: 0 }, "2");
+    second.dispatch("heartbeat", { seq: 2, serverTime: "2026-09-25T00:01:00.000Z" });
     expect(channel.status()).toBe("open");
     expect(channel.lastSeq()).toBe(2);
 
@@ -230,7 +276,8 @@ describe("createBuildingChannel() realtime hardening", () => {
     const channel = createBuildingChannel(nextBuildingId());
     const first = FakeEventSource.last;
     first.open();
-    first.dispatch("heartbeat", { seq: 1, serverTime: "2026-09-25T00:00:00.000Z" }, "1");
+    // No id — the backend never puts one on a heartbeat frame.
+    first.dispatch("heartbeat", { seq: 1, serverTime: "2026-09-25T00:00:00.000Z" });
 
     first.error(); // transport drop, not staleness
     jest.advanceTimersByTime(1_000);
@@ -255,9 +302,11 @@ describe("createBuildingChannel() realtime hardening", () => {
     es.open();
 
     // Several healthy beats at the server's 25 s cadence: each one re-arms.
+    // None carries an id of its own — the backend never puts one on a
+    // heartbeat frame.
     for (const seq of [1, 2, 3]) {
       jest.advanceTimersByTime(25_000);
-      es.dispatch("heartbeat", { seq, serverTime: `2026-09-25T00:00:${seq}0.000Z` }, String(seq));
+      es.dispatch("heartbeat", { seq, serverTime: `2026-09-25T00:00:${seq}0.000Z` });
       expect(channel.status()).toBe("open");
     }
 
@@ -268,7 +317,9 @@ describe("createBuildingChannel() realtime hardening", () => {
     jest.advanceTimersByTime(1_000);
     expect(channel.status()).toBe("degraded");
     expect(es.closed).toBe(true);
-    expect(channel.lastSeq()).toBe(3);
+    // No real named frame ever arrived in this session, only heartbeats —
+    // the cursor stays null.
+    expect(channel.lastSeq()).toBeNull();
 
     channel.close();
   });
@@ -277,7 +328,8 @@ describe("createBuildingChannel() realtime hardening", () => {
     const channel = createBuildingChannel(nextBuildingId());
     const es = FakeEventSource.last;
     es.open();
-    es.dispatch("heartbeat", { seq: 1, serverTime: "2026-09-25T00:00:00.000Z" }, "1");
+    // No id — the backend never puts one on a heartbeat frame.
+    es.dispatch("heartbeat", { seq: 1, serverTime: "2026-09-25T00:00:00.000Z" });
 
     jest.advanceTimersByTime(40_000);
     es.dispatch("counters_updated", { scanned: 1, evacuated: 0, calledEmergency: 0 }, "2");
@@ -299,7 +351,9 @@ describe("createBuildingChannel() realtime hardening", () => {
     const first = FakeEventSource.last;
     expect(first.url).not.toContain("sinceSeq");
     first.open();
-    first.dispatch("heartbeat", { seq: 42, serverTime: "2026-09-25T00:00:00.000Z" }, "42");
+    // A real named frame is what carries a resumable id in production — a
+    // heartbeat never does.
+    first.dispatch("counters_updated", { scanned: 0, evacuated: 0, calledEmergency: 0 }, "42");
 
     first.error();
     jest.advanceTimersByTime(1_000); // full-jitter backoff, Math.random pinned
@@ -328,6 +382,88 @@ describe("createBuildingChannel() realtime hardening", () => {
     FakeEventSource.last.dispatch("closure_changed", payload, "9");
 
     expect(events).toEqual([{ type: "closure_changed", data: payload }]);
+
+    channel.close();
+  });
+
+  it("resyncs when a heartbeat's seq is ahead of what this connection has received, without leaking that seq into the resume cursor", () => {
+    const channel = createBuildingChannel(nextBuildingId());
+    const es = FakeEventSource.last;
+    es.open();
+    // Establish a baseline: this connection has genuinely received frame 5.
+    es.dispatch("counters_updated", { scanned: 1, evacuated: 0, calledEmergency: 0 }, "5");
+
+    (global.fetch as jest.Mock).mockClear();
+
+    // The heartbeat carries no id of its own (the backend never puts one on
+    // a heartbeat frame), so the sticky cursor stays at 5 — but its body
+    // reports the building is at 50 — frames 6..50 were emitted and this
+    // socket never saw them. The size of that gap is irrelevant; only the
+    // fact that seq > what we've received matters.
+    es.dispatch("heartbeat", { seq: 50, serverTime: "2026-09-25T00:00:00.000Z" });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/api/emergency/buildings/"),
+      expect.objectContaining({ credentials: "include" })
+    );
+
+    // A reconnect must resume from the last real frame id we actually
+    // received (5), never from the heartbeat's building-wide seq (50) —
+    // feeding 50 into the cursor would ask the server to resume from a point
+    // ahead of what this client actually saw and skip frames forever.
+    es.error();
+    jest.advanceTimersByTime(1_000); // full-jitter backoff, Math.random pinned
+    expect(FakeEventSource.last.url).toContain("?sinceSeq=5");
+    expect(FakeEventSource.last.url).not.toContain("sinceSeq=50");
+
+    channel.close();
+  });
+
+  it("does not resync on a heartbeat whose seq merely matches what was already received", () => {
+    const channel = createBuildingChannel(nextBuildingId());
+    const es = FakeEventSource.last;
+    es.open();
+    es.dispatch("counters_updated", { scanned: 1, evacuated: 0, calledEmergency: 0 }, "5");
+
+    (global.fetch as jest.Mock).mockClear();
+
+    // No frames missed: the heartbeat's seq does not exceed what this
+    // connection has already received. No id — the backend never puts one
+    // on a heartbeat frame.
+    es.dispatch("heartbeat", { seq: 5, serverTime: "2026-09-25T00:00:00.000Z" });
+
+    expect(global.fetch).not.toHaveBeenCalled();
+
+    channel.close();
+  });
+
+  it("treats resync_required as an instruction to rebuild state without dropping the connection", () => {
+    const channel = createBuildingChannel(nextBuildingId());
+    const events: BuildingEvent[] = [];
+    channel.subscribe((e) => events.push(e));
+    const es = FakeEventSource.last;
+    es.open();
+
+    (global.fetch as jest.Mock).mockClear();
+
+    // No id — the backend never puts one on a resync_required frame either.
+    es.dispatch("resync_required", { reason: "backlog_truncated", atSeq: 120 });
+
+    // A truncated replay means missed frames that will never be replayed —
+    // the client must rebuild from a fresh snapshot rather than assume it
+    // is caught up.
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/api/emergency/buildings/"),
+      expect.objectContaining({ credentials: "include" })
+    );
+    expect(events).toEqual([
+      { type: "resync_required", data: { reason: "backlog_truncated", atSeq: 120 } },
+    ]);
+
+    // The socket itself is healthy — a truncated replay is not a transport
+    // failure, so resync must not tear the connection down.
+    expect(es.closed).toBe(false);
+    expect(channel.status()).toBe("open");
 
     channel.close();
   });

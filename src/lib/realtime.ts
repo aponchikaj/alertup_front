@@ -18,6 +18,7 @@ const SSE_EVENT_TYPES = [
   "log_appended",
   "counters_updated",
   "closure_changed",
+  "resync_required",
 ] as const;
 
 const POLL_INTERVAL_MS = 10_000;
@@ -106,6 +107,13 @@ class BuildingChannel implements RealtimeChannel {
 
   private emit(evt: BuildingEvent) {
     if (evt.type === "state") this.lastSnapshot = evt.data;
+    if (evt.type === "resync_required") {
+      // The replay was truncated: frames up to `atSeq` are gone for good.
+      // The cached state can no longer be trusted just because the socket
+      // looks fine — rebuild it from a fresh snapshot, the same way the
+      // staleness path does, rather than silently assuming we're caught up.
+      void this.resync();
+    }
     this.handlers.forEach((h) => h(evt));
   }
 
@@ -205,7 +213,12 @@ class BuildingChannel implements RealtimeChannel {
     es.onopen = () => {
       this.sseFailures = 0;
       this.setStatus("open");
-      // The server sends a fresh `state` on connect; nothing else needed.
+      // On a resumed connection `state` is no longer guaranteed to be the
+      // first frame — replayed backlog can precede it, with the
+      // authoritative snapshot landing last. Nothing here depends on order:
+      // handlers apply each frame as it arrives (SNAPSHOT is idempotent) and
+      // `resync_required`/heartbeat gap detection cover the case where
+      // frames were dropped outright.
       this.armStaleness();
     };
 
@@ -218,7 +231,23 @@ class BuildingChannel implements RealtimeChannel {
       this.lastHeartbeatAtValue = Date.now();
       try {
         const data = JSON.parse(frame.data) as { seq?: number };
-        if (typeof data.seq === "number") this.lastSeqValue = data.seq;
+        // `seq` here is the BUILDING's true high-water sequence, not this
+        // connection's resume cursor — that distinction matters. It is read
+        // ONLY to detect a shortfall (compared against `lastSeqValue`, which
+        // `noteFrame` below derives solely from frame `id:` values) and is
+        // never assigned into `lastSeqValue`/`lastEventId` itself. Feeding it
+        // into the cursor would make a future reconnect ask to resume from a
+        // point ahead of what this client actually received, skipping
+        // frames forever. Sequences are wall-clock-scale and deliberately
+        // non-dense, so only the PRESENCE of a shortfall is meaningful —
+        // never its magnitude.
+        if (
+          typeof data.seq === "number" &&
+          this.lastSeqValue !== null &&
+          data.seq > this.lastSeqValue
+        ) {
+          void this.resync();
+        }
       } catch {
         // Malformed heartbeat body — the frame itself is still proof of life.
       }
