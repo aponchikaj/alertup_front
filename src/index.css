@@ -131,10 +131,15 @@
   :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
   ::selection { background: var(--accent-wash); color: var(--fg); }
 
+  /* Position, spacing and elevation ONLY — colour belongs to whichever
+     variant renders this link (buttonStyles({variant:"primary"})). This rule
+     used to also set `background`/`color`, fighting the button's own
+     bg-accent/text-accent-ink and landing on ~1.68:1, near-invisible text.
+     Two systems setting the same properties is the bug; only one may. */
   .skip-link {
     position: absolute; left: -9999px; top: 0; z-index: 100;
     padding: 12px 20px; border-radius: var(--r-sm);
-    background: var(--bg-elevated); color: var(--fg); box-shadow: var(--shadow-float);
+    box-shadow: var(--shadow-float);
   }
   .skip-link:focus { left: 16px; top: 16px; }
 }

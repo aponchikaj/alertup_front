@@ -134,10 +134,17 @@ export const RouteStepper = ({
    */
   const titleText =
     serverText ??
-    (activeStep.kind === "walk" && activeSegment
-      ? t("wayfinding.stepWalk", {
-          target: activeSegment.nodes.at(-1)?.label ?? t("wayfinding.destination"),
-        })
+    (activeStep.kind === "walk"
+      ? // Guard BEFORE the arrive branch: a walk step whose segmentIndex does
+        // not resolve (activeSegment null) must render no headline rather
+        // than fall through to "You have arrived" — the wrong direction to
+        // fail in for someone evacuating. The live region stays mounted with
+        // empty text rather than unmounting, so its identity survives.
+        (activeSegment
+          ? t("wayfinding.stepWalk", {
+              target: activeSegment.nodes.at(-1)?.label ?? t("wayfinding.destination"),
+            })
+          : "")
       : activeStep.kind === "transit" && activeTransition
         ? t("wayfinding.takeTransit", {
             transit: t(TRANSIT_LABEL_KEYS[activeTransition.transitType]),

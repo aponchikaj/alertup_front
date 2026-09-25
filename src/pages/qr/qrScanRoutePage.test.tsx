@@ -318,6 +318,47 @@ describe('scan page — failure states', () => {
 });
 
 /* ============================================================================
+   F15 item 6 — exactly one h1, in every state this page can render.
+   ----------------------------------------------------------------------------
+   Screen-reader users navigate by heading; a scan-review flagged this page as
+   having none. At this commit `RouteHeader`/`PageHeader` already renders a
+   descriptive <h1> in the loading, error and loaded states — these pin that
+   so a future refactor cannot drop it back to zero. If this ever regresses,
+   the fix belongs in `RouteHeader` (loaded) or the loading/error branches
+   directly, all in this file.
+   ========================================================================= */
+describe('scan page — exactly one h1 (F15 item 6)', () => {
+  test('names the page while the scan is loading', () => {
+    // The fetch is mocked but unresolved at first paint.
+    mockedGet.mockReturnValue(new Promise(() => {}));
+    renderPage();
+
+    const headings = screen.getAllByRole('heading', { level: 1 });
+    expect(headings).toHaveLength(1);
+    expect(headings[0]).toHaveTextContent(en.route.loadingTitle);
+  });
+
+  test('names the page on a failed scan', async () => {
+    mockedGet.mockRejectedValue(new http.ApiError('gone', 404, null));
+    renderPage();
+    await screen.findByText(en.route.qrNotFound);
+
+    const headings = screen.getAllByRole('heading', { level: 1 });
+    expect(headings).toHaveLength(1);
+    expect(headings[0]).toHaveTextContent(en.route.errorTitle);
+  });
+
+  test('names the page once the route loads', async () => {
+    renderPage();
+    await screen.findByText(/Tbilisi Mall/);
+
+    const headings = screen.getAllByRole('heading', { level: 1 });
+    expect(headings).toHaveLength(1);
+    expect(headings[0]).toHaveTextContent(en.route.title);
+  });
+});
+
+/* ============================================================================
    F10 — connection-lost indicator + closure-driven refetch
    ----------------------------------------------------------------------------
    The stubbed realtime channel from the top of this file is driven directly

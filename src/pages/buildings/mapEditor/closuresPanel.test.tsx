@@ -421,8 +421,24 @@ describe('ClosuresPanel — picking connections without a pointer', () => {
       target: { value: 'nowhere' },
     });
 
-    expect(screen.getByText(en.mapEditor.closureEdgeNone)).toBeInTheDocument();
+    // The visible empty state — the search-results live region (F15 item 3)
+    // echoes the same string for screen readers, so it is excluded here.
+    expect(
+      screen.getByText(en.mapEditor.closureEdgeNone, {
+        selector: 'p:not([role="status"])',
+      }),
+    ).toBeInTheDocument();
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+  });
+
+  test('a floor with no connections at all gets its own empty state, not "no search match"', () => {
+    // F15 item 2: opening a draft on a floor with zero connections showed
+    // "No connections match that search" before the operator typed anything —
+    // misdiagnosing an empty floor as a failed search.
+    renderPanel({ draftEdgeIds: [], edgeOptions: [] });
+
+    expect(screen.getByText(en.mapEditor.closureEdgeEmpty)).toBeInTheDocument();
+    expect(screen.queryByText(en.mapEditor.closureEdgeNone)).not.toBeInTheDocument();
   });
 
   test('caps the unpicked rows on a dense floor and says how many are left', () => {
@@ -444,14 +460,83 @@ describe('ClosuresPanel — picking connections without a pointer', () => {
     ).toBeInTheDocument();
   });
 
+  test('the shown/total arithmetic reconciles when a row is already picked', () => {
+    // F15 item 1: `shown` (edgeRows.rows.length) counted the picked row, but
+    // `total` (edgeRows.matched) excluded it — with 40 connections and 1
+    // picked, the panel read "Showing 13 of 39" while 13 + 27 hidden = 40, not
+    // 39. Picked rows must be counted in BOTH halves so the arithmetic closes:
+    // shown (13) + hidden (27) === total (40).
+    const many = Array.from({ length: 40 }, (_, i) =>
+      edgeOption(`x${i}`, `Room ${i}`, `Corridor ${i}`),
+    );
+    renderPanel({ draftEdgeIds: ['x0'], edgeOptions: many });
+
+    // 1 picked row (always shown, uncapped) + 12 windowed matches = 13 shown.
+    expect(screen.getAllByRole('checkbox')).toHaveLength(13);
+    expect(
+      screen.getByText(
+        en.mapEditor.closureEdgeMore
+          .replace('{shown}', '13')
+          .replace('{total}', '40'),
+      ),
+    ).toBeInTheDocument();
+    // The old, unreconciled reading must be gone.
+    expect(
+      screen.queryByText(
+        en.mapEditor.closureEdgeMore
+          .replace('{shown}', '13')
+          .replace('{total}', '39'),
+      ),
+    ).not.toBeInTheDocument();
+  });
+
   test('the count is a status region, announced whole', () => {
     renderPanel({ draftEdgeIds: ['e1'] });
 
-    const live = screen.getByRole('status');
+    // Two status regions now share the draft: this one for the picked count,
+    // a second (below) for the search results. Scoped by testid so adding the
+    // second does not make this ambiguous.
+    const live = screen.getByTestId('closure-selected-count');
     expect(live).toHaveAttribute('aria-live', 'polite');
     expect(live).toHaveAttribute('aria-atomic', 'true');
     // One connection is not "1 connections".
     expect(live).toHaveTextContent(en.mapEditor.closureSelectedCountOne);
+  });
+
+  test('search results are announced in a live region, mounted empty before the first search', () => {
+    // F15 item 3: the row list, the empty state and "Showing X of Y" all sat
+    // outside any live region, so narrowing the search announced nothing to a
+    // screen-reader operator. Mounted WITH the draft (not with its text) so
+    // the region is being watched before it ever has anything to say.
+    renderPanel({ draftEdgeIds: [] });
+
+    const resultsStatus = screen.getByTestId('closure-edge-search-status');
+    expect(resultsStatus).toHaveAttribute('role', 'status');
+    expect(resultsStatus).toHaveAttribute('aria-live', 'polite');
+    expect(resultsStatus).toHaveAttribute('aria-atomic', 'true');
+    // Nothing announced before the operator has typed anything.
+    expect(resultsStatus).toHaveTextContent('');
+    // Never nested inside the OTHER live region on this draft.
+    expect(
+      resultsStatus.closest('[role="status"][aria-live="polite"] [role="status"]'),
+    ).toBeNull();
+
+    fireEvent.change(screen.getByLabelText(en.mapEditor.closureEdgeSearch), {
+      target: { value: 'North stairs' },
+    });
+
+    // Now it carries the count of what the search narrowed to.
+    expect(resultsStatus).not.toHaveTextContent('');
+    expect(resultsStatus.textContent).toMatch(/2|North stairs/i);
+  });
+
+  test('the search-results region never hides with display:none when empty', () => {
+    renderPanel({ draftEdgeIds: [] });
+    const resultsStatus = screen.getByTestId('closure-edge-search-status');
+    // `sr-only`, never a display:none/empty:hidden utility that would drop it
+    // from the accessibility tree.
+    expect(resultsStatus.className).not.toMatch(/hidden/);
+    expect(resultsStatus).toBeVisible();
   });
 
   test('the slow-down factors say what the number means, not just "2×"', () => {

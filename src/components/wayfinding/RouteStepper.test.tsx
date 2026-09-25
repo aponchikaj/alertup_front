@@ -277,6 +277,22 @@ describe("RouteStepper", () => {
     ).toBeInTheDocument();
   });
 
+  test("an unresolvable walk step renders no headline, never a false arrival", () => {
+    // F15 item 4: a `walk` step whose `activeSegment` resolves to null (an
+    // out-of-range `segmentIndex`) fell through the ternary chain all the way
+    // to `stepArrive` — telling an evacuating visitor they have arrived when
+    // the step could not even be resolved is the wrong direction to fail in.
+    const broken = {
+      ...route,
+      steps: [{ kind: "walk" as const, segmentIndex: 99 }],
+    } as AssembledRoute;
+
+    renderStepper(broken);
+
+    expect(screen.getByTestId("instruction-title")).toBeEmptyDOMElement();
+    expect(screen.queryByText(en.wayfinding.stepArrive)).not.toBeInTheDocument();
+  });
+
   test("announces the active instruction politely", () => {
     renderStepper(narratedRoute);
 

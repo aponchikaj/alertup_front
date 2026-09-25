@@ -174,6 +174,14 @@ export const ClosuresPanel = ({
 
   const pickedIds = useMemo(() => new Set(draftEdgeIds ?? []), [draftEdgeIds]);
 
+  // Distinct from a failed search: a floor with zero connections has nothing
+  // to search yet, so blaming the search box for the empty list would be
+  // wrong the moment a draft opens, before the operator has typed anything.
+  const edgeEmptyMessage =
+    edgeOptions.length === 0
+      ? t('mapEditor.closureEdgeEmpty')
+      : t('mapEditor.closureEdgeNone');
+
   const optionLabel = (option: ClosureEdgeOption) =>
     t('mapEditor.closureEdgeOption', {
       from: option.fromLabel,
@@ -186,6 +194,13 @@ export const ClosuresPanel = ({
    * The ordering is the accessibility requirement, not a nicety: an edge
    * picked on the map and then filtered out by a search for something else
    * would otherwise only be removable with the pointer that put it there.
+   *
+   * That guarantee holds only WITHIN the active floor: `edgeOptions` is
+   * scoped to it, so a row picked before a floor switch can drop out of this
+   * list entirely — the count still says "N connections selected" with fewer
+   * rows ticked here. This is parity with the map, not a bug: EdgeLayer does
+   * not draw the other floor's edge either, so neither picker can reach it
+   * until the operator switches back.
    */
   const edgeRows = useMemo(() => {
     const query = edgeQuery.trim().toLowerCase();
@@ -207,10 +222,16 @@ export const ClosuresPanel = ({
 
     return {
       rows: [...picked, ...matches.slice(0, EDGE_WINDOW)],
-      // What the window is a window onto — picked rows are never hidden, so
-      // they are not part of the "and N more" arithmetic.
-      matched: matches.length,
+      // `total` covers the same set `rows.length` (shown) and `hidden` add up
+      // to: every picked row PLUS every match, windowed or not. Counting
+      // picked rows into `rows.length` but not into `total` was the F15 bug —
+      // "Showing 15 of 37" while 25 more sat hidden, 15 + 25 = 40 != 37.
+      total: picked.length + matches.length,
       hidden: Math.max(matches.length - EDGE_WINDOW, 0),
+      // Raw match count, BEFORE the window cap — what the search-results live
+      // region announces. Picked rows are excluded here on purpose: they are
+      // not something the search narrowed to, they were already on the draft.
+      matchCount: matches.length,
     };
   }, [edgeOptions, edgeQuery, pickedIds]);
 
@@ -361,6 +382,7 @@ export const ClosuresPanel = ({
               nothing was watching. aria-atomic so "2 connections selected"
               arrives as one sentence rather than a bare changed number. */}
           <p
+            data-testid="closure-selected-count"
             role="status"
             aria-live="polite"
             aria-atomic="true"
@@ -380,9 +402,39 @@ export const ClosuresPanel = ({
               onChange={(e) => setEdgeQuery(e.target.value)}
             />
 
+            {/* The search-results announcement (F15 item 3). The row list, the
+                empty state and "Showing X of Y" below are all silent to a
+                screen reader — this is the one thing that speaks as the query
+                narrows. Mounted WITH the draft, not with its text: an empty
+                string here until the first search, never unmounted, so the
+                region is already being watched by the time it has something
+                to say. `sr-only`, never `hidden`/`display:none` — either of
+                those would drop it from the accessibility tree, undoing the
+                fix. A sibling of the selection-count status above, not nested
+                inside it, so the two never announce as one region. */}
+            <p
+              data-testid="closure-edge-search-status"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+              className="sr-only"
+            >
+              {edgeQuery.trim() === ''
+                ? ''
+                : edgeRows.matchCount === 0
+                  ? edgeEmptyMessage
+                  : edgeRows.matchCount === 1
+                    ? t('mapEditor.closureEdgeSearchCountOne')
+                    : t('mapEditor.closureEdgeSearchCount', {
+                        count: edgeRows.matchCount,
+                      })}
+            </p>
+
             {edgeRows.rows.length === 0 ? (
               <p className="text-sm text-ink-muted">
-                {t('mapEditor.closureEdgeNone')}
+                {/* A floor with zero connections is not a failed search — the
+                    operator has not necessarily typed anything yet. */}
+                {edgeEmptyMessage}
               </p>
             ) : (
               <div
@@ -414,7 +466,7 @@ export const ClosuresPanel = ({
               <p className="text-xs text-ink-subtle">
                 {t('mapEditor.closureEdgeMore', {
                   shown: edgeRows.rows.length,
-                  total: edgeRows.matched,
+                  total: edgeRows.total,
                 })}
               </p>
             )}

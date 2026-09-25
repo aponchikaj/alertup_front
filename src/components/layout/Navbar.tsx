@@ -318,8 +318,13 @@ const Navbar = () => {
 
   return (
     <>
+      {/* `data-button`: without it typography.css's `a:not([data-button])`
+          (specificity 0,1,1) beats the `text-accent-ink` utility (0,1,0)
+          below, and the link renders link-blue text on its own button-blue
+          fill — see the matching note on `ButtonLink` in ui/button.tsx. */}
       <a
         href="#main"
+        data-button
         className={cn(
           "skip-link focus:translate-y-0",
           buttonStyles({ variant: "primary", size: "sm" }),

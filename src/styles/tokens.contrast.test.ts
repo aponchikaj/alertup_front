@@ -89,6 +89,21 @@ describe.each([
     ["accent-text on bg", "accent-text", "bg"],
     ["accent-text on card", "accent-text", "bg-card"],
     ["accent-ink on accent (filled button)", "accent-ink", "accent"],
+    // The skip link (F15 item 5): buttonStyles({variant:"primary"}) resolves
+    // to this same pair. Pinned under its own label so a future change to
+    // accent/accent-ink is caught for the skip link too, not eyeballed.
+    //
+    // HONEST LIMIT: this only checks the TOKEN VALUES. It cannot tell you
+    // whether the skip link's rendered anchor actually GETS this pair — that
+    // is a cascade/specificity question (which CSS rule wins on the real
+    // element), and this file only ever reads tokens.css text, never applies
+    // real stylesheets to a real DOM (round 1 of this fix passed this exact
+    // assertion while the live page measured 1.68:1, then 1.23:1, because
+    // `a:not([data-button])` in typography.css was winning over the utility
+    // class this pair names). The mechanism check lives in
+    // `Navbar.test.tsx` and `button.test.tsx` (selector-matching against the
+    // rendered anchor); only a live browser scan measures the final number.
+    ["accent-ink on accent (skip link, focused)", "accent-ink", "accent"],
     ["safe-text on card", "safe-text", "bg-card"],
     ["safe-ink on safe (green fill)", "safe-ink", "safe"],
     ["alarm-text on card", "alarm-text", "bg-card"],
@@ -145,6 +160,34 @@ describe("light-only checks", () => {
     expect(ratio(t("danger-text"), t("surface"))).toBeGreaterThanOrEqual(4.5);
     expect(ratio(t("success-ink"), t("success"))).toBeGreaterThanOrEqual(4.5);
     expect(ratio(t("warning-ink"), t("warning"))).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+describe("the skip link (F15 item 5)", () => {
+  // `.skip-link` used to set its OWN background/color while the element also
+  // wore `buttonStyles({variant:"primary"})`, which sets bg-accent/text-
+  // accent-ink — two systems fighting produced 1.68:1, near-invisible text.
+  // The fix decides buttonStyles owns the colours; `.skip-link` may only
+  // handle position, spacing and elevation from here on.
+  //
+  // That fix alone was NOT sufficient (round 2): removing `.skip-link`'s own
+  // background/color uncovered a second, unrelated rule already fighting the
+  // same utility classes — `typography.css`'s `a:not([data-button])`, at
+  // higher specificity than `text-accent-ink`. This test still only reads
+  // index.css's text, so it cannot see that second rule at all; see
+  // `Navbar.test.tsx` for the check that does.
+  const indexCss = readFileSync(join(__dirname, "..", "index.css"), "utf8");
+  const skipLinkRule = (() => {
+    const start = indexCss.indexOf(".skip-link {");
+    if (start === -1) throw new Error("`.skip-link` rule not found in index.css");
+    const open = indexCss.indexOf("{", start);
+    const close = indexCss.indexOf("}", open);
+    return indexCss.slice(open, close);
+  })();
+
+  it("does not declare its own background or color — buttonStyles owns both", () => {
+    expect(skipLinkRule).not.toMatch(/\bbackground\s*:/);
+    expect(skipLinkRule).not.toMatch(/\bcolor\s*:/);
   });
 });
 

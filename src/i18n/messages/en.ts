@@ -749,8 +749,18 @@ export const en = {
     closureEdgeSearch: "Find a connection",
     closureEdgeSearchHint: "Type part of the name at either end.",
     closureEdgeOption: "{from} to {to}",
+    // Distinct from `closureEdgeNone`: this floor has zero connections, full
+    // stop — a search box the operator has not touched yet would otherwise be
+    // blamed for an empty list it never filtered.
+    closureEdgeEmpty: "This floor has no connections yet.",
     closureEdgeNone: "No connections match that search.",
     closureEdgeMore: "Showing {shown} of {total}. Narrow the search to reach the rest.",
+    // The search-results live region (F15 item 3). Distinct from
+    // `closureEdgeNone`/`closureEdgeMore`, which are the VISIBLE strings —
+    // this is what a screen reader hears as the query narrows, so it stays
+    // silent until there is a query to report on.
+    closureEdgeSearchCountOne: "1 connection found",
+    closureEdgeSearchCount: "{count} connections found",
     closureEdgeHighlighted: "In the closure being drafted",
     closureReason: "Reason",
     closureDuration: "Duration",
