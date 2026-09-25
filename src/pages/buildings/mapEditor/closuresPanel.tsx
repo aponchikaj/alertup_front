@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Alert, Badge } from '../../../components/ui/feedback';
 import { Button } from '../../../components/ui/button';
 import { ConfirmDialog } from '../../../components/ui/confirmDialog';
@@ -7,6 +7,9 @@ import { Select } from '../../../components/ui/select';
 import { PlusIcon, TrashIcon } from '../../../components/ui/icons';
 import { useI18n } from '../../../i18n/LanguageProvider';
 import type { Closure } from '../../../apis/mapEditorApi';
+import { ClosureEdgePicker, type ClosureEdgeOption } from './ClosureEdgePicker';
+
+export type { ClosureEdgeOption };
 
 /* ============================================================================
    ClosuresPanel — "this corridor is shut" without a command line.
@@ -43,18 +46,6 @@ const HOUR_MS = 60 * 60 * 1000;
  *  what the backend requires of a non-null `costMultiplier`. */
 const SLOW_FACTORS = ['1.5', '2', '3', '4'] as const;
 
-/**
- * How many UNPICKED connections the list offers at once.
- *
- * One tab stop per edge would be its own accessibility regression — a floor
- * with forty connections would bury the reason field forty tabs deep — so the
- * list is a window onto the search results, and the count of what is hidden is
- * stated rather than silent. Picked rows are exempt from the cap: whatever is
- * in the draft must always be un-pickable without a mouse, including the rows
- * a later search would otherwise filter away.
- */
-const EDGE_WINDOW = 12;
-
 /** `datetime-local` wants a LOCAL wall-clock string, not an ISO instant. */
 const toDateTimeLocal = (ms: number): string => {
   const d = new Date(ms);
@@ -73,15 +64,6 @@ export interface ClosureDraftInput {
   endsAt: string | null;
   /** `null` = blocked outright; a number >= 1 = a routing penalty. */
   costMultiplier: number | null;
-}
-
-/** One connection of the active floor, already named for a human. */
-export interface ClosureEdgeOption {
-  id: string;
-  /** The `sourceNodeId` end, labelled exactly as the direction Select does. */
-  fromLabel: string;
-  /** The `targetNodeId` end. */
-  toLabel: string;
 }
 
 export interface ClosuresPanelProps {
@@ -160,7 +142,6 @@ export const ClosuresPanel = ({
   const { t } = useI18n();
 
   const [reason, setReason] = useState('');
-  const [edgeQuery, setEdgeQuery] = useState('');
   const [duration, setDuration] = useState<DurationChoice>('1');
   const [customEndsAt, setCustomEndsAt] = useState('');
   // No default: blocking a corridor must be something the operator chose.
@@ -171,69 +152,6 @@ export const ClosuresPanel = ({
 
   const drafting = draftEdgeIds !== null;
   const selectedCount = draftEdgeIds?.length ?? 0;
-
-  const pickedIds = useMemo(() => new Set(draftEdgeIds ?? []), [draftEdgeIds]);
-
-  // Distinct from a failed search: a floor with zero connections has nothing
-  // to search yet, so blaming the search box for the empty list would be
-  // wrong the moment a draft opens, before the operator has typed anything.
-  const edgeEmptyMessage =
-    edgeOptions.length === 0
-      ? t('mapEditor.closureEdgeEmpty')
-      : t('mapEditor.closureEdgeNone');
-
-  const optionLabel = (option: ClosureEdgeOption) =>
-    t('mapEditor.closureEdgeOption', {
-      from: option.fromLabel,
-      to: option.toLabel,
-    });
-
-  /**
-   * Picked rows first and always, then the search hits, then the cap.
-   *
-   * The ordering is the accessibility requirement, not a nicety: an edge
-   * picked on the map and then filtered out by a search for something else
-   * would otherwise only be removable with the pointer that put it there.
-   *
-   * That guarantee holds only WITHIN the active floor: `edgeOptions` is
-   * scoped to it, so a row picked before a floor switch can drop out of this
-   * list entirely — the count still says "N connections selected" with fewer
-   * rows ticked here. This is parity with the map, not a bug: EdgeLayer does
-   * not draw the other floor's edge either, so neither picker can reach it
-   * until the operator switches back.
-   */
-  const edgeRows = useMemo(() => {
-    const query = edgeQuery.trim().toLowerCase();
-    const picked: ClosureEdgeOption[] = [];
-    const matches: ClosureEdgeOption[] = [];
-
-    for (const option of edgeOptions) {
-      if (pickedIds.has(option.id)) {
-        picked.push(option);
-        continue;
-      }
-      if (
-        query === '' ||
-        `${option.fromLabel} ${option.toLabel}`.toLowerCase().includes(query)
-      ) {
-        matches.push(option);
-      }
-    }
-
-    return {
-      rows: [...picked, ...matches.slice(0, EDGE_WINDOW)],
-      // `total` covers the same set `rows.length` (shown) and `hidden` add up
-      // to: every picked row PLUS every match, windowed or not. Counting
-      // picked rows into `rows.length` but not into `total` was the F15 bug —
-      // "Showing 15 of 37" while 25 more sat hidden, 15 + 25 = 40 != 37.
-      total: picked.length + matches.length,
-      hidden: Math.max(matches.length - EDGE_WINDOW, 0),
-      // Raw match count, BEFORE the window cap — what the search-results live
-      // region announces. Picked rows are excluded here on purpose: they are
-      // not something the search narrowed to, they were already on the draft.
-      matchCount: matches.length,
-    };
-  }, [edgeOptions, edgeQuery, pickedIds]);
 
   /**
    * The draft's end instant, resolved at the moment it is asked for.
@@ -262,7 +180,6 @@ export const ClosuresPanel = ({
 
   const resetDraft = () => {
     setReason('');
-    setEdgeQuery('');
     setDuration('1');
     setCustomEndsAt('');
     setEffect(null);
@@ -393,84 +310,11 @@ export const ClosuresPanel = ({
 
           {/* The keyboard path. See the header comment: without this the map
               is the only way to pick an edge, and the map has no tab stops. */}
-          <div className="flex flex-col gap-2">
-            <TextField
-              label={t('mapEditor.closureEdgeSearch')}
-              hint={t('mapEditor.closureEdgeSearchHint')}
-              type="search"
-              value={edgeQuery}
-              onChange={(e) => setEdgeQuery(e.target.value)}
-            />
-
-            {/* The search-results announcement (F15 item 3). The row list, the
-                empty state and "Showing X of Y" below are all silent to a
-                screen reader — this is the one thing that speaks as the query
-                narrows. Mounted WITH the draft, not with its text: an empty
-                string here until the first search, never unmounted, so the
-                region is already being watched by the time it has something
-                to say. `sr-only`, never `hidden`/`display:none` — either of
-                those would drop it from the accessibility tree, undoing the
-                fix. A sibling of the selection-count status above, not nested
-                inside it, so the two never announce as one region. */}
-            <p
-              data-testid="closure-edge-search-status"
-              role="status"
-              aria-live="polite"
-              aria-atomic="true"
-              className="sr-only"
-            >
-              {edgeQuery.trim() === ''
-                ? ''
-                : edgeRows.matchCount === 0
-                  ? edgeEmptyMessage
-                  : edgeRows.matchCount === 1
-                    ? t('mapEditor.closureEdgeSearchCountOne')
-                    : t('mapEditor.closureEdgeSearchCount', {
-                        count: edgeRows.matchCount,
-                      })}
-            </p>
-
-            {edgeRows.rows.length === 0 ? (
-              <p className="text-sm text-ink-muted">
-                {/* A floor with zero connections is not a failed search — the
-                    operator has not necessarily typed anything yet. */}
-                {edgeEmptyMessage}
-              </p>
-            ) : (
-              <div
-                role="group"
-                aria-label={t('mapEditor.closureEdgeList')}
-                className="max-h-64 overflow-y-auto rounded-xl border border-line bg-surface-2 p-2"
-              >
-                <ul className="flex flex-col">
-                  {edgeRows.rows.map((option) => (
-                    <li key={option.id}>
-                      <label className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm text-ink hover:bg-surface-hover">
-                        <input
-                          type="checkbox"
-                          checked={pickedIds.has(option.id)}
-                          onChange={() => onToggleEdge(option.id)}
-                          className="h-4 w-4 shrink-0 rounded border-line accent-[var(--brand)]"
-                        />
-                        <span className="min-w-0 break-words">
-                          {optionLabel(option)}
-                        </span>
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {edgeRows.hidden > 0 && (
-              <p className="text-xs text-ink-subtle">
-                {t('mapEditor.closureEdgeMore', {
-                  shown: edgeRows.rows.length,
-                  total: edgeRows.total,
-                })}
-              </p>
-            )}
-          </div>
+          <ClosureEdgePicker
+            edgeOptions={edgeOptions}
+            pickedIds={draftEdgeIds ?? []}
+            onToggleEdge={onToggleEdge}
+          />
 
           <TextField
             label={t('mapEditor.closureReason')}

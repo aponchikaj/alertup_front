@@ -364,131 +364,11 @@ describe('ClosuresPanel — picking connections without a pointer', () => {
     expect(onToggleEdge).toHaveBeenCalledWith('e2');
   });
 
-  test('edges picked on the map show as ticked here', () => {
-    renderPanel({ draftEdgeIds: ['e3'] });
-
-    expect(
-      screen.getByRole('checkbox', { name: edgeName('Food court', 'Service door') }),
-    ).toBeChecked();
-    expect(
-      screen.getByRole('checkbox', { name: edgeName('Main hall', 'North stairs') }),
-    ).not.toBeChecked();
-  });
-
-  test('unticking a picked connection removes it, so the list can undo a map tap', () => {
-    const { onToggleEdge } = renderPanel({ draftEdgeIds: ['e3'] });
-
-    fireEvent.click(
-      screen.getByRole('checkbox', { name: edgeName('Food court', 'Service door') }),
-    );
-
-    expect(onToggleEdge).toHaveBeenCalledWith('e3');
-  });
-
-  test('the search box narrows a dense floor to the connection being looked for', () => {
-    renderPanel({ draftEdgeIds: [] });
-
-    fireEvent.change(screen.getByLabelText(en.mapEditor.closureEdgeSearch), {
-      target: { value: 'service' },
-    });
-
-    expect(
-      screen.getByRole('checkbox', { name: edgeName('Food court', 'Service door') }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('checkbox', { name: edgeName('Main hall', 'North stairs') }),
-    ).not.toBeInTheDocument();
-  });
-
-  test('a filter never hides an already-picked connection — it must stay unpickable', () => {
-    // Picked on the map, then filtered out by a search for something else. If
-    // the row vanished, the only way to undo the pick would be the pointer.
-    renderPanel({ draftEdgeIds: ['e1'] });
-
-    fireEvent.change(screen.getByLabelText(en.mapEditor.closureEdgeSearch), {
-      target: { value: 'service' },
-    });
-
-    expect(
-      screen.getByRole('checkbox', { name: edgeName('Main hall', 'North stairs') }),
-    ).toBeChecked();
-  });
-
-  test('says so when nothing matches, rather than showing an empty box', () => {
-    renderPanel({ draftEdgeIds: [] });
-
-    fireEvent.change(screen.getByLabelText(en.mapEditor.closureEdgeSearch), {
-      target: { value: 'nowhere' },
-    });
-
-    // The visible empty state — the search-results live region (F15 item 3)
-    // echoes the same string for screen readers, so it is excluded here.
-    expect(
-      screen.getByText(en.mapEditor.closureEdgeNone, {
-        selector: 'p:not([role="status"])',
-      }),
-    ).toBeInTheDocument();
-    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
-  });
-
-  test('a floor with no connections at all gets its own empty state, not "no search match"', () => {
-    // F15 item 2: opening a draft on a floor with zero connections showed
-    // "No connections match that search" before the operator typed anything —
-    // misdiagnosing an empty floor as a failed search.
-    renderPanel({ draftEdgeIds: [], edgeOptions: [] });
-
-    expect(screen.getByText(en.mapEditor.closureEdgeEmpty)).toBeInTheDocument();
-    expect(screen.queryByText(en.mapEditor.closureEdgeNone)).not.toBeInTheDocument();
-  });
-
-  test('caps the unpicked rows on a dense floor and says how many are left', () => {
-    // A tab stop per edge is its own regression: 40 connections would bury the
-    // reason field 40 tabs deep. The list shows a window and points at search.
-    const many = Array.from({ length: 40 }, (_, i) =>
-      edgeOption(`x${i}`, `Room ${i}`, `Corridor ${i}`),
-    );
-    renderPanel({ draftEdgeIds: [], edgeOptions: many });
-
-    const boxes = screen.getAllByRole('checkbox');
-    expect(boxes.length).toBeLessThan(many.length);
-    expect(
-      screen.getByText(
-        en.mapEditor.closureEdgeMore
-          .replace('{shown}', String(boxes.length))
-          .replace('{total}', String(many.length)),
-      ),
-    ).toBeInTheDocument();
-  });
-
-  test('the shown/total arithmetic reconciles when a row is already picked', () => {
-    // F15 item 1: `shown` (edgeRows.rows.length) counted the picked row, but
-    // `total` (edgeRows.matched) excluded it — with 40 connections and 1
-    // picked, the panel read "Showing 13 of 39" while 13 + 27 hidden = 40, not
-    // 39. Picked rows must be counted in BOTH halves so the arithmetic closes:
-    // shown (13) + hidden (27) === total (40).
-    const many = Array.from({ length: 40 }, (_, i) =>
-      edgeOption(`x${i}`, `Room ${i}`, `Corridor ${i}`),
-    );
-    renderPanel({ draftEdgeIds: ['x0'], edgeOptions: many });
-
-    // 1 picked row (always shown, uncapped) + 12 windowed matches = 13 shown.
-    expect(screen.getAllByRole('checkbox')).toHaveLength(13);
-    expect(
-      screen.getByText(
-        en.mapEditor.closureEdgeMore
-          .replace('{shown}', '13')
-          .replace('{total}', '40'),
-      ),
-    ).toBeInTheDocument();
-    // The old, unreconciled reading must be gone.
-    expect(
-      screen.queryByText(
-        en.mapEditor.closureEdgeMore
-          .replace('{shown}', '13')
-          .replace('{total}', '39'),
-      ),
-    ).not.toBeInTheDocument();
-  });
+  // The remaining picker behaviour (search filtering, the picked-row
+  // exemption, the shown/total arithmetic, both empty states, and the
+  // search-results live region) moved to ClosureEdgePicker.test.tsx with the
+  // F16 extraction — it is now local to that component and no longer needs
+  // ClosuresPanel mounted to reach it. See that file's header comment.
 
   test('the count is a status region, announced whole', () => {
     renderPanel({ draftEdgeIds: ['e1'] });
@@ -528,15 +408,6 @@ describe('ClosuresPanel — picking connections without a pointer', () => {
     // Now it carries the count of what the search narrowed to.
     expect(resultsStatus).not.toHaveTextContent('');
     expect(resultsStatus.textContent).toMatch(/2|North stairs/i);
-  });
-
-  test('the search-results region never hides with display:none when empty', () => {
-    renderPanel({ draftEdgeIds: [] });
-    const resultsStatus = screen.getByTestId('closure-edge-search-status');
-    // `sr-only`, never a display:none/empty:hidden utility that would drop it
-    // from the accessibility tree.
-    expect(resultsStatus.className).not.toMatch(/hidden/);
-    expect(resultsStatus).toBeVisible();
   });
 
   test('the slow-down factors say what the number means, not just "2×"', () => {

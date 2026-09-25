@@ -187,6 +187,8 @@ Rules: eps 0.4 m × px/m; decisions < 3 m merge; `straight` only as confirmation
 ### B12. Multi-stop routing
 
 **Files:** create `src/features/wayfinding/multiStop.js` (`orderStops(costMatrix,{fixedStart})` NN + 2-opt open tour; `planMultiStop(graph, fromId, targetIds, ctx)` ≤ 9 shortestPath runs → `{path, order, legs}` or which leg failed); modify `wayfinding.routes.js` (`legs[]`, `stops[]`; > 8 targets → 422; `instructions` get an `arrive` with `stopIndex` per stop; single `to` shape identical).
+
+**Ordering cost — ruling, 2026-09-25.** The stop-ordering cost matrix is built from a geometric proxy (straight-line distance plus a floor-change penalty scaled to the floor's pixels-per-metre), NOT from the routing context's `costFn`. A true matrix costs n(n−1) = 72 Dijkstras at 9 nodes on a public unauthenticated endpoint, which is exactly what the run budget exists to prevent. Every LEG still uses the context's `costFn` and `edgeFilter`, so closures, tags and visibility are always honoured and the returned route is always correct; under an active closure the visiting ORDER may be optimised against a walk the visitor will not take. That is the accepted trade — the budget wins over optimal ordering. **Worst-case request cost:** 3 fallback attempts × 8 legs = 24 `shortestPath` runs, not the per-plan 8.
 - [ ] Tests `multiStop.test.js` (2-opt fixes crossed NN order on a square); featureRoutes (single `to` has no `legs`; `to=a&to=b` legs in optimised order; unreachable stop → 404 naming it).
 - [ ] Verify: `npm test -- src/features/wayfinding/multiStop.test.js src/tests/featureRoutes.test.js`
 
