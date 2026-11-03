@@ -48,10 +48,9 @@ function statusUrl(
 
 async function fetchSnapshot(buildingId: string): Promise<EmergencySnapshot | null> {
   try {
-    const res = await fetch(
-      `${API_BASE_URL}/api/emergency/buildings/${buildingId}/status`,
-      { credentials: "include" }
-    );
+    // Public and briefly cacheable (D15, research 004): no credentials, so a
+    // CDN can serve one copy to every phone in the building.
+    const res = await fetch(`${API_BASE_URL}/api/emergency/buildings/${buildingId}/status`);
     if (!res.ok) return null;
     const body = (await res.json()) as { data?: EmergencySnapshot };
     return body.data ?? null;
@@ -107,6 +106,18 @@ class BuildingChannel implements RealtimeChannel {
 
   private emit(evt: BuildingEvent) {
     if (evt.type === "state") this.lastSnapshot = evt.data;
+    if (evt.type === "resync_required" && (evt.data as { reason?: string } | undefined)?.reason === "capacity") {
+      // D15 (research 004): the server evicted this stream to make room in a
+      // full building. Poll instead, and only try a stream again on the
+      // polling path's slow probe — reconnecting now would just evict
+      // someone else.
+      this.es?.close();
+      this.es = null;
+      this.clearStaleness();
+      this.startPolling();
+      this.handlers.forEach((h) => h(evt));
+      return;
+    }
     if (evt.type === "resync_required") {
       // The replay was truncated: frames up to `atSeq` are gone for good.
       // The cached state can no longer be trusted just because the socket

@@ -298,6 +298,8 @@ export const en = {
     myTitle: "My buildings",
     myLead: "Every building you manage, with its floors, maps and scan activity.",
     emptyTitle: "No buildings yet",
+    sharedWithMe: "Shared with me",
+    sharedWithMeLead: "Buildings you were invited to. What you can do in each depends on your role.",
     emptyLead: "Add your first building to start mapping its floors and printing codes.",
     deactivate: "Deactivate",
     deactivateConfirm: "Deactivate this building? Its codes will stop resolving.",

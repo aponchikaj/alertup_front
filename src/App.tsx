@@ -4,7 +4,6 @@ import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
 import GuestGuard from "./guards/guestguard";
 import AuthGuard from "./guards/authguard";
-import BuildingOwnerGuard from "./guards/buildingOwnerGuard";
 import PermissionGuard from "./guards/permissionGuard";
 import ServerGate from "./pages/other/loading";
 import { Analytics } from "@vercel/analytics/react";
@@ -195,27 +194,29 @@ const App = () => {
             <Route
               path="/building/:buildingId/logs"
               element={
-                <BuildingOwnerGuard>
+                // Any member may read the live log (the API's requireMembership);
+                // the page shows the API's 403 to anyone else.
+                <AuthGuard>
                   <Logs />
-                </BuildingOwnerGuard>
+                </AuthGuard>
               }
             />
 
             <Route
               path="/building/:buildingId/analytics"
               element={
-                <BuildingOwnerGuard>
+                <PermissionGuard permission="CAN_VIEW_ANALYTICS">
                   <AnalyticsPage />
-                </BuildingOwnerGuard>
+                </PermissionGuard>
               }
             />
 
             <Route
               path="/building/:buildingId/:emergencyId/analytics"
               element={
-                <BuildingOwnerGuard>
+                <PermissionGuard permission="CAN_VIEW_ANALYTICS">
                   <EmergencyAnalytics />
-                </BuildingOwnerGuard>
+                </PermissionGuard>
               }
             />
 

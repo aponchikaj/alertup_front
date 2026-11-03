@@ -1,4 +1,4 @@
-import { post, del, getBlob } from './http';
+import { post, del } from './http';
 
 export interface QRCodeRequest {
   nodeId?: string;
@@ -39,13 +39,6 @@ export const generateQRCode = async (request: QRCodeRequest): Promise<QRCodeResp
 };
 
 /**
- * Download QR code file
- */
-export const downloadQRCode = async (filename: string): Promise<Blob> => {
-  return getBlob(`/api/qr/download/${encodeURIComponent(filename)}`);
-};
-
-/**
  * Delete QR code file
  */
 export const deleteQRCode = async (buildingId: string, qrUrl: string) => {
@@ -64,14 +57,3 @@ export const deleteQRCode = async (buildingId: string, qrUrl: string) => {
 /**
  * Download QR code as file
  */
-export const downloadQRCodeAsFile = async (filename: string, nodeName: string): Promise<void> => {
-  const blob = await downloadQRCode(filename);
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `qr-code-${nodeName.replace(/\s+/g, '-').toLowerCase()}-${filename}`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  window.URL.revokeObjectURL(url);
-};

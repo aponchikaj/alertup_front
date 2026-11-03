@@ -238,9 +238,10 @@ describe("createBuildingChannel() realtime hardening", () => {
     expect(channel.status()).toBe("degraded");
     expect(first.closed).toBe(true);
     // Staleness re-syncs from the snapshot endpoint so state is not lost.
+    // D15: the status document is public and briefly cacheable, so it is
+    // fetched WITHOUT credentials (a CDN can then serve it to everyone).
     expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/emergency/buildings/"),
-      expect.objectContaining({ credentials: "include" })
+      expect.stringContaining("/api/emergency/buildings/")
     );
 
     // The dropped socket is gone for good: recovery can only come from the
@@ -403,8 +404,7 @@ describe("createBuildingChannel() realtime hardening", () => {
     es.dispatch("heartbeat", { seq: 50, serverTime: "2026-09-25T00:00:00.000Z" });
 
     expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/emergency/buildings/"),
-      expect.objectContaining({ credentials: "include" })
+      expect.stringContaining("/api/emergency/buildings/")
     );
 
     // A reconnect must resume from the last real frame id we actually
@@ -453,8 +453,7 @@ describe("createBuildingChannel() realtime hardening", () => {
     // the client must rebuild from a fresh snapshot rather than assume it
     // is caught up.
     expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/emergency/buildings/"),
-      expect.objectContaining({ credentials: "include" })
+      expect.stringContaining("/api/emergency/buildings/")
     );
     expect(events).toEqual([
       { type: "resync_required", data: { reason: "backlog_truncated", atSeq: 120 } },
@@ -464,6 +463,26 @@ describe("createBuildingChannel() realtime hardening", () => {
     // failure, so resync must not tear the connection down.
     expect(es.closed).toBe(false);
     expect(channel.status()).toBe("open");
+
+    channel.close();
+  });
+
+  // D15 (research 004): a full building evicts the oldest stream of the IP
+  // holding the most slots and tells it `reason: "capacity"`. That client must
+  // move to polling and NOT reconnect straight away — two evicted phones
+  // reconnecting at once would just keep evicting each other.
+  it("falls back to polling, without reconnecting, when evicted for capacity", () => {
+    const channel = createBuildingChannel(nextBuildingId());
+    const es = FakeEventSource.last;
+    es.open();
+    const before = FakeEventSource.instances.length;
+
+    es.dispatch("resync_required", { reason: "capacity" });
+
+    expect(es.closed).toBe(true);
+    expect(channel.status()).toBe("degraded");
+    jest.advanceTimersByTime(60_000);
+    expect(FakeEventSource.instances.length).toBe(before);
 
     channel.close();
   });

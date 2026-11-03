@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { safeNextPath } from "../../lib/safeNext";
 import { useAuth } from "../../auth/useAuth";
 import { LoginUser, Login2faUser } from "../../apis/auth";
 import { errorMessage } from "../../apis/http";
@@ -38,6 +39,7 @@ const AuthFooterLinks = () => (
 const Login = () => {
   const rootRef = usePageAnimations();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   // The auth context reads /api/me once on mount. Signing in changes the
   // answer, so it has to be told — without this the session cookie is set but
   // the whole app still renders as a guest until a hard reload.
@@ -83,7 +85,7 @@ const Login = () => {
       if (res.token) localStorage.setItem("userToken", res.token);
 
       await refresh();
-      navigate("/dashboard", { replace: true });
+      navigate(safeNextPath(searchParams.get("next")), { replace: true });
     } catch (err: unknown) {
       setServerError(errorMessage(err, "Something went wrong."));
     } finally {
@@ -113,7 +115,7 @@ const Login = () => {
       if (res.token) localStorage.setItem("userToken", res.token);
 
       await refresh();
-      navigate("/dashboard", { replace: true });
+      navigate(safeNextPath(searchParams.get("next")), { replace: true });
     } catch (err: unknown) {
       setServerError(errorMessage(err, "Something went wrong."));
     } finally {
