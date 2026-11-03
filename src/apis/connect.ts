@@ -12,8 +12,6 @@ export const ConnectApis = async () => {
         if (!res) return { Success: false, Message: 'Something went wrong.' };
         return res;
     } catch (error) {
-        console.error("ConnectApis error:", error);
-
         if (error instanceof ApiError) {
             // status 0 means the request never got a response (timeout / network)
             if (error.status === 0) return { Success: false, Message: error.message };

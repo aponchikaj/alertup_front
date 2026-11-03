@@ -3,12 +3,10 @@ import { Link } from "react-router-dom";
 import Scanner from "../components/qr/Scanner";
 import ProductAiWidget from "../components/ai/ProductAiWidget";
 import AiDemo from "../components/ai/AiDemo";
-import Sponsors from "../components/marketing/Sponsors";
 import Reviews from "../components/marketing/Reviews";
 import { ContactAPI } from "../apis/contact";
 import { getMe } from "../apis/me";
 import Seo from "../seo/Seo";
-import LightRays from "../components/ui/lightRays";
 // FAQ and HOW_TO drive the visible sections further down the page; the JSON-LD
 // builders read the same data so the markup can never drift from the copy.
 import { FAQ, HOW_TO } from "../seo/seo.config";
@@ -193,24 +191,13 @@ const Home = () => {
       <ProductAiWidget />
 
       {/* ================= HERO =================
-          Follows the theme. Light rays are emitted light — they only read as
-          rays against a dark surface, and forcing the hero dark in light mode
-          just looked broken. So dark mode gets the rays; light mode gets the
-          floor-plan grid it always had. */}
+          Follows the theme: the floor-plan grid sits under both, softened in
+          dark mode, with a brand glow behind the scanner column in light mode.
+
+          The animated WebGL light rays that used to sit here in dark mode are
+          gone. They were emitted light on a dark ground — decoration, and this
+          product reserves visual energy for the emergency register. */}
       <section className="relative overflow-hidden bg-canvas">
-        {isDark ? (
-          <LightRays
-            raysOrigin="top-center"
-            raysColor="#ffffff"
-            raysSpeed={0.9}
-            lightSpread={0.6}
-            rayLength={2.4}
-            followMouse
-            mouseInfluence={0.08}
-            saturation={0}
-            fadeDistance={1.1}
-          />
-        ) : null}
         <div
           className={cn(
             "bg-grid pointer-events-none absolute inset-0",
@@ -519,13 +506,10 @@ const Home = () => {
       </Section>
 
       {/* ================= SOCIAL PROOF ================= */}
-      {/* Deliberately unnamed: <Sponsors /> and <Reviews /> each bring their
-          own heading, so labelling the wrapper would only duplicate them. */}
+      {/* Deliberately unnamed: <Reviews /> brings its own heading, so
+          labelling the wrapper would only duplicate it. */}
       <Section tone="subtle">
-        <Container className="flex flex-col items-center gap-12">
-          <div data-reveal>
-            <Sponsors align="center" />
-          </div>
+        <Container className="flex flex-col items-center">
           <div data-reveal className="flex w-full justify-center">
             <Reviews />
           </div>

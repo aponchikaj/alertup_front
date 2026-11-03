@@ -86,6 +86,66 @@ describe('buildRouteScene', () => {
     expect(f2.elevation).toBe(PITCH);
   });
 
+  test('floor route specs use the smoothed segment.points when present', () => {
+    const withPoints: AssembledRoute = {
+      ...route,
+      segments: [
+        {
+          ...route.segments[0],
+          points: [
+            { x: 100, y: 100 },
+            { x: 250, y: 130 },
+            { x: 400, y: 100 },
+          ],
+        },
+        route.segments[1],
+      ],
+    };
+    const { spec } = buildRouteScene({ route: withPoints, activeStepIndex: 0 });
+    expect(spec.floors[0].routes[0].points).toEqual([
+      { x: 100, y: 100 },
+      { x: 250, y: 130 },
+      { x: 400, y: 100 },
+    ]);
+  });
+
+  test('a floor revisited by a second segment also prefers its smoothed points', () => {
+    const revisit: AssembledRoute = {
+      ...route,
+      segments: [
+        route.segments[0],
+        {
+          index: 1,
+          floor: floor('f1', 1),
+          nodes: [
+            { id: 'e', x: 100, y: 300, type: 'NORMAL', label: null },
+            { id: 'f', x: 400, y: 300, type: 'NORMAL', label: null },
+          ],
+          points: [
+            { x: 100, y: 300 },
+            { x: 250, y: 330 },
+            { x: 400, y: 300 },
+          ],
+          distancePx: 300,
+          distanceMeters: 6,
+        },
+      ],
+      transitions: [],
+      steps: [
+        { kind: 'walk', segmentIndex: 0 },
+        { kind: 'walk', segmentIndex: 1 },
+        { kind: 'arrive' },
+      ],
+    };
+    const { spec } = buildRouteScene({ route: revisit, activeStepIndex: 0 });
+    expect(spec.floors).toHaveLength(1);
+    expect(spec.floors[0].routes[1].points).toEqual([
+      { x: 100, y: 300 },
+      { x: 250, y: 330 },
+      { x: 400, y: 300 },
+    ]);
+  });
+
   test('the transition becomes a connector between the transit nodes', () => {
     const { spec } = buildRouteScene({ route, activeStepIndex: 1 });
     expect(spec.connectors).toHaveLength(1);

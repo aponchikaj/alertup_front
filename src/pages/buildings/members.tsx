@@ -45,7 +45,7 @@ import { Select } from "../../components/ui/select";
 import { DataTable, type Column } from "../../components/ui/table";
 import { Tab, TabList, TabPanel, Tabs } from "../../components/ui/tabs";
 import { ConfirmDialog } from "../../components/ui/confirmDialog";
-import { useToast } from "../../components/ui/toast";
+import { useToast } from "../../components/ui/toastContext";
 import {
   AlertTriangleIcon,
   MailIcon,

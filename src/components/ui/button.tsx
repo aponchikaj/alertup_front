@@ -55,7 +55,14 @@ export interface ButtonLinkProps
     Omit<LinkProps, "className" | "children"> {}
 
 /** Router link that wears the button skin. Stays an anchor, so middle-click,
- *  "open in new tab" and copy-link all keep working. */
+ *  "open in new tab" and copy-link all keep working.
+ *
+ *  `data-button` is load-bearing, not decorative: `typography.css` sets
+ *  `a:not([data-button]) { color: var(--accent-text) }` at specificity
+ *  (0,1,1), which beats a `text-accent-ink` utility class at (0,1,0). Without
+ *  this attribute every button-styled anchor keeps the plain-link colour
+ *  underneath its button background — button blue text on button blue fill,
+ *  ~1.2:1, on every primary `ButtonLink` in the app. */
 export const ButtonLink = ({
   variant,
   size,
@@ -64,7 +71,11 @@ export const ButtonLink = ({
   children,
   ...props
 }: ButtonLinkProps) => (
-  <Link className={buttonStyles({ variant, size, fullWidth, className })} {...props}>
+  <Link
+    data-button
+    className={buttonStyles({ variant, size, fullWidth, className })}
+    {...props}
+  >
     {children}
   </Link>
 );

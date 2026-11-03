@@ -257,10 +257,6 @@ export const en = {
     thankYouBody: "Your feedback goes straight to the person building this.",
   },
 
-  sponsors: {
-    trustedBy: "Trusted by",
-  },
-
   dashboard: {
     title: "Your dashboard",
     lead: "Your buildings, their maps and how often people are using them.",
@@ -302,6 +298,8 @@ export const en = {
     myTitle: "My buildings",
     myLead: "Every building you manage, with its floors, maps and scan activity.",
     emptyTitle: "No buildings yet",
+    sharedWithMe: "Shared with me",
+    sharedWithMeLead: "Buildings you were invited to. What you can do in each depends on your role.",
     emptyLead: "Add your first building to start mapping its floors and printing codes.",
     deactivate: "Deactivate",
     deactivateConfirm: "Deactivate this building? Its codes will stop resolving.",
@@ -468,6 +466,9 @@ export const en = {
     unavailableBody: "Use the destination search to find your way instead.",
     unavailableCta: "Open search",
     retry: "Try again",
+    searching: "Looking it up…",
+    showRoute: "Show me the route",
+    routeDrawn: "Route drawn on the map.",
     chips: {
       nearestExit: "Nearest exit",
       nearestRestroom: "Nearest restroom",
@@ -546,6 +547,7 @@ export const en = {
     messagePlaceholder: "e.g. Fire on level 2 — use the north stairs",
     liveLog: "Live activity",
     liveLogEmpty: "No activity yet.",
+    connectionLost: "Connection lost — showing the last known route.",
   },
 
   emergencyChallenge: {
@@ -592,6 +594,26 @@ export const en = {
     startOver: "Start over",
     barometerPrompt: "Looks like you changed floors. Are you on floor {floor}?",
     barometerConfirm: "Yes, I'm here",
+    eta: "{minutes} min",
+    distanceAndEta: "{meters} m · {minutes} min",
+    remaining: "{distance} left",
+    remainingTime: "about {minutes} min left",
+    profileLabel: "Route preference",
+    profileWalk: "Fastest",
+    profileElevatorFirst: "Prefer elevators",
+    profileMinFloorChanges: "Fewest floor changes",
+    warningsTitle: "Heads-up",
+    alternativeExits: "Other exits",
+    segmentNotAccessible: "Not step-free",
+    landmark: "{name} on your {side}",
+    sideLeft: "left",
+    sideRight: "right",
+    useCompass: "Use compass",
+    compassDenied: "Compass access was declined.",
+    facing: "Facing {deg}°",
+    closuresTitle: "Route adjusted for closures",
+    closureUntil: "{reason} — until {time}",
+    closureReasonUnknown: "Temporary closure",
   },
 
   qr: {
@@ -666,6 +688,16 @@ export const en = {
     deleteEdgeConfirm: "This removes the connection between the two points.",
     edgeWeightHint: "Leave empty to use the measured distance.",
     edgeWeightInvalid: "Must be a positive number.",
+    edgeDirection: "Direction",
+    edgeDirectionBoth: "Both ways",
+    // Spelled out rather than "{from} → {to}": an <option>'s text is the one
+    // place aria-hidden cannot reach, and a screen reader either says
+    // "right arrow" or skips the glyph, leaving the operator guessing which
+    // end "forward" points at.
+    edgeDirectionForward: "One way: {from} to {to}",
+    edgeEndpoints: "{from} and {to}",
+    edgeTags: "Tags",
+    edgeTagsHint: "Press Enter to add, e.g. outdoor, narrow.",
     autoConnect: "Auto-connect",
     autoConnectFloor: "Auto-connect floor",
     autoConnectFloorHint: "Wire every node on this floor into one walkable graph. Drawn walls block connections.",
@@ -689,12 +721,64 @@ export const en = {
     poiDescription: "Description",
     poiKeywords: "Search keywords",
     poiKeywordsHint: "Press Enter to add. Shoppers can search these.",
+    poiExternalId: "Printed code",
+    poiExternalIdHint: "Visitors can route to it with ext:CODE.",
+    poiAliases: "Also known as",
     savePoi: "Save shop",
     removePoi: "Remove shop details",
     generateQr: "QR code",
     validation: "Checks",
     validationPassed: "No problems found.",
     validationRun: "Re-run checks",
+
+    // Closures — a corridor shut for an incident. `closureBlocked` /
+    // `closureSlowed` / `closureEffect` / `closureSlowFactor` are additions to
+    // the task brief's key list: `costMultiplier: null` means BLOCKED on the
+    // wire, so the difference between "shut" and "penalised" has to be a
+    // labelled choice the operator makes, never a silent form default.
+    closures: "Closures",
+    closuresEmpty: "No active closures.",
+    closureAdd: "Add closure",
+    closurePickEdges: "Tap connections on the map, or tick them in the list below.",
+    closureSelectedCount: "{count} connections selected",
+    closureSelectedCountOne: "1 connection selected",
+
+    // The keyboard path. Edge picking shipped as a map gesture only, and
+    // EdgeLayer's edges are bare SVG lines with no tabIndex and no role, so
+    // without this list a keyboard-only operator can fill in every field of a
+    // closure and never enable Save.
+    closureEdgeList: "Connections on this floor",
+    closureEdgeSearch: "Find a connection",
+    closureEdgeSearchHint: "Type part of the name at either end.",
+    closureEdgeOption: "{from} to {to}",
+    // Distinct from `closureEdgeNone`: this floor has zero connections, full
+    // stop — a search box the operator has not touched yet would otherwise be
+    // blamed for an empty list it never filtered.
+    closureEdgeEmpty: "This floor has no connections yet.",
+    closureEdgeNone: "No connections match that search.",
+    closureEdgeMore: "Showing {shown} of {total}. Narrow the search to reach the rest.",
+    // The search-results live region (F15 item 3). Distinct from
+    // `closureEdgeNone`/`closureEdgeMore`, which are the VISIBLE strings —
+    // this is what a screen reader hears as the query narrows, so it stays
+    // silent until there is a query to report on.
+    closureEdgeSearchCountOne: "1 connection found",
+    closureEdgeSearchCount: "{count} connections found",
+    closureEdgeHighlighted: "In the closure being drafted",
+    closureReason: "Reason",
+    closureDuration: "Duration",
+    closureHours: "{hours} h",
+    closureCustom: "Custom",
+    closureEndsIn: "Ends {time}",
+    closureDelete: "Remove closure",
+    closureDeleteConfirm: "This reopens the connections immediately.",
+    closureSaved: "Closure saved",
+    closureAddEdge: "Add to closure",
+    closureEffect: "Effect",
+    closureBlocked: "Block completely",
+    closureSlowed: "Slow down",
+    closureSlowFactor: "Slow-down factor",
+    closureSlowFactorOption: "{factor}× slower",
+
     pickTransitTarget: "Now pick the matching node on another floor.",
     cancelHint: "Press Escape to cancel.",
     unsaved: "Saving…",
@@ -771,6 +855,46 @@ export const en = {
     iconInfo: "Information",
   },
 
+  analystAi: {
+    title: "Ask about this building",
+    launcher: "Ask AI",
+    lead: "Questions about how this building is actually used, and how its emergencies went.",
+    placeholder: "e.g. Which entrance is busiest?",
+    send: "Send",
+    stop: "Stop",
+    thinking: "Looking at your data…",
+    checking: "Reading {tool}…",
+    empty: "Ask a question and I will read the scan and emergency records.",
+    retry: "Try again",
+    unavailableTitle: "Assistant unavailable",
+    unavailableBody: "The assistant could not be reached. The charts and tables on this page are the underlying data and still work.",
+    unavailableCta: "Reload the report",
+    disclaimer: "Answers come from this building's own records. Scans only exist where a QR code was scanned.",
+    s1: "Which entrance is busiest?",
+    s2: "How did our last emergency go?",
+    s3: "Is scanning going up or down?",
+  },
+  auditAi: {
+    title: "Safety Auditor",
+    launcher: "Audit",
+    lead: "Checks this building's routing graph the way evacuation routing will, and explains what to fix first.",
+    placeholder: "e.g. Is this building ready for visitors?",
+    send: "Send",
+    stop: "Stop",
+    thinking: "Checking your building…",
+    checking: "Checking {tool}…",
+    empty: "Ask for a safety check and I will look at every floor.",
+    retry: "Try again",
+    unavailableTitle: "Auditor unavailable",
+    unavailableBody: "The assistant could not be reached. The validation check in the panel still works and is the source of truth.",
+    unavailableCta: "Run validation",
+    action_auto_connect_floor: "Connect this floor",
+    actionDone: "Connected — press Ctrl+Z to undo.",
+    disclaimer: "The auditor explains the validation report. The report itself is what decides.",
+    s1: "Is this building ready for visitors?",
+    s2: "What would break evacuation routing here?",
+    s3: "Which floor needs work first?",
+  },
   editorAi: {
     title: "AI floor designer",
     launcher: "AI",

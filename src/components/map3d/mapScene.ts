@@ -3,8 +3,8 @@
    ----------------------------------------------------------------------------
    Owns the renderer, scene graph, camera rig, and the render-on-demand loop:
    frames are drawn only while the camera is settling, an animation is live,
-   or something changed — an idle 3D map costs ~zero CPU. Follows the
-   lightRays.tsx lifecycle rules: dpr ≤ 2, quiet context-loss handling,
+   or something changed — an idle 3D map costs ~zero CPU. Follows our WebGL
+   lifecycle rules: dpr ≤ 2, quiet context-loss handling,
    loseContext() on dispose.
    ========================================================================= */
 

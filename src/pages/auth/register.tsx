@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { safeNextPath } from "../../lib/safeNext";
 import { useAuth } from "../../auth/useAuth";
 import Seo from "../../seo/Seo";
 import { breadcrumbJsonLd } from "../../seo/structuredData";
@@ -18,6 +19,7 @@ const Register = () => {
 
   const rootRef = usePageAnimations();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   // Registration signs the user straight in, so the auth context must be
   // re-read before navigating or the app renders them as a guest.
   const { refresh } = useAuth();
@@ -64,7 +66,6 @@ const Register = () => {
   const handleSubmit = async () => {
     setServerError("");
     setLoading(true);
-    console.log(newUserData)
 
     if (newUserData.password !== repeatPassword) {
       setServerError("Passwords do not match");
@@ -85,7 +86,6 @@ const Register = () => {
 
     try {
       const res = await RegisterUser(newUserData);
-      console.log(res)
       if (!res) {
         setServerError("Something went wrong.");
         setLoading(false);
@@ -98,7 +98,7 @@ const Register = () => {
       }
 
       await refresh();
-      navigate("/dashboard", { replace: true });
+      navigate(safeNextPath(searchParams.get("next")), { replace: true });
     } catch {
       setServerError("Something went wrong.");
     } finally {

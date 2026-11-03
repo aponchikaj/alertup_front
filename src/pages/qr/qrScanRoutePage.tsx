@@ -24,13 +24,15 @@ import {
 import { EmergencyProvider } from '../../emergency/EmergencyProvider';
 import { useEmergency } from '../../emergency/useEmergency';
 import { EmergencyOverlay } from '../../components/emergency/EmergencyOverlay';
+import { fetchEvacuationBrief } from '../../apis/evacuationApi';
 import { EmergencyBanner } from '../../components/emergency/EmergencyBanner';
 import { WayfindingPanel } from '../../components/wayfinding/WayfindingPanel';
 import { parseDrawing, isDrawingEmpty } from '../../components/map/drawing';
 import { DirectoryPanel } from './DirectoryPanel';
 import { fetchDirectory, type DirectoryEntry } from '../../apis/wayfindingApi';
-import { AiChatLauncher } from '../../components/ai/AiChatLauncher';
+import { WayfinderAgentLauncher } from '../../components/ai/WayfinderAgentLauncher';
 import { useI18n } from '../../i18n/LanguageProvider';
+import { formatDistanceAndEta } from '../../lib/format';
 
 interface FloorNode {
   id: string;
@@ -120,15 +122,63 @@ interface RouteData {
  * appears the instant an emergency is reported — the scan payload seeds the
  * provider, so it paints on first render rather than waiting for the stream.
  */
-const EmergencyLayer: React.FC<{ onShowExitRoute: () => void }> = ({
-  onShowExitRoute,
-}) => {
+const EmergencyLayer: React.FC<{
+  onShowExitRoute: () => void;
+  buildingId: string;
+  nodeId: string;
+}> = ({ onShowExitRoute, buildingId, nodeId }) => {
   const emergency = useEmergency();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const [brief, setBrief] = useState<string | null>(null);
+  const phase = emergency?.phase;
+
+  // Fetched once the emergency starts, never blocking: the overlay is already
+  // on screen with the route button and the instructions. If this never
+  // arrives, nothing about the alert is missing.
+  useEffect(() => {
+    if (phase !== 'emergency' || !buildingId || !nodeId) return;
+    const controller = new AbortController();
+    void fetchEvacuationBrief({
+      buildingId,
+      nodeId,
+      locale: lang === 'ka' ? 'ka' : 'en',
+      signal: controller.signal,
+    }).then((result) => {
+      if (!controller.signal.aborted && result?.text) setBrief(result.text);
+    });
+    return () => controller.abort();
+  }, [phase, buildingId, nodeId, lang]);
+
   if (!emergency) return null;
+
+  // A degraded channel can mean the SSE feed silently died or fell back to
+  // polling — either way the surface stays the same, gated to when it
+  // actually matters: mid-evacuation, not during everyday wayfinding.
+  const isActiveEmergency =
+    emergency.phase === 'emergency' || emergency.phase === 'bypassed';
 
   return (
     <>
+      {/* The region is permanent; only its contents come and go.
+          A screen reader announces changes INSIDE a live region it was already
+          watching — mounting the whole role=status alert at the moment the
+          channel dies is the one case where it may announce nothing at all,
+          and the person who needs to know the route has stopped updating is
+          exactly the person who would never be told. The Alert inside opts out
+          of being its own region so the two do not nest. */}
+      <div
+        data-testid="connection-status"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {emergency.connection === 'degraded' && isActiveEmergency ? (
+          <Alert tone="warning" live={false} className="mb-4">
+            {t('emergency.connectionLost')}
+          </Alert>
+        ) : null}
+      </div>
+
       {emergency.phase === 'bypassed' ? (
         <EmergencyBanner onViewRoute={onShowExitRoute} />
       ) : null}
@@ -155,6 +205,7 @@ const EmergencyLayer: React.FC<{ onShowExitRoute: () => void }> = ({
           emergency.bypass();
         }}
         onBypass={emergency.bypass}
+        brief={brief}
       />
     </>
   );
@@ -232,17 +283,36 @@ const RouteHeader: React.FC<{ buildingName: string; floorNumber: number }> = ({
   );
 };
 
-/** Hides the AI launcher while the emergency overlay is demanding attention. */
-const AiLayer: React.FC<{ buildingId: string; nodeId: string; locale: 'en' | 'ka' }> = ({
-  buildingId,
-  nodeId,
-  locale,
-}) => {
+/**
+ * Wraps WayfindingPanel so it can read `closureVersion` off the same
+ * EmergencyProvider the rest of the page shares — WayfindingPanel itself
+ * knows nothing about emergencies, closures, or realtime, it just accepts a
+ * token to refetch on.
+ */
+const RouteWayfindingSlot: React.FC<
+  Omit<React.ComponentProps<typeof WayfindingPanel>, 'refetchToken'>
+> = (props) => {
   const emergency = useEmergency();
+  return <WayfindingPanel {...props} refetchToken={emergency?.closureVersion} />;
+};
+
+/** Hides the AI launcher while the emergency overlay is demanding attention. */
+const AiLayer: React.FC<{
+  buildingId: string;
+  nodeId: string;
+  onShowRoute: (selection: { poiId?: string; nodeId?: string; name: string }) => void;
+}> = ({ buildingId, nodeId, onShowRoute }) => {
+  const emergency = useEmergency();
+  // Unmounted, not hidden, during an emergency: an evacuating person should not
+  // be typing, and this also drops any open drawer rather than leaving it
+  // parked behind the overlay. The overlay carries the grounded brief instead.
+  if (emergency?.phase === 'emergency') return null;
+
   return (
-    <AiChatLauncher
-      hidden={emergency?.phase === 'emergency'}
-      context={{ buildingId, nodeId, locale }}
+    <WayfinderAgentLauncher
+      buildingId={buildingId}
+      nodeId={nodeId}
+      onShowRoute={onShowRoute}
     />
   );
 };
@@ -250,7 +320,7 @@ const AiLayer: React.FC<{ buildingId: string; nodeId: string; locale: 'en' | 'ka
 const QRScanRoutePageFixed: React.FC = () => {
   const { qrId } = useParams<{ qrId: string }>();
   const rootRef = usePageAnimations();
-  const { lang, t } = useI18n();
+  const { t, lang } = useI18n();
 
   // Held in a ref so the fetch effect keeps its empty dependency list. Listing
   // `t` there would re-run the scan request — and flash the loading screen —
@@ -385,8 +455,6 @@ const QRScanRoutePageFixed: React.FC = () => {
         setError(response.message || tRef.current('route.loadFailed'));
       }
     } catch (err: unknown) {
-      console.error('Error fetching route data:', err);
-
       if (err instanceof ApiError) {
         if (err.status === 404) {
           setError(tRef.current('route.qrNotFound'));
@@ -542,7 +610,11 @@ const QRScanRoutePageFixed: React.FC = () => {
       }
     >
     <div ref={rootRef}>
-      <EmergencyLayer onShowExitRoute={requestEvacuation} />
+      <EmergencyLayer
+        onShowExitRoute={requestEvacuation}
+        buildingId={routeData.buildingId}
+        nodeId={routeData.nodeId}
+      />
       <PageShell width="wide">
         {/* Header — the only animated element; route content below renders
             instantly, nothing safety-critical waits on an animation. */}
@@ -564,7 +636,7 @@ const QRScanRoutePageFixed: React.FC = () => {
             destination is picked (search box, tapped marker, or the emergency
             overlay), then the route view in the same place. */}
         <Card id="scan-map" className="mt-8 scroll-mt-24 p-5 sm:p-6">
-          <WayfindingPanel
+          <RouteWayfindingSlot
             buildingId={routeData.buildingId}
             originNodeId={routeData.nodeId}
             originFloorNumber={Number(routeData.floorNumber)}
@@ -652,13 +724,23 @@ const QRScanRoutePageFixed: React.FC = () => {
                         t('route.emergencyExit')}
                       <span className="font-normal text-ink-muted">
                         {' · '}
-                        {routeData.route?.totalDistanceMeters != null
-                          ? t('wayfinding.distanceMeters', {
-                              meters: routeData.route.totalDistanceMeters,
-                            })
-                          : t('route.steps', {
-                              count: routeData.emergencyRoute.distance,
-                            })}
+                        {/* "How far and how long" beats "how far" when the
+                            building is on fire. Falls back through metres to
+                            the legacy hop count. */}
+                        {routeData.route?.totalDistanceM != null &&
+                        routeData.route.totalDurationSec != null
+                          ? formatDistanceAndEta(
+                              routeData.route.totalDistanceM,
+                              routeData.route.totalDurationSec,
+                              lang,
+                            )
+                          : routeData.route?.totalDistanceMeters != null
+                            ? t('wayfinding.distanceMeters', {
+                                meters: routeData.route.totalDistanceMeters,
+                              })
+                            : t('route.steps', {
+                                count: routeData.emergencyRoute.distance,
+                              })}
                       </span>
                     </p>
                   </div>
@@ -684,7 +766,11 @@ const QRScanRoutePageFixed: React.FC = () => {
       <AiLayer
         buildingId={routeData.buildingId}
         nodeId={routeData.nodeId}
-        locale={lang}
+        // The agent names a destination and the existing selection plumbing
+        // draws it — the same path the search box and a tapped marker use.
+        onShowRoute={({ poiId, nodeId: targetNodeId, name }) =>
+          pushSelection({ kind: 'poi', poiId, nodeId: targetNodeId, name })
+        }
       />
     </div>
     </EmergencyProvider>

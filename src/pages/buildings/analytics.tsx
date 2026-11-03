@@ -7,6 +7,7 @@ import { Link, useParams } from "react-router-dom"
 import { GET_BUILDING_ANALYTICS } from "../../apis/administration"
 import { usePageAnimations } from "../../lib/animations"
 import { PageHeader, PageShell } from "../../components/ui/layout"
+import { AgentChatPanel } from "../../components/ai/AgentChatPanel"
 import { Button } from "../../components/ui/button"
 import { Card } from "../../components/ui/card"
 import { Alert, EmptyState, Skeleton } from "../../components/ui/feedback"
@@ -39,6 +40,7 @@ interface EMERGENCY_SCHEMA {
 export default function AnalyticsPage(){
 
     const {buildingId} = useParams()
+    const [askOpen, setAskOpen] = useState(false)
     const rootRef = usePageAnimations()
     const { t } = useI18n()
 
@@ -135,7 +137,29 @@ export default function AnalyticsPage(){
                             title={t("buildings.analytics")}
                             description={t("buildings.analyticsPickLead")}
                         />
+                        {/* The charts are the data; the assistant explains
+                            them. Offered beside the report, never instead. */}
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            className="mt-3"
+                            onClick={() => setAskOpen(true)}
+                        >
+                            <ChartIcon size={16} />
+                            {t("analystAi.launcher")}
+                        </Button>
                     </div>
+
+                    {buildingId ? (
+                        <AgentChatPanel
+                            open={askOpen}
+                            onClose={() => setAskOpen(false)}
+                            agentId="analyst"
+                            namespace="analystAi"
+                            buildingId={buildingId}
+                            onFallbackAction={getAnalytics}
+                        />
+                    ) : null}
 
                     {
                         EMERGENCIES && (<>

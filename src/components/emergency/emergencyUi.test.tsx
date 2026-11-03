@@ -16,6 +16,37 @@ describe("EmergencyOverlay", () => {
     expect(screen.queryByTestId("emergency-overlay")).not.toBeInTheDocument();
   });
 
+  test("shows the evacuation brief when one is supplied", () => {
+    renderWithI18n(
+      <EmergencyOverlay
+        open
+        brief="Nearest exit: North Exit, floor 1, about 40 m."
+        onShowRoute={jest.fn()}
+        onBypass={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("evacuation-brief")).toHaveTextContent("North Exit");
+  });
+
+  test("renders no brief slot when none arrived — it is best-effort", () => {
+    renderWithI18n(
+      <EmergencyOverlay open onShowRoute={jest.fn()} onBypass={jest.fn()} />,
+    );
+
+    expect(screen.queryByTestId("evacuation-brief")).not.toBeInTheDocument();
+    // The alert itself is complete without it.
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+  });
+
+  test("an empty brief is treated as no brief", () => {
+    renderWithI18n(
+      <EmergencyOverlay open brief="   " onShowRoute={jest.fn()} onBypass={jest.fn()} />,
+    );
+
+    expect(screen.queryByTestId("evacuation-brief")).not.toBeInTheDocument();
+  });
+
   test("announces itself as an alert dialog and shows the building message", () => {
     renderWithI18n(
       <EmergencyOverlay
@@ -78,13 +109,22 @@ describe("EmergencyBanner", () => {
     renderWithI18n(<EmergencyBanner onViewRoute={onViewRoute} />);
 
     const banner = screen.getByTestId("emergency-banner");
-    expect(banner).toHaveAttribute("role", "status");
+    expect(banner).toHaveAttribute("role", "alert");
     expect(screen.getByText(en.emergency.bannerText)).toBeInTheDocument();
 
     await userEvent.click(
       screen.getByRole("button", { name: en.emergency.bannerAction }),
     );
     expect(onViewRoute).toHaveBeenCalledTimes(1);
+  });
+
+  test("announces assertively — a life-safety alert must not wait for a pause", () => {
+    renderWithI18n(<EmergencyBanner />);
+    const banner = screen.getByTestId("emergency-banner");
+    // `polite` makes a screen reader hold the announcement until the user
+    // pauses. The building is on fire; it does not wait for a gap.
+    expect(banner).toHaveAttribute("role", "alert");
+    expect(banner).toHaveAttribute("aria-live", "assertive");
   });
 
   test("renders without an action when none is supplied", () => {

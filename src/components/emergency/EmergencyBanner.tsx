@@ -1,4 +1,4 @@
-import { AlertTriangleIcon } from "../ui/icons";
+import { EvacuateIcon } from "../ui/safetyIcons";
 import { Button } from "../ui/button";
 import { useI18n } from "../../i18n/LanguageProvider";
 import { cn } from "../../lib/cn";
@@ -21,17 +21,20 @@ export const EmergencyBanner = ({ onViewRoute, className }: EmergencyBannerProps
   const { t } = useI18n();
 
   return (
+    // `alert`/`assertive`, not `status`/`polite`: polite makes a screen reader
+    // hold the announcement until the user pauses. For a banner that means
+    // "the building is still in an emergency", waiting for a gap is wrong.
     <div
-      role="status"
-      aria-live="polite"
+      role="alert"
+      aria-live="assertive"
       data-testid="emergency-banner"
       className={cn(
-        "sticky top-0 z-50 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-danger px-4 py-2 text-center text-danger-ink",
+        "sticky top-0 z-50 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-alarm px-4 py-3 text-center text-alarm-ink",
         className,
       )}
     >
       <span className="inline-flex items-center gap-2 text-sm font-bold tracking-wide">
-        <AlertTriangleIcon className="size-4 shrink-0" aria-hidden="true" />
+        <EvacuateIcon title="" size={17} className="shrink-0" />
         {t("emergency.bannerText")}
       </span>
       {onViewRoute ? (
@@ -39,7 +42,7 @@ export const EmergencyBanner = ({ onViewRoute, className }: EmergencyBannerProps
           variant="ghost"
           size="sm"
           onClick={onViewRoute}
-          className="text-danger-ink underline underline-offset-2 hover:bg-white/10"
+          className="text-alarm-ink underline underline-offset-2 hover:bg-black/10"
         >
           {t("emergency.bannerAction")}
         </Button>

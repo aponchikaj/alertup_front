@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { deactivateBuilding, deleteBuilding, getMyBuildings } from "../../apis/building";
+import { errorMessage } from "../../apis/http";
 import { Link } from "react-router-dom";
 import { usePageAnimations } from "../../lib/animations";
 import { PageHeader, PageShell } from "../../components/ui/layout";
@@ -38,10 +39,20 @@ interface Building {
   isDeactivated: boolean;
 }
 
+/** A building someone else owns that this user was invited into. */
+interface MemberBuilding {
+  _id: string;
+  buildingName: string;
+  role: string;
+}
+
 const Mybuildings = () => {
   const rootRef = usePageAnimations();
   const { t } = useI18n();
   const [buildings, setBuildings] = useState<Building[]>([]);
+  // FX-023 (FE-12): the API already returned these; the page dropped them, so
+  // an invited member saw "No buildings yet".
+  const [memberBuildings, setMemberBuildings] = useState<MemberBuilding[]>([]);
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null); // track action per building
@@ -54,10 +65,14 @@ const Mybuildings = () => {
 
       try {
         const res = await getMyBuildings();
-        if (res.Success) setBuildings(res.Message);
+        if (res.Success) {
+          setBuildings(res.Message);
+          const shared = (res as { memberBuildings?: unknown }).memberBuildings;
+          setMemberBuildings(Array.isArray(shared) ? (shared as MemberBuilding[]) : []);
+        }
         else setServerError(res.Message || t("common.error"));
-      } catch (err: any) {
-        setServerError(err.message || t("common.error"));
+      } catch (err: unknown) {
+        setServerError(errorMessage(err, t("common.error")));
       } finally {
         setLoading(false);
       }
@@ -80,9 +95,8 @@ const Mybuildings = () => {
       } else {
         alert(res.Message || t("common.error"));
       }
-    } catch (err) {
-      console.error(err);
-      alert(t("common.error"));
+    } catch (err: unknown) {
+      alert(errorMessage(err, t("common.error")));
     } finally {
       setActionLoading(null);
     }
@@ -95,15 +109,13 @@ const Mybuildings = () => {
     try {
       setActionLoading(id);
       const res = await deleteBuilding(id);
-      console.log(res)
       if (res.Success) {
         setBuildings((prev) => prev.filter((b) => b._id !== id));
       } else {
         alert(res.Message || t("common.error"));
       }
-    } catch (err) {
-      console.error(err);
-      alert(t("common.error"));
+    } catch (err: unknown) {
+      alert(errorMessage(err, t("common.error")));
     } finally {
       setActionLoading(null);
     }
@@ -147,7 +159,7 @@ const Mybuildings = () => {
           </Alert>
         )}
 
-        {!loading && !serverError && buildings.length === 0 && (
+        {!loading && !serverError && buildings.length === 0 && memberBuildings.length === 0 && (
           <div className="pt-8">
             <EmptyState
               icon={<BuildingIcon size={24} />}
@@ -237,6 +249,37 @@ const Mybuildings = () => {
             </li>
           ))}
         </ul>
+
+        {memberBuildings.length > 0 && (
+          <section aria-labelledby="shared-buildings" className="pt-12">
+            <h2 id="shared-buildings" className="text-xl font-semibold text-ink">
+              {t("buildings.sharedWithMe")}
+            </h2>
+            <p className="mt-1 text-sm text-ink-muted">{t("buildings.sharedWithMeLead")}</p>
+            <ul className="grid list-none grid-cols-1 gap-6 pt-6 sm:grid-cols-2 lg:grid-cols-3">
+              {memberBuildings.map((b) => (
+                <li key={b._id} className="h-full">
+                  <Card interactive className="flex h-full flex-col gap-3 p-6">
+                    <Link
+                      to={`/building/${b._id}`}
+                      className="group flex flex-col gap-3 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-subtle text-brand-text">
+                          <BuildingIcon size={22} />
+                        </span>
+                        <Badge tone="neutral">{b.role}</Badge>
+                      </div>
+                      <h3 className="text-lg font-semibold text-ink group-hover:text-brand-text">
+                        {b.buildingName}
+                      </h3>
+                    </Link>
+                  </Card>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </PageShell>
     </div>
   );

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useLatestRef } from "../../lib/useLatestRef";
 import { streamChat, type AiChatMessage, type AiContext } from "../../apis/aiApi";
 
 /* ============================================================================
@@ -40,8 +41,7 @@ export function useAiChat(context: AiContext): UseAiChatResult {
   const bufferRef = useRef("");
   const frameRef = useRef<number | null>(null);
   const activeIdRef = useRef<string | null>(null);
-  const contextRef = useRef(context);
-  contextRef.current = context;
+  const contextRef = useLatestRef(context);
 
   const flush = useCallback(() => {
     frameRef.current = null;
@@ -136,7 +136,7 @@ export function useAiChat(context: AiContext): UseAiChatResult {
         controller.signal,
       );
     },
-    [messages, streaming, scheduleFlush, flush],
+    [messages, streaming, scheduleFlush, flush, contextRef],
   );
 
   const reset = useCallback(() => {

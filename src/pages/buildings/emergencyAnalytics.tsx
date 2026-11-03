@@ -56,7 +56,6 @@ export default function EmergencyAnalytics(){
         setServerError("")
         try{
             const res = await GET_EMERGENCY_DATA({buildingID:buildingId!,emergencyID:emergencyId!}) // filters unda
-            console.log(res)
             if(!res ) {
                 setServerError(t("common.error"))
                 setLoading(false)
@@ -83,7 +82,6 @@ export default function EmergencyAnalytics(){
             setLoading(true)
             try{
                 const res = await GET_EMERGENCY_DATA({buildingID:buildingId!,emergencyID:emergencyId!}) // filters unda
-                console.log(res)
                 if(!res ) {
                     setServerError(t("common.error"))
                     setLoading(false)

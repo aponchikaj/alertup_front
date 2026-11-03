@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { generateQRCode, downloadQRCodeAsFile, type QRCodeRequest } from '../../apis/qrApi';
+import { generateQRCode, type QRCodeRequest } from '../../apis/qrApi';
+import { downloadQrSvg } from '../../lib/qrDownload';
 import { buildScanUrl, type Node } from '../../apis/nodesApi';
 import { sanitizeSvg } from '../../lib/sanitizeSvg';
 import { cn } from '../../lib/cn';
@@ -158,9 +159,10 @@ const SimpleQRCodeDisplay = ({
   };
 
   const handleDownload = () => {
-    if (!qrData?.filename) return;
+    if (!qrData?.svgContent) return;
     try {
-      downloadQRCodeAsFile(qrData.filename, node.label || `${node.type}-node`);
+      // Saved straight from the markup already on screen (FX-020).
+      downloadQrSvg(qrData.svgContent, node.label || `${node.type}-node`);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('qr.downloadFailed'));
     }
@@ -284,7 +286,7 @@ const SimpleQRCodeDisplay = ({
                   <PrinterIcon size={18} />
                   {t('qr.print')}
                 </Button>
-                <Button variant="secondary" onClick={handleDownload} disabled={!qrData?.filename}>
+                <Button variant="secondary" onClick={handleDownload} disabled={!qrData?.svgContent}>
                   <DownloadIcon size={18} />
                   {t('qr.download')}
                 </Button>

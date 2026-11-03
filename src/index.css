@@ -1,418 +1,216 @@
 @import "tailwindcss";
+
 @import "./styles/tokens.css";
+@import "./styles/typography.css";
 
-/* Theme is driven by an explicit attribute on <html>, not the OS query, so the
-   in-app toggle can override the system preference. `system` mode writes the
-   resolved value onto the attribute. */
+/* Explicit theme attributes on <html>. Dark also follows the OS unless pinned.
+   Emergency is declared by the app; the OS has no opinion about it. */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+@custom-variant emergency (&:where([data-mode="emergency"], [data-mode="emergency"] *, .on-emergency, .on-emergency *));
 
 /* ============================================================================
-   Fonts — typeface.ge families with Georgian + Latin coverage.
-   All three custom faces are display cuts, so body/UI text stays on the
-   system stack for legibility: GL Tatishvili Metal is the heading face,
-   GL Kirovi an alternate display, and Dachi The Lynx a decorative accent
-   for brand moments only.
-   ========================================================================= */
-@font-face {
-  font-family: "GL Tatishvili Metal";
-  src: url("./assets/fonts/GLTatishviliMetal-Bold.ttf") format("truetype");
-  font-weight: 400 800;
-  font-display: swap;
-}
-@font-face {
-  font-family: "GL Kirovi";
-  src: url("./assets/fonts/GLKirovi-Bold.ttf") format("truetype");
-  font-weight: 400 800;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Dachi The Lynx";
-  src: url("./assets/fonts/DachiTheLynx.otf") format("opentype");
-  font-weight: 400;
-  font-display: swap;
-}
+   Tailwind v4 theme mapping.
 
-/* ============================================================================
-   Tailwind theme mapping
-   `inline` keeps `var(--canvas)` in the generated utility, so the value is
-   resolved in the element's own context and re-resolves when the theme flips.
+   THE BRIEF ASKS FOR tailwind.config.ts. This repo is Tailwind 4.1.18, which
+   replaced the JS config with @theme in CSS — a config file would be ignored.
+   This block IS theme.extend: every token here becomes a utility (bg-card,
+   text-fg-secondary, rounded-lg, duration-smooth, ease-snappy…).
+
+   `inline` keeps var(--bg) in the emitted utility instead of resolving it at
+   build time, so one attribute flip on <html> re-themes the whole page — that
+   is what makes the emergency switch a 400ms crossfade instead of a reload.
    ========================================================================= */
 @theme inline {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
-  --font-display: "GL Tatishvili Metal", "Segoe UI", system-ui, sans-serif;
-  --font-alt: "GL Kirovi", "GL Tatishvili Metal", system-ui, sans-serif;
-  --font-accent: "Dachi The Lynx", "GL Kirovi", system-ui, sans-serif;
-  --font-mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, monospace;
+  --font-sans: var(--font-sans);
+  --font-rounded: var(--font-rounded);
+  --font-mono: var(--font-mono);
 
-  /* Surfaces */
-  --color-canvas: var(--canvas);
-  --color-canvas-subtle: var(--canvas-subtle);
-  --color-surface: var(--surface);
-  --color-surface-2: var(--surface-2);
-  --color-surface-hover: var(--surface-hover);
-
-  /* Foregrounds */
-  --color-ink: var(--ink);
-  --color-ink-muted: var(--ink-muted);
-  --color-ink-subtle: var(--ink-subtle);
-  --color-ink-inverse: var(--ink-inverse);
-
-  /* Lines */
+  /* Semantic surfaces and text */
+  --color-bg: var(--bg);
+  --color-card: var(--bg-card);
+  --color-inset: var(--bg-inset);
+  --color-elevated: var(--bg-elevated);
+  --color-fg: var(--fg);
+  --color-fg-secondary: var(--fg-secondary);
+  --color-fg-tertiary: var(--fg-tertiary);
+  --color-fg-disabled: var(--fg-disabled);
   --color-line: var(--line);
-  --color-line-strong: var(--line-strong);
+  --color-line-opaque: var(--line-opaque);
+  --color-line-control: var(--line-control);
+  --color-fill: var(--fill);
+  --color-fill-secondary: var(--fill-secondary);
+  --color-fill-tertiary: var(--fill-tertiary);
 
-  /* Brand */
-  --color-brand: var(--brand);
-  --color-brand-hover: var(--brand-hover);
-  --color-brand-ink: var(--brand-ink);
-  --color-brand-text: var(--brand-text);
-  --color-brand-subtle: var(--brand-subtle);
-  --color-brand-border: var(--brand-border);
-  --color-brand-50: var(--brand-50);
-  --color-brand-100: var(--brand-100);
-  --color-brand-200: var(--brand-200);
-  --color-brand-300: var(--brand-300);
-  --color-brand-400: var(--brand-400);
-  --color-brand-500: var(--brand-500);
-  --color-brand-600: var(--brand-600);
-  --color-brand-700: var(--brand-700);
-  --color-brand-800: var(--brand-800);
-  --color-brand-900: var(--brand-900);
-  --color-brand-950: var(--brand-950);
+  /* Accent (the one saturated colour on a screen) */
+  --color-accent: var(--accent);
+  --color-accent-icon: var(--accent-icon);
+  --color-accent-text: var(--accent-text);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-wash: var(--accent-wash);
 
-  /* Status */
-  --color-danger: var(--danger);
-  --color-danger-ink: var(--danger-ink);
-  --color-danger-text: var(--danger-text);
-  --color-danger-subtle: var(--danger-subtle);
-  --color-danger-border: var(--danger-border);
-  --color-success: var(--success);
-  --color-success-ink: var(--success-ink);
-  --color-success-text: var(--success-text);
-  --color-success-subtle: var(--success-subtle);
-  --color-success-border: var(--success-border);
-  --color-warning: var(--warning);
-  --color-warning-ink: var(--warning-ink);
-  --color-warning-text: var(--warning-text);
-  --color-warning-subtle: var(--warning-subtle);
-  --color-warning-border: var(--warning-border);
-  --color-info: var(--info);
-  --color-info-ink: var(--info-ink);
-  --color-info-text: var(--info-text);
-  --color-info-subtle: var(--info-subtle);
-  --color-info-border: var(--info-border);
-
+  /* Semantic states */
+  --color-route: var(--route);
+  --color-route-exit: var(--route-exit);
+  --color-safe: var(--safe);           --color-safe-ink: var(--safe-ink);
+  --color-safe-text: var(--safe-text); --color-safe-subtle: var(--safe-subtle);
+  --color-alarm: var(--alarm);         --color-alarm-ink: var(--alarm-ink);
+  --color-alarm-text: var(--alarm-text); --color-alarm-subtle: var(--alarm-subtle);
+  --color-destructive: var(--destructive);
+  --color-destructive-ink: var(--destructive-ink);
+  --color-destructive-text: var(--destructive-text);
+  --color-ai: var(--ai);               --color-ai-text: var(--ai-text);
+  --color-stepfree: var(--stepfree);   --color-stepfree-text: var(--stepfree-text);
+  --color-drill: var(--drill);         --color-drill-text: var(--drill-text);
   --color-ring: var(--ring);
   --color-scrim: var(--scrim);
 
-  /* Radii — one scale, used everywhere. */
-  --radius-xs: 0.25rem;
-  --radius-sm: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1rem;
-  --radius-xl: 1.25rem;
-  --radius-2xl: 1.75rem;
-  --radius-3xl: 2.25rem;
+  /* Apple primitives, for the rare place a role is not enough */
+  --color-tint: var(--tint);     --color-green: var(--green);   --color-orange: var(--orange);
+  --color-red: var(--red);       --color-yellow: var(--yellow); --color-indigo: var(--indigo);
+  --color-teal: var(--teal);     --color-gray: var(--gray);
+  --color-gray-2: var(--gray-2); --color-gray-3: var(--gray-3); --color-gray-4: var(--gray-4);
+  --color-gray-5: var(--gray-5); --color-gray-6: var(--gray-6);
+  --color-viz-f: var(--viz-f); --color-viz-d: var(--viz-d); --color-viz-c: var(--viz-c);
+  --color-viz-b: var(--viz-b); --color-viz-a: var(--viz-a); --color-viz-ap: var(--viz-ap);
+
+  /* Compat aliases — previous vocabulary, see tokens.css */
+  --color-canvas: var(--canvas);         --color-canvas-subtle: var(--canvas-subtle);
+  --color-surface: var(--surface);       --color-surface-2: var(--surface-2);
+  --color-surface-hover: var(--surface-hover);
+  --color-ink: var(--ink);   --color-ink-2: var(--ink-2);  --color-ink-3: var(--ink-3);  --color-ink-4: var(--ink-4);
+  --color-ink-muted: var(--ink-muted);   --color-ink-subtle: var(--ink-subtle);  --color-ink-inverse: var(--ink-inverse);
+  --color-line-strong: var(--line-strong);
+  --color-brand: var(--brand);   --color-brand-hover: var(--brand-hover);  --color-brand-ink: var(--brand-ink);
+  --color-brand-text: var(--brand-text); --color-brand-subtle: var(--brand-subtle); --color-brand-border: var(--brand-border);
+  --color-brand-50: var(--brand-50);   --color-brand-100: var(--brand-100); --color-brand-300: var(--brand-300);
+  --color-brand-500: var(--brand-500); --color-brand-600: var(--brand-600); --color-brand-700: var(--brand-700);
+  --color-brand-900: var(--brand-900);
+  --color-danger: var(--danger);   --color-danger-ink: var(--danger-ink);   --color-danger-text: var(--danger-text);
+  --color-danger-subtle: var(--danger-subtle); --color-danger-border: var(--danger-border);
+  --color-success: var(--success); --color-success-ink: var(--success-ink); --color-success-text: var(--success-text);
+  --color-success-subtle: var(--success-subtle); --color-success-border: var(--success-border);
+  --color-exit-300: var(--exit-300); --color-exit-500: var(--exit-500); --color-exit-600: var(--exit-600); --color-exit-700: var(--exit-700);
+  --color-warning: var(--warning); --color-warning-ink: var(--warning-ink); --color-warning-text: var(--warning-text);
+  --color-warning-subtle: var(--warning-subtle); --color-warning-border: var(--warning-border);
+  --color-signal-700: var(--signal-700);
+  --color-info: var(--info); --color-info-ink: var(--info-ink); --color-info-text: var(--info-text);
+  --color-info-subtle: var(--info-subtle); --color-info-border: var(--info-border);
+
+  /* Shape — concentric */
+  --radius-xs: var(--r-xs);   --radius-sm: var(--r-sm);   --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);   --radius-xl: var(--r-xl);   --radius-pill: var(--r-pill);
 
   /* Elevation */
-  --shadow-xs: var(--shadow-xs);
-  --shadow-sm: var(--shadow-sm);
-  --shadow-md: var(--shadow-md);
-  --shadow-lg: var(--shadow-lg);
-  --shadow-xl: var(--shadow-xl);
+  --shadow-card: var(--shadow-card);   --shadow-float: var(--shadow-float);
+  --shadow-sheet: var(--shadow-sheet); --shadow-glass: var(--glass-shadow);
+  --shadow-sm: var(--shadow-card);     --shadow-md: var(--shadow-float);  --shadow-lg: var(--shadow-sheet);
 
-  /* Motion — 150–300ms band, ease-out on enter. */
-  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* Motion */
+  --ease-snappy: var(--spring-snappy); --ease-smooth: var(--spring-smooth); --ease-bouncy: var(--spring-bouncy);
+  --ease-out: var(--spring-smooth);    --ease-in-out: var(--spring-smooth);
+  --duration-snappy: var(--dur-snappy); --duration-smooth: var(--dur-smooth);
+  --duration-bouncy: var(--dur-bouncy); --duration-fade: var(--dur-fade);
+  --duration-fast: var(--dur-snappy);  --duration-base: var(--dur-snappy);
+  --duration-slow: var(--dur-smooth);  --duration-hero: 900ms;
 
-  --animate-fade-up: fade-up 0.5s var(--ease-out-quint) both;
-  --animate-fade-in: fade-in 0.35s ease-out both;
-  --animate-scale-in: scale-in 0.2s var(--ease-out-quint) both;
-  --animate-slide-in-left: slide-in-left 0.28s var(--ease-out-quint) both;
-  --animate-shimmer: shimmer 1.6s linear infinite;
-  --animate-pulse-ring: pulse-ring 2.4s var(--ease-out-quint) infinite;
+  /* Layout — a website that mimics iOS must not stretch a list row to 1600px */
+  --container-list: 720px;     /* lists, forms */
+  --container-content: 1040px; /* marketing */
+  --container-wide: 1280px;    /* map editor, analytics */
+
+  /* Breakpoints — iPad size classes */
+  --breakpoint-regular: 768px;
+  --breakpoint-wide: 1024px;
+  --breakpoint-xwide: 1440px;
 }
 
-@keyframes fade-up {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 16px, 0);
+@layer base {
+  *, *::before, *::after { border-color: var(--line); }
+
+  /* Never a removed focus ring. Solid, 2px — the spec's .35 alpha was 1.60:1. */
+  :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+  ::selection { background: var(--accent-wash); color: var(--fg); }
+
+  /* Position, spacing and elevation ONLY — colour belongs to whichever
+     variant renders this link (buttonStyles({variant:"primary"})). This rule
+     used to also set `background`/`color`, fighting the button's own
+     bg-accent/text-accent-ink and landing on ~1.68:1, near-invisible text.
+     Two systems setting the same properties is the bug; only one may. */
+  .skip-link {
+    position: absolute; left: -9999px; top: 0; z-index: 100;
+    padding: 12px 20px; border-radius: var(--r-sm);
+    box-shadow: var(--shadow-float);
   }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-  }
+  .skip-link:focus { left: 16px; top: 16px; }
 }
 
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes scale-in {
-  from {
-    opacity: 0;
-    transform: scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes slide-in-left {
-  from {
-    transform: translate3d(-100%, 0, 0);
-  }
-  to {
-    transform: translate3d(0, 0, 0);
-  }
-}
-
-@keyframes shimmer {
-  from {
-    background-position: -200% 0;
-  }
-  to {
-    background-position: 200% 0;
+/* ============================================================================
+   Materials. Glass is for bars, toolbars and floating controls — never for
+   content. A solid fallback ships for browsers without backdrop-filter, and
+   prefers-reduced-transparency flips --glass-bg to the solid value.
+   ========================================================================= */
+@utility glass {
+  background-color: var(--glass-solid);
+  box-shadow: var(--glass-edge), var(--glass-shadow);
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    background-color: var(--glass-bg);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
   }
 }
 
-@keyframes pulse-ring {
-  0% {
-    transform: scale(0.9);
-    opacity: 0.6;
-  }
-  70% {
-    transform: scale(1.35);
-    opacity: 0;
-  }
-  100% {
-    transform: scale(1.35);
-    opacity: 0;
-  }
+/* Inset grouped card: no border in light, a 0.5px hairline in dark. */
+@utility card-inset {
+  background-color: var(--bg-card);
+  border-radius: var(--r-lg);
+  box-shadow: var(--card-edge);
 }
 
-/* ----------------------------------------------------------------------------
-   Map route animations.
-   These are CSS rather than anime.js on purpose: route geometry always arrives
-   with a fetch, and usePageAnimations only scans the DOM once on mount. CSS
-   also respects the reduced-motion kill-switch in the base layer for free —
-   which the safety-critical scan route page depends on.
-   ------------------------------------------------------------------------- */
-@keyframes route-draw {
-  from {
-    stroke-dashoffset: 1;
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
-}
+/* Fixed bars honour the notch and the home indicator. */
+@utility safe-top { padding-top: env(safe-area-inset-top); }
+@utility safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+@utility safe-x { padding-inline: env(safe-area-inset-left) env(safe-area-inset-right); }
 
-@keyframes route-march {
-  from {
-    stroke-dashoffset: 40;
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
-}
+@keyframes fade-up { from { opacity: 0; transform: translate3d(0, 12px, 0); } to { opacity: 1; transform: none; } }
+@keyframes orbit { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes counter-orbit { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
+@keyframes pulse-dot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.55; transform: scale(0.85); } }
+@keyframes pulse-ring { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(2.4); opacity: 0; } }
+
+/* ============================================================================
+   Route rendering — RouteLayer (2D) draws the walking path with pathLength={1}
+   set on the stroke path, which normalizes any leg's real length to 1 unit so
+   these keyframes animate identically for a 20px hop and a 2000px corridor.
+   ----------------------------------------------------------------------------
+   route-draw: the line materializing from start to destination on arrival.
+   route-march: dashes sliding along the line on top, showing travel direction.
+   map-user-pulse: the "you are here" ring — an SVG-safe reuse of pulse-ring
+   (see UserDotLayer.tsx) since animating a circle's r is unreliable cross-
+   browser; this instead scales a fixed-radius ring about its own center.
+   ========================================================================= */
+@keyframes route-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes route-march { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -40; } }
 
 .route-path-draw {
-  /* pathLength-independent draw-on: the dash array is expressed in the
-     path's own length via pathLength normalization below. */
   stroke-dasharray: 1;
-  stroke-dashoffset: 0;
-  animation: route-draw 0.9s var(--ease-out-quint) both;
+  animation: route-draw 900ms ease-out both;
 }
-
 .route-path-march {
-  animation: route-march 1.6s linear infinite;
+  animation: route-march 900ms linear infinite;
 }
-
 .map-user-pulse {
-  animation: var(--animate-pulse-ring);
+  animation: pulse-ring 1.8s ease-out infinite;
 }
 
-/* ============================================================================
-   Base
-   ========================================================================= */
-@layer base {
-  * {
-    border-color: var(--line);
-  }
-
-  html {
-    -webkit-text-size-adjust: 100%;
-    scroll-behavior: smooth;
-    /* Anything anchored to an id clears the fixed header. */
-    scroll-padding-top: 6rem;
-  }
-
-  body {
-    background-color: var(--canvas);
-    color: var(--ink);
-    font-family: var(--font-sans);
-    font-size: 1rem;
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
-    transition: background-color 0.2s ease, color 0.2s ease;
-  }
-
-  /* Georgian body text.
-     The default UI stack resolves Georgian through whatever fallback the OS
-     picks, which varies from decent (Android) to cramped (older Windows).
-     Naming Georgian-capable faces first gives consistent glyphs without
-     shipping a webfont — the display faces are already Georgian-specific, so
-     only body copy needed this. LanguageProvider sets <html lang>, which is
-     what :lang(ka) keys off. */
-  :lang(ka) {
-    font-family: "Noto Sans Georgian", "BPG Nino Mtavruli", "Sylfaen",
-      var(--font-sans);
-  }
-
-  h1,
-  h2,
-  h3,
-  h4 {
-    font-family: var(--font-display);
-    line-height: 1.2;
-    letter-spacing: -0.01em;
-    text-wrap: balance;
-  }
-
-  p {
-    text-wrap: pretty;
-  }
-
-  /* One focus treatment for the entire app. Never removed — only restyled. */
-  :focus-visible {
-    outline: 2px solid var(--ring);
-    outline-offset: 2px;
-    border-radius: 0.25rem;
-  }
-
-  ::selection {
-    background-color: var(--brand);
-    color: var(--brand-ink);
-  }
-
-  /* Native controls follow the theme (date pickers, dropdown popups, etc.). */
-  input,
-  textarea,
-  select,
-  button {
-    font: inherit;
-    color: inherit;
-  }
-
-  ::placeholder {
-    color: var(--ink-subtle);
-    opacity: 1;
-  }
-
-  /* Scrollbars: themed, and wide enough to actually grab (the old 1px track
-     was effectively unusable with a pointer). */
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: var(--line-strong) transparent;
-  }
-
-  ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-  }
-
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: var(--line-strong);
-    border-radius: 9999px;
-    border: 2px solid var(--canvas);
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: var(--ink-subtle);
-  }
-}
-
-/* ============================================================================
-   Utilities
-   ========================================================================= */
-@utility text-gradient-brand {
-  /* Monochrome: ink fading toward mid-gray. */
-  background-image: linear-gradient(
-    100deg,
-    var(--ink) 0%,
-    var(--ink) 45%,
-    var(--neutral-500) 100%
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-/* Subtle safety-grid backdrop — evokes a floor plan without competing with
-   content. Fades out toward the bottom so sections can butt up against it. */
-@utility bg-grid {
-  background-image: linear-gradient(
-      to right,
-      color-mix(in oklab, var(--line) 70%, transparent) 1px,
-      transparent 1px
-    ),
-    linear-gradient(
-      to bottom,
-      color-mix(in oklab, var(--line) 70%, transparent) 1px,
-      transparent 1px
-    );
-  background-size: 44px 44px;
-  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
-}
-
-@utility skeleton {
-  background-image: linear-gradient(
-    90deg,
-    var(--surface-2) 25%,
-    var(--surface-hover) 37%,
-    var(--surface-2) 63%
-  );
-  background-size: 200% 100%;
-  animation: var(--animate-shimmer);
-}
-
-/* Keyboard-only escape hatch to the main content. */
-@utility skip-link {
-  position: fixed;
-  top: 0.5rem;
-  left: 0.5rem;
-  z-index: 200;
-  transform: translateY(-150%);
-  transition: transform 0.2s var(--ease-out-quint);
-}
-
-/* ============================================================================
-   Reduced motion — honoured globally, not per component.
-   ========================================================================= */
+/* Disabling the animation (rather than zeroing its duration) matters here:
+   .route-path-draw's only stroke-dashoffset value comes from the keyframes,
+   so turning animation off reverts to the initial value (0) — fully drawn —
+   instead of risking a browser that skips the "to" frame and leaves the
+   dashoffset stuck at 1 (an invisible line). */
 @media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
-
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+  .route-path-draw,
+  .route-path-march,
+  .map-user-pulse {
+    animation: none;
   }
 }

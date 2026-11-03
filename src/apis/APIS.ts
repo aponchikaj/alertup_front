@@ -61,7 +61,11 @@ export const APIS = {
     administration:{
         getBuildingLogs:`${MAIN_API_URL}administration/logs`,
         clearBuildingLogs:`${MAIN_API_URL}administration/logs/clear`,
+        // Legacy toggle — kept only for clients still on `main`. FX-018: use
+        // emergencyTrigger / emergencyResolve, which state their intent.
         emergencyMode:`${MAIN_API_URL}administration/emergency`,
+        emergencyTrigger:(buildingId: string) => `${MAIN_API_URL}emergency/buildings/${encodeURIComponent(buildingId)}/trigger`,
+        emergencyResolve:(buildingId: string) => `${MAIN_API_URL}emergency/buildings/${encodeURIComponent(buildingId)}/resolve`,
         getBuildingAnalytics:`${MAIN_API_URL}administration/analytics/`,
         getEmergencyAnalytics:`${MAIN_API_URL}administration/analytics/`
     }
