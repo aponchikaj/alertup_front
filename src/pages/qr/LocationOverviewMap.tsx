@@ -17,8 +17,8 @@ import {
   type NodeType,
   type RouteSegment,
 } from '../../components/map';
-import { Button } from '../../components/ui/button';
-import { CloseIcon, RouteIcon } from '../../components/ui/icons';
+import { Button } from '../../components/ui/Button';
+import { CloseIcon, RouteIcon } from '../../components/ui/Icons';
 import { useI18n } from '../../i18n/LanguageProvider';
 import { MapViewToggle } from '../../components/map/MapViewToggle';
 import {

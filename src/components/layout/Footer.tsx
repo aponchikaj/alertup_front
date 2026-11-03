@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
-import { Container } from "../ui/layout";
-import { Logo } from "../ui/logo";
+import { Container } from "../ui/Layout";
+import { Logo } from "../ui/Logo";
 import { useI18n } from "../../i18n/LanguageProvider";
 
 const footerLinkClass =

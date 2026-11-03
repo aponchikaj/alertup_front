@@ -1,11 +1,11 @@
 import { useState, type FormEvent } from "react";
 import { demoDesign } from "../../apis/aiApi";
 import { DrawingLayer, type FloorDrawing } from "../map";
-import { Container, Section, SectionHeading } from "../ui/layout";
-import { Button, ButtonLink } from "../ui/button";
-import { Card } from "../ui/card";
-import { Alert } from "../ui/feedback";
-import { SpinnerIcon, ZapIcon } from "../ui/icons";
+import { Container, Section, SectionHeading } from "../ui/Layout";
+import { Button, ButtonLink } from "../ui/Button";
+import { Card } from "../ui/Card";
+import { Alert } from "../ui/Feedback";
+import { SpinnerIcon, ZapIcon } from "../ui/Icons";
 import { useI18n } from "../../i18n/LanguageProvider";
 
 /* ============================================================================

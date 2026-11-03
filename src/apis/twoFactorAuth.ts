@@ -1,32 +1,32 @@
 import { APIS } from "./APIS"
-import { post, errorMessage, type ApiResponse } from "./http"
+import { post, errorMessage, failure, type Envelope } from "./http"
 
-export const enable2fa = async () => {
+export const enable2fa = async (): Promise<Envelope> => {
     try {
-        const res = await post<ApiResponse>(APIS.twoFactorAuth.activate2fa);
-        if (!res) return { Success: false, Message: "Something went wrong." };
+        const res = await post<Envelope>(APIS.twoFactorAuth.activate2fa);
+        if (!res) return failure("Something went wrong.");
         return res;
     } catch (err) {
-        return { Success: false, Message: errorMessage(err) };
+        return failure(errorMessage(err));
     }
 }
 
-export const deactivate2fa = async () => {
+export const deactivate2fa = async (): Promise<Envelope> => {
     try {
-        const res = await post<ApiResponse>(APIS.twoFactorAuth.deactivate2fa);
-        if (!res) return { Success: false, Message: "Something went wrong." };
+        const res = await post<Envelope>(APIS.twoFactorAuth.deactivate2fa);
+        if (!res) return failure("Something went wrong.");
         return res;
     } catch (err) {
-        return { Success: false, Message: errorMessage(err) };
+        return failure(errorMessage(err));
     }
 }
 
-export const verify2fa = async (data: unknown) => {
+export const verify2fa = async (data: unknown): Promise<Envelope> => {
     try {
-        const res = await post<ApiResponse>(APIS.twoFactorAuth.verify2fa, data);
-        if (!res) return { Success: false, Message: "Something went wrong." };
+        const res = await post<Envelope>(APIS.twoFactorAuth.verify2fa, data);
+        if (!res) return failure("Something went wrong.");
         return res;
     } catch (err) {
-        return { Success: false, Message: errorMessage(err) };
+        return failure(errorMessage(err));
     }
 }

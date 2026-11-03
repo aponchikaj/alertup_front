@@ -1,4 +1,4 @@
-import { post, del } from './http';
+import { post } from './http';
 
 export interface QRCodeRequest {
   nodeId?: string;
@@ -41,14 +41,6 @@ export const generateQRCode = async (request: QRCodeRequest): Promise<QRCodeResp
 /**
  * Delete QR code file
  */
-export const deleteQRCode = async (buildingId: string, qrUrl: string) => {
-  // buildingId is part of the path so the server can authorize the caller and
-  // confirm the asset belongs to that building.
-  return del<{ success: boolean; message: string }>(
-    `/api/qr/${encodeURIComponent(buildingId)}/${encodeURIComponent(qrUrl)}`,
-  );
-};
-
 // getQRCodeUrl and getQRCodePublicUrl were removed. QR images live on
 // Cloudinary and are referenced by their secure_url; nothing is written to the
 // API server's uploads/qr-codes directory, so both helpers produced URLs that

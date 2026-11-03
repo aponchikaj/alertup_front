@@ -1,22 +1,17 @@
 /**
  * Team / RBAC endpoints: custom roles, building members and invitations.
  *
- * Every route here answers with the lowercase `{ success, message, data }`
- * envelope (unlike the older `{ Success, Message }` routes), so the payload
- * always lives under `.data`. Errors reject as `ApiError` — call sites decide
+ * Every route here answers with the `{ success, message, data }` envelope,
+ * so the payload always lives under `.data`. Errors reject as `ApiError` — call sites decide
  * what a 403/409/502 means for them, which is why the meaningful statuses are
  * exported as named constants rather than compared against magic numbers.
  */
 
-import { get, post, del, request } from './http';
+import { get, post, del, request, type Envelope as BaseEnvelope } from './http';
 import type { Permission } from '../auth/permissions';
 
-/** Lowercase response envelope used by the team routes. */
-export interface Envelope<T> {
-  success: boolean;
-  message: string;
-  data: T;
-}
+/** The shared envelope, with `data` guaranteed: every team route sends one. */
+export type Envelope<T> = BaseEnvelope<T> & { data: T };
 
 /* --- Roles --------------------------------------------------------------- */
 

@@ -1,11 +1,10 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import Login from './login';
+import Login from './Login';
 import * as authApi from '../../apis/auth';
 import { LanguageProvider } from '../../i18n/LanguageProvider';
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import { en } from '../../i18n/messages/en';
 
 /**
  * Regression cover for a reported bug: signing in appeared to do nothing.
@@ -61,10 +60,10 @@ beforeEach(() => {
 describe('signing in', () => {
   test('refreshes the auth context before navigating', async () => {
     mockAuth.LoginUser.mockResolvedValue({
-      Success: true,
-      Message: 'Logged in successfully.',
-      token: 'tok_abc',
-    } as any);
+      success: true,
+      message: 'Logged in successfully.',
+      data: { token: 'tok_abc' },
+    });
 
     renderLogin();
     await submitCredentials();
@@ -82,10 +81,10 @@ describe('signing in', () => {
 
   test('stores the Safari/iOS fallback token when the API returns one', async () => {
     mockAuth.LoginUser.mockResolvedValue({
-      Success: true,
-      Message: 'Logged in successfully.',
-      token: 'tok_xyz',
-    } as any);
+      success: true,
+      message: 'Logged in successfully.',
+      data: { token: 'tok_xyz' },
+    });
 
     renderLogin();
     await submitCredentials();
@@ -95,30 +94,67 @@ describe('signing in', () => {
 
   test('a rejected sign-in neither refreshes nor navigates', async () => {
     mockAuth.LoginUser.mockResolvedValue({
-      Success: false,
-      Message: 'Invalid credentials.',
-    } as any);
+      success: false,
+      message: 'Invalid credentials.',
+    });
 
     renderLogin();
     await submitCredentials();
 
-    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Invalid credentials.'));
     expect(refreshMock).not.toHaveBeenCalled();
     expect(navigateMock).not.toHaveBeenCalled();
   });
 
   test('a 2FA challenge advances to the code screen instead of navigating', async () => {
-    // The API wrapper converts the 401 challenge into this legacy shape.
+    // The API wrapper turns the 401 challenge into a failure envelope.
     mockAuth.LoginUser.mockResolvedValue({
-      Success: false,
-      Message: '2fa',
-    } as any);
+      success: false,
+      message: '2fa',
+    });
 
     renderLogin();
     await submitCredentials();
 
     // Still on the login flow, not sent anywhere, and not treated as an error.
-    await waitFor(() => expect(navigateMock).not.toHaveBeenCalled());
+    expect(await screen.findByText(en.auth.twoFaSubtitle)).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(navigateMock).not.toHaveBeenCalled();
     expect(refreshMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('the 2FA code step', () => {
+  const reachCodeStep = async () => {
+    mockAuth.LoginUser.mockResolvedValue({ success: false, message: '2fa' });
+    renderLogin();
+    await submitCredentials();
+    await screen.findByText(en.auth.twoFaSubtitle);
+    const user = userEvent.setup();
+    await user.type(document.querySelector('input')!, '123456');
+    await user.click(screen.getAllByRole('button', { name: /log ?in|verify|continue/i })[0]);
+  };
+
+  test('a wrong code shows the server reason and stays put', async () => {
+    mockAuth.Login2faUser.mockResolvedValue({ success: false, message: 'Invalid Code.' });
+
+    await reachCodeStep();
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Invalid Code.'));
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+
+  test('a right code stores the fallback token from `data` and signs in', async () => {
+    mockAuth.Login2faUser.mockResolvedValue({
+      success: true,
+      message: 'Logged in successfully.',
+      data: { token: 'tok_2fa' },
+    });
+
+    await reachCodeStep();
+
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/dashboard', { replace: true }));
+    expect(localStorage.getItem('userToken')).toBe('tok_2fa');
+    expect(refreshMock).toHaveBeenCalled();
   });
 });

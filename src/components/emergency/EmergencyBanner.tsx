@@ -1,5 +1,5 @@
-import { EvacuateIcon } from "../ui/safetyIcons";
-import { Button } from "../ui/button";
+import { EvacuateIcon } from "../ui/SafetyIcons";
+import { Button } from "../ui/Button";
 import { useI18n } from "../../i18n/LanguageProvider";
 import { cn } from "../../lib/cn";
 

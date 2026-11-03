@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { get } from '../../apis/http';
-import { Button } from '../ui/button';
-import { Modal } from '../ui/modal';
-import { Alert } from '../ui/feedback';
-import { AlertTriangleIcon } from '../ui/icons';
+import { Button } from '../ui/Button';
+import { Modal } from '../ui/Modal';
+import { Alert } from '../ui/Feedback';
+import { AlertTriangleIcon } from '../ui/Icons';
 import { useI18n } from '../../i18n/LanguageProvider';
 
 /* ============================================================================

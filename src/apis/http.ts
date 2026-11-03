@@ -24,30 +24,27 @@ export const API_URL = `${API_BASE_URL}/api`;
 const DEFAULT_TIMEOUT_MS = 15000;
 
 /**
- * The response envelope most of this API returns.
+ * The response envelope every route returns: `{ success, message, data? }`.
  *
- * `Message` is deliberately loose: depending on the endpoint it is either a
- * human-readable string or the actual payload (a building, a list of logs, a
- * settings object). Narrowing it would mean re-typing every call site, so it
- * stays permissive and the index signature keeps the extra top-level fields
- * some routes add (Owner, token, user, ...) accessible.
+ * `message` is always human-readable text (a status or the reason a request
+ * failed); the payload, when there is one, lives in `data`. A handful of routes
+ * add legacy top-level fields beside it — model those as an intersection,
+ * e.g. `Envelope<Building> & { Owner?: BuildingOwner }`.
+ *
+ * Some routes still answer a failure with HTTP 200 and `success: false`, so a
+ * resolved envelope is not necessarily a successful one: check `success`.
  */
-export interface ApiResponse {
-  Success: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  Message: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [key: string]: any;
+export interface Envelope<T = undefined> {
+  success: boolean;
+  message: string;
+  data?: T;
 }
 
-/** Envelope used by the password-reset routes, which use lowercase keys. */
-export interface ApiResponseLower {
-  success: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  message: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [key: string]: any;
-}
+/**
+ * The envelope an API wrapper returns when the request itself failed (it
+ * rejected, or produced no body), so call sites handle one shape either way.
+ */
+export const failure = (message: string): Envelope<never> => ({ success: false, message });
 
 export class ApiError extends Error {
   status: number;
@@ -102,9 +99,8 @@ const extractMessage = (data: unknown, fallback: string): string => {
 
   if (data && typeof data === 'object') {
     const record = data as Record<string, unknown>;
-    // The API is inconsistent: some routes return { Message }, others { message }.
-    // `Message` is sometimes a payload object rather than text, so only strings count.
-    for (const key of ['Message', 'message', 'error'] as const) {
+    // `message` is the envelope's text; `error` covers non-API bodies (proxies).
+    for (const key of ['message', 'error'] as const) {
       const value = record[key];
       if (typeof value === 'string' && value.trim()) return value;
     }
@@ -193,7 +189,7 @@ export const request = async <T = unknown>(path: string, options: RequestOptions
     if (signal) signal.removeEventListener('abort', onExternalAbort);
   }
 
-  const data = normalizeEnvelope(await parseBody(response));
+  const data = await parseBody(response);
 
   if (!response.ok) {
     throw new ApiError(
@@ -205,71 +201,6 @@ export const request = async <T = unknown>(path: string, options: RequestOptions
 
   return data as T;
 };
-
-/**
- * Envelope compatibility shim.
- *
- * The API was standardised on `{ success, message, data }`. Screens written
- * against the old `{ Success, Message }` shape are still being migrated, so
- * responses are mirrored across both spellings: existing pages keep reading
- * the capitalised keys while new code uses the lowercase ones.
- *
- * REMOVE once `grep -rn "\.Success\|\.Message" src/` comes back empty. Both
- * spellings are only ever added, never overwritten, so a server that already
- * sends one form is left untouched.
- */
-function normalizeEnvelope(body: unknown): unknown {
-  if (!body || typeof body !== 'object' || Array.isArray(body)) return body;
-  const record = mirrorIds(body) as Record<string, unknown>;
-
-  const hasLower = 'success' in record || 'message' in record;
-  const hasUpper = 'Success' in record || 'Message' in record;
-  if (!hasLower || hasUpper) return record;
-
-  const mirrored: Record<string, unknown> = { ...record };
-  if ('success' in record) mirrored.Success = record.success;
-  if ('message' in record) {
-    // Legacy screens read payloads out of `Message`; the new shape puts them
-    // in `data` and leaves `message` as human-readable text.
-    mirrored.Message = 'data' in record ? record.data : record.message;
-  }
-  return mirrored;
-}
-
-/** Cheap insurance against a pathological payload; real ones nest ~4 deep. */
-const MAX_MIRROR_DEPTH = 8;
-
-/**
- * `id` → `_id` compatibility shim.
- *
- * The database moved from MongoDB to PostgreSQL, so records now carry `id`
- * where every existing screen reads `_id`. Roughly forty call sites assume the
- * Mongo spelling — including the auth check, where a missing `_id` made a
- * perfectly valid session look logged-out and bounced the user straight back
- * to the login page.
- *
- * Mirroring it once here fixes all of them at the boundary. `_id` is only ever
- * added, never overwritten, so a record that already has one is untouched.
- *
- * REMOVE once `grep -rn "\._id" src/` comes back empty.
- */
-function mirrorIds(value: unknown, depth = 0): unknown {
-  if (depth > MAX_MIRROR_DEPTH || !value || typeof value !== 'object') return value;
-
-  if (Array.isArray(value)) {
-    return value.map((entry) => mirrorIds(entry, depth + 1));
-  }
-
-  const record = value as Record<string, unknown>;
-  const out: Record<string, unknown> = {};
-  for (const [key, entry] of Object.entries(record)) {
-    out[key] = mirrorIds(entry, depth + 1);
-  }
-  if (typeof record.id === 'string' && !('_id' in record)) {
-    out._id = record.id;
-  }
-  return out;
-}
 
 export const get = <T = unknown>(path: string, options?: Omit<RequestOptions, 'method' | 'body'>) =>
   request<T>(path, { ...options, method: 'GET' });
@@ -324,7 +255,7 @@ export const getBlob = async (path: string, options: RequestOptions = {}): Promi
 
 /**
  * Normalise any thrown value into a user-facing message.
- * Used by the API wrappers that return `{ Success, Message }` envelopes.
+ * Used by the API wrappers that turn a rejection into a `failure()` envelope.
  */
 export const errorMessage = (err: unknown, fallback = 'Something went wrong.'): string => {
   if (err instanceof ApiError) return err.message || fallback;

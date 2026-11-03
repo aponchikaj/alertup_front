@@ -78,9 +78,7 @@ export function streamAgent(
         let message = `Assistant error (${res.status})`;
         try {
           const errorBody = await res.json();
-          if (errorBody?.message || errorBody?.Message) {
-            message = errorBody.message || errorBody.Message;
-          }
+          if (errorBody?.message) message = errorBody.message;
         } catch {
           // non-JSON error body
         }

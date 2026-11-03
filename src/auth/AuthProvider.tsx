@@ -41,7 +41,7 @@ const readMemberships = (user: MeUser | null): Record<string, Membership> => {
   return out;
 };
 
-/** Legacy `user.Buildings`: an array of building ids (or objects with _id). */
+/** Legacy `user.Buildings`: an array of building ids (or objects with an id). */
 const readOwnedBuildingIds = (user: MeUser | null): string[] => {
   const raw = user?.Buildings;
   if (!Array.isArray(raw)) return [];
@@ -49,7 +49,7 @@ const readOwnedBuildingIds = (user: MeUser | null): string[] => {
     .map((entry) =>
       typeof entry === "string"
         ? entry
-        : (entry as { _id?: unknown } | null)?._id,
+        : (entry as { id?: unknown } | null)?.id,
     )
     .filter((id): id is string => typeof id === "string");
 };

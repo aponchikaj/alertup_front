@@ -2,43 +2,45 @@ import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate, useParams } from "react-router-dom";
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
-import GuestGuard from "./guards/guestguard";
-import AuthGuard from "./guards/authguard";
-import PermissionGuard from "./guards/permissionGuard";
-import ServerGate from "./pages/other/loading";
+import GuestGuard from "./guards/Guestguard";
+import AuthGuard from "./guards/Authguard";
+import PermissionGuard from "./guards/PermissionGuard";
+import ServerGate from "./pages/other/Loading";
 import { Analytics } from "@vercel/analytics/react";
 import Seo from "./seo/Seo";
-import { SpinnerIcon } from "./components/ui/icons";
-import Logs from "./pages/buildings/logs";
-import AnalyticsPage from "./pages/buildings/analytics";
-import EmergencyAnalytics from "./pages/buildings/emergencyAnalytics";
+import { SpinnerIcon } from "./components/ui/Icons";
 
 // Lazy-loaded pages
-const Home = lazy(() => import("./pages/home"));
-const Scan = lazy(() => import("./pages/scan/scan"));
-const QRScanRoutePage = lazy(() => import("./pages/qr/qrScanRoutePage"));
-const Contact = lazy(() => import("./pages/contact/contact"));
-const Register = lazy(() => import("./pages/auth/register"));
-const Login = lazy(() => import("./pages/auth/login"));
-const Reset = lazy(() => import("./pages/reset/reset"));
-const Dashboard = lazy(() => import("./pages/dashboard/dashboard"));
-const NewBuilding = lazy(() => import("./pages/buildings/newBuilding"));
-const Mybuildings = lazy(() => import("./pages/buildings/mybuildings"));
-const MapEditor = lazy(() => import("./pages/buildings/mapEditor/mapEditorPage"));
-const Building = lazy(() => import("./pages/buildings/building"));
-const Floor = lazy(() => import("./pages/buildings/floor"));
-const Settings = lazy(() => import("./pages/settings/settings"));
-const Members = lazy(() => import("./pages/buildings/members"));
-const InviteAccept = lazy(() => import("./pages/invite/inviteAccept"));
-const PageNotFound = lazy(() => import("./pages/other/pageNotFound"));
-const DesignGallery = lazy(() => import("./pages/other/designGallery"));
-const Pricing = lazy(() => import("./pages/pricing/pricing"));
-const Help = lazy(() => import("./pages/help/help"));
-const Privacy = lazy(() => import("./pages/legal/privacy"));
-const Terms = lazy(() => import("./pages/legal/terms"));
-const Cookies = lazy(() => import("./pages/legal/cookies"));
-const Security = lazy(() => import("./pages/legal/security"));
-const Accessibility = lazy(() => import("./pages/legal/accessibility"));
+const Home = lazy(() => import("./pages/Home"));
+// FX-064: owner-only pages, lazy like every other page (they were the only
+// eager ones, so every visitor downloaded them with the entry chunk).
+const Logs = lazy(() => import("./pages/buildings/Logs"));
+const AnalyticsPage = lazy(() => import("./pages/buildings/Analytics"));
+const EmergencyAnalytics = lazy(() => import("./pages/buildings/EmergencyAnalytics"));
+const Scan = lazy(() => import("./pages/scan/Scan"));
+const QRScanRoutePage = lazy(() => import("./pages/qr/QrScanRoutePage"));
+const Contact = lazy(() => import("./pages/contact/Contact"));
+const Register = lazy(() => import("./pages/auth/Register"));
+const Login = lazy(() => import("./pages/auth/Login"));
+const Reset = lazy(() => import("./pages/reset/Reset"));
+const Dashboard = lazy(() => import("./pages/dashboard/Dashboard"));
+const NewBuilding = lazy(() => import("./pages/buildings/NewBuilding"));
+const Mybuildings = lazy(() => import("./pages/buildings/Mybuildings"));
+const MapEditor = lazy(() => import("./pages/buildings/mapEditor/MapEditorPage"));
+const Building = lazy(() => import("./pages/buildings/Building"));
+const Floor = lazy(() => import("./pages/buildings/Floor"));
+const Settings = lazy(() => import("./pages/settings/Settings"));
+const Members = lazy(() => import("./pages/buildings/Members"));
+const InviteAccept = lazy(() => import("./pages/invite/InviteAccept"));
+const PageNotFound = lazy(() => import("./pages/other/PageNotFound"));
+const DesignGallery = lazy(() => import("./pages/other/DesignGallery"));
+const Pricing = lazy(() => import("./pages/pricing/Pricing"));
+const Help = lazy(() => import("./pages/help/Help"));
+const Privacy = lazy(() => import("./pages/legal/Privacy"));
+const Terms = lazy(() => import("./pages/legal/Terms"));
+const Cookies = lazy(() => import("./pages/legal/Cookies"));
+const Security = lazy(() => import("./pages/legal/Security"));
+const Accessibility = lazy(() => import("./pages/legal/Accessibility"));
 
 /**
  * Older QR codes were generated pointing at `/route/qr_...` while the current
@@ -160,13 +162,13 @@ const App = () => {
               }
             />
             <Route
-              path="/building/:buildingID"
+              path="/building/:buildingId"
               element={
                 <Building />
               }
             />
             <Route
-              path="/building/:id/:floor"
+              path="/building/:buildingId/:floor"
               element={
                 <Floor />
               }

@@ -38,7 +38,16 @@ export interface EmergencyProviderProps {
 
 const MAX_LOGS = 200;
 
-export const EmergencyProvider = ({
+/**
+ * Keyed by building so switching building remounts the body: the reducer,
+ * logs, counters, the sessionStorage ack and the one-shot seed all start fresh
+ * instead of showing the previous building's emergency until a frame arrives.
+ */
+export const EmergencyProvider = (props: EmergencyProviderProps) => (
+  <BuildingEmergencyProvider key={props.buildingId ?? ""} {...props} />
+);
+
+const BuildingEmergencyProvider = ({
   buildingId,
   feed = false,
   initialSnapshot = null,

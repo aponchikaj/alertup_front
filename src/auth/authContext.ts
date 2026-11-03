@@ -14,7 +14,6 @@ export type AuthStatus = "loading" | "guest" | "authed" | "error";
 /** Deliberately loose — /api/me's user shape is still evolving. */
 export interface MeUser {
   id?: string;
-  _id?: string;
   email?: string;
   name?: string;
   lastname?: string;

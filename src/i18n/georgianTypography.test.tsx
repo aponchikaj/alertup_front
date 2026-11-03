@@ -91,7 +91,7 @@ import { render, screen } from "@testing-library/react";
 import { LanguageProvider } from "./LanguageProvider";
 import { ka } from "./messages/ka";
 import { en } from "./messages/en";
-import { ClosuresPanel } from "../pages/buildings/mapEditor/closuresPanel";
+import { ClosuresPanel } from "../pages/buildings/mapEditor/ClosuresPanel";
 
 describe("slice 1 copy in Georgian", () => {
   beforeEach(() => {

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Portal, useScrollLock, useFocusTrap } from "../ui/overlayUtils";
-import { Button } from "../ui/button";
-import { AlertTriangleIcon, ExitDoorIcon } from "../ui/icons";
+import { Button } from "../ui/Button";
+import { AlertTriangleIcon, ExitDoorIcon } from "../ui/Icons";
 import { useI18n } from "../../i18n/LanguageProvider";
 
 /* ============================================================================

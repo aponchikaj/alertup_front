@@ -1,7 +1,7 @@
 import { get, post, put, del } from './http';
 
 export interface Node {
-  _id: string;
+  id: string;
   buildingId: string;
   floorNumber: number;
   x: number;

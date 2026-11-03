@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { generateQRCode, type QRCodeRequest } from '../../apis/qrApi';
 import { downloadQrSvg } from '../../lib/qrDownload';
+import { qrPublicOrigin } from '../../lib/qrOrigin';
 import { buildScanUrl, type Node } from '../../apis/nodesApi';
 import { sanitizeSvg } from '../../lib/sanitizeSvg';
 import { cn } from '../../lib/cn';
@@ -12,9 +13,9 @@ import {
   SHEET_CAPACITY,
   type PrintLayout,
 } from '../../lib/qrPrint';
-import { Card } from '../ui/card';
-import { Button } from '../ui/button';
-import { Alert, Skeleton } from '../ui/feedback';
+import { Card } from '../ui/Card';
+import { Button } from '../ui/Button';
+import { Alert, Skeleton } from '../ui/Feedback';
 import {
   CheckIcon,
   CloseIcon,
@@ -23,7 +24,7 @@ import {
   LayersIcon,
   PrinterIcon,
   SmartphoneIcon,
-} from '../ui/icons';
+} from '../ui/Icons';
 import { useI18n } from '../../i18n/LanguageProvider';
 
 /* ============================================================================
@@ -38,11 +39,9 @@ import { useI18n } from '../../i18n/LanguageProvider';
    Layout geometry lives in lib/qrPrint.ts; this file is the chrome around it.
    ========================================================================= */
 
-// Printed QR codes must keep resolving no matter where the app is served from,
-// so the production origin is pinned here rather than taken from
-// window.location — a code generated on localhost would otherwise be useless
-// once it is on a wall.
-const PUBLIC_ORIGIN = 'https://www.alertup.world';
+// Where printed codes point depends on where they were printed from — see
+// lib/qrOrigin.ts (FX-099).
+const PUBLIC_ORIGIN = qrPublicOrigin(window.location);
 
 /** Screen pixels per millimetre at the CSS reference of 96dpi. */
 const PX_PER_MM = 96 / 25.4;
@@ -80,7 +79,7 @@ const SimpleQRCodeDisplay = ({
   const [copies, setCopies] = useState(SHEET_CAPACITY);
   const [copied, setCopied] = useState(false);
 
-  const scanUrl = buildScanUrl(node.buildingId, node.floorNumber, node._id, PUBLIC_ORIGIN);
+  const scanUrl = buildScanUrl(node.buildingId, node.floorNumber, node.id, PUBLIC_ORIGIN);
   const locationLabel = node.label || t(`qr.node${node.type === 'exit' ? 'Exit' : 'Point'}`);
   const floorLabel = t('wayfinding.floor', { number: floorName || node.floorNumber || 1 });
 
@@ -89,7 +88,7 @@ const SimpleQRCodeDisplay = ({
     setError('');
     try {
       const request: QRCodeRequest = {
-        nodeId: node._id,
+        nodeId: node.id,
         buildingId: node.buildingId,
         floorNumber: node.floorNumber,
         format: 'svg',
@@ -114,7 +113,7 @@ const SimpleQRCodeDisplay = ({
     } finally {
       setLoading(false);
     }
-  }, [node._id, node.buildingId, node.floorNumber, t]);
+  }, [node.id, node.buildingId, node.floorNumber, t]);
 
   // Generated on open rather than behind a button: there is exactly one thing
   // to do in this dialog, and making the user ask for it first is a step that

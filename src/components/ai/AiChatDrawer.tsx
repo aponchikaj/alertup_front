@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Sheet } from "../ui/sheet";
-import { Button } from "../ui/button";
-import { Alert } from "../ui/feedback";
-import { SpinnerIcon, ArrowUpRightIcon } from "../ui/icons";
+import { Sheet } from "../ui/Sheet";
+import { Button } from "../ui/Button";
+import { Alert } from "../ui/Feedback";
+import { SpinnerIcon, ArrowUpRightIcon } from "../ui/Icons";
 import { useI18n } from "../../i18n/LanguageProvider";
 import { cn } from "../../lib/cn";
 import { useAiChat } from "./useAiChat";

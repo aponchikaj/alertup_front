@@ -1,8 +1,8 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { cn } from "../../lib/cn";
-import { Alert } from "../ui/feedback";
-import { ScanIcon } from "../ui/icons";
+import { Alert } from "../ui/Feedback";
+import { ScanIcon } from "../ui/Icons";
 import { useI18n } from "../../i18n/LanguageProvider";
 
 type ScannerProps = {

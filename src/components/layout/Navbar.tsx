@@ -19,9 +19,9 @@ import { useAuth } from "../../auth/useAuth";
 import { logoutFromAccount } from "../../apis/settings";
 import { cn } from "../../lib/cn";
 import { reducedMotion } from "../../lib/animations";
-import { Logo } from "../ui/logo";
-import { ThemeToggle } from "../ui/themeToggle";
-import { ButtonLink } from "../ui/button";
+import { Logo } from "../ui/Logo";
+import { ThemeToggle } from "../ui/ThemeToggle";
+import { ButtonLink } from "../ui/Button";
 import { buttonStyles } from "../ui/styles";
 import {
   BuildingIcon,
@@ -32,7 +32,7 @@ import {
   PlusIcon,
   ScanIcon,
   SettingsIcon,
-} from "../ui/icons";
+} from "../ui/Icons";
 import { useI18n } from "../../i18n/LanguageProvider";
 
 /* ============================================================================

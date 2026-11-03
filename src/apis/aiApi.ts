@@ -69,12 +69,22 @@ export function streamChat(
         locale: context.locale,
       };
 
+  // FX-059: Safari/iOS drops the cross-site cookie; the stored session token
+  // rides along as a Bearer header, the same fallback http.ts applies.
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  try {
+    const token = localStorage.getItem("userToken");
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+  } catch {
+    // Private mode can throw on access; the cookie still carries the session.
+  }
+
   void (async () => {
     try {
       const res = await fetch(url, {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(body),
         signal,
       });
@@ -83,9 +93,7 @@ export function streamChat(
         let message = `Assistant error (${res.status})`;
         try {
           const errorBody = await res.json();
-          if (errorBody?.message || errorBody?.Message) {
-            message = errorBody.message || errorBody.Message;
-          }
+          if (errorBody?.message) message = errorBody.message;
         } catch {
           // non-JSON error body
         }

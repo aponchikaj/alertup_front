@@ -1,36 +1,32 @@
 import { APIS } from "./APIS"
-import { post, errorMessage, type ApiResponseLower } from "./http"
+import { post, errorMessage, failure, type Envelope } from "./http"
 
-// Note: these endpoints return a lowercase { success, message } envelope,
-// unlike most of the API which uses { Success, Message }. The callers in
-// pages/reset/reset.tsx read the lowercase form, so it is passed through as-is.
-
-export const SendResetCode = async (data: unknown) => {
+export const SendResetCode = async (data: unknown): Promise<Envelope> => {
     try {
-        const res = await post<ApiResponseLower>(APIS.reset.resetSendCode, data);
-        if (!res) return { success: false, message: "Something went wrong." };
+        const res = await post<Envelope>(APIS.reset.resetSendCode, data);
+        if (!res) return failure("Something went wrong.");
         return res;
     } catch (err) {
-        return { success: false, message: errorMessage(err) };
+        return failure(errorMessage(err));
     }
 }
 
-export const ResetVerifyCode = async (data: unknown) => {
+export const ResetVerifyCode = async (data: unknown): Promise<Envelope> => {
     try {
-        const res = await post<ApiResponseLower>(APIS.reset.resetVerifyCode, data);
-        if (!res) return { success: false, message: "Something went wrong." };
+        const res = await post<Envelope>(APIS.reset.resetVerifyCode, data);
+        if (!res) return failure("Something went wrong.");
         return res;
     } catch (err) {
-        return { success: false, message: errorMessage(err) };
+        return failure(errorMessage(err));
     }
 }
 
-export const ResetNewPassword = async (data: unknown) => {
+export const ResetNewPassword = async (data: unknown): Promise<Envelope> => {
     try {
-        const res = await post<ApiResponseLower>(APIS.reset.resetPassword, data);
-        if (!res) return { success: false, message: "Something went wrong." };
+        const res = await post<Envelope>(APIS.reset.resetPassword, data);
+        if (!res) return failure("Something went wrong.");
         return res;
     } catch (err) {
-        return { success: false, message: errorMessage(err) };
+        return failure(errorMessage(err));
     }
 }

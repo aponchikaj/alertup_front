@@ -1,7 +1,7 @@
 import { useEffect } from "react";
-import { Button } from "../ui/button";
-import { Alert, Badge } from "../ui/feedback";
-import { ArrowRightIcon, CheckCircleIcon, RouteIcon, ScanIcon } from "../ui/icons";
+import { Button } from "../ui/Button";
+import { Alert, Badge } from "../ui/Feedback";
+import { ArrowRightIcon, CheckCircleIcon, RouteIcon, ScanIcon } from "../ui/Icons";
 import { useI18n } from "../../i18n/LanguageProvider";
 import { cn } from "../../lib/cn";
 import { durationMinutes, formatDistance, formatDistanceAndEta } from "../../lib/format";

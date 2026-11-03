@@ -1,22 +1,22 @@
 import { APIS } from "./APIS"
-import { get, post, errorMessage, type ApiResponse } from "./http"
+import { get, post, errorMessage, failure, type Envelope } from "./http"
 
-export const checkUserReviewAvailability = async () => {
+export const checkUserReviewAvailability = async (): Promise<Envelope> => {
     try {
-        const res = await get<ApiResponse>(APIS.reviews.checkReviewSent);
-        if (!res) return { Success: false, Message: "Something went wrong." };
+        const res = await get<Envelope>(APIS.reviews.checkReviewSent);
+        if (!res) return failure("Something went wrong.");
         return res;
     } catch (err) {
-        return { Success: false, Message: errorMessage(err) };
+        return failure(errorMessage(err));
     }
 }
 
-export const sendFeedbackReview = async (data: unknown) => {
+export const sendFeedbackReview = async (data: unknown): Promise<Envelope> => {
     try {
-        const res = await post<ApiResponse>(APIS.reviews.sendReview, data);
-        if (!res) return { Success: false, Message: "Something went wrong." };
+        const res = await post<Envelope>(APIS.reviews.sendReview, data);
+        if (!res) return failure("Something went wrong.");
         return res;
     } catch (err) {
-        return { Success: false, Message: errorMessage(err) };
+        return failure(errorMessage(err));
     }
 }

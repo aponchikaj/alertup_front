@@ -6,7 +6,7 @@ import { getAuthState } from "./me";
  * Regression cover for "I press log in and the site just refreshes".
  *
  * The session was valid and the cookie was set, but `getAuthState` required
- * `user._id` — MongoDB's field name. After the move to PostgreSQL the API
+ * the user's `_id`, MongoDB's field name. After the move to PostgreSQL the API
  * returns `id`, so a signed-in user was reported as unauthenticated, the guard
  * on /dashboard bounced them to /login, and the whole thing looked like the
  * page reloading on submit.
@@ -48,19 +48,31 @@ describe("getAuthState", () => {
     expect(state.state).toBe("authenticated");
     if (state.state === "authenticated") {
       expect(state.user.email).toBe("lazaremirziashvili8@gmail.com");
-      // The shim mirrors id -> _id so the ~40 legacy readers keep working.
-      expect(state.user._id).toBe("cms8uvnod0000hogkb8bzij3e");
+      expect(state.user.id).toBe("cms8uvnod0000hogkb8bzij3e");
     }
   });
 
-  test("still accepts a legacy Mongo response", async () => {
-    respondWith(200, {
-      Success: true,
-      Message: { _id: "64a1b2c3d4e5f6a7b8c9d0e1", email: "old@example.com" },
-    });
+  test("the user is read from `data`, never from the `message` text", async () => {
+    // A success whose payload is missing must not be mistaken for a session
+    // just because `message` is a non-empty string.
+    respondWith(200, { success: true, message: "cms8uvnod0000hogkb8bzij3e" });
 
     const state = await getAuthState();
-    expect(state.state).toBe("authenticated");
+    expect(state.state).toBe("unauthenticated");
+  });
+
+  test("a user record without an id is unauthenticated", async () => {
+    respondWith(200, { success: true, message: "OK", data: { email: "x@example.com" } });
+
+    const state = await getAuthState();
+    expect(state.state).toBe("unauthenticated");
+  });
+
+  test("a 200 carrying success:false is unauthenticated", async () => {
+    respondWith(200, { success: false, message: "Unauthorized.", data: { id: "u1" } });
+
+    const state = await getAuthState();
+    expect(state.state).toBe("unauthenticated");
   });
 
   test("a 401 is a definitive logged-out, not an error", async () => {

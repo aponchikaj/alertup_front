@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { searchPois, type PoiSearchResult } from "../../apis/wayfindingApi";
 import { useI18n } from "../../i18n/LanguageProvider";
 import { cn } from "../../lib/cn";
-import { SearchIcon, ExitDoorIcon, SpinnerIcon } from "../ui/icons";
+import { SearchIcon, ExitDoorIcon, SpinnerIcon } from "../ui/Icons";
 import type { RouteProfile } from "../map/types";
 
 /* ============================================================================

@@ -38,9 +38,9 @@ import {
 } from "./routeProfile";
 import { fetchRoute, fetchEvacuationRoute } from "../../apis/wayfindingApi";
 import { errorMessage } from "../../apis/http";
-import { Alert } from "../ui/feedback";
-import { Button } from "../ui/button";
-import { SpinnerIcon } from "../ui/icons";
+import { Alert } from "../ui/Feedback";
+import { Button } from "../ui/Button";
+import { SpinnerIcon } from "../ui/Icons";
 import { useI18n } from "../../i18n/LanguageProvider";
 import { cn } from "../../lib/cn";
 import { formatDistance, formatDistanceAndEta, formatDuration } from "../../lib/format";

@@ -6,7 +6,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { ThemeProvider } from './theme/ThemeProvider'
 import { LanguageProvider } from './i18n/LanguageProvider'
 import { AuthProvider } from './auth/AuthProvider'
-import { ToastProvider } from './components/ui/toast'
+import { ToastProvider } from './components/ui/Toast'
 
 // The Safari/iOS Bearer-token fallback that used to live here as an axios
 // request interceptor now lives in src/apis/http.ts, so every request made

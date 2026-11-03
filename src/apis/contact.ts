@@ -1,12 +1,12 @@
 import { APIS } from "./APIS"
-import { post, errorMessage, type ApiResponse } from "./http"
+import { post, errorMessage, failure, type Envelope } from "./http"
 
-export const ContactAPI = async (data: unknown) => {
+export const ContactAPI = async (data: unknown): Promise<Envelope> => {
     try {
-        const res = await post<ApiResponse>(APIS.contact, data);
-        if (!res) return { Success: false, Message: 'Something went wrong.' };
+        const res = await post<Envelope>(APIS.contact, data);
+        if (!res) return failure('Something went wrong.');
         return res;
     } catch (err) {
-        return { Success: false, Message: errorMessage(err) };
+        return failure(errorMessage(err));
     }
 }

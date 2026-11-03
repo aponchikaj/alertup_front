@@ -1012,6 +1012,74 @@ export const en = {
       "It may have expired, been revoked, or already been used. Ask for a new one.",
     backHome: "Back to home",
   },
+
+  auth: {
+    welcomeBack: "Welcome back",
+    loginSubtitle: "Log in to manage your buildings and QR routes.",
+    verificationCode: "Verification code",
+    twoFaSubtitle: "Enter the code from your authenticator to finish signing in.",
+    codePlaceholder: "Code",
+    passwordPlaceholder: "Your password",
+    loggingIn: "Logging in…",
+    invalidCredentials: "Invalid credentials.",
+    noAccount: "Don't have an account?",
+    forgotPassword: "Forgot password?",
+    resetLink: "Reset",
+    haveAccount: "Already have an account?",
+    createAccountTitle: "Create account",
+    registerSubtitle:
+      "Put your building on the map — directions for visitors, and a way out if they ever need one.",
+    accountType: "Account type",
+    individual: "Individual",
+    company: "Company",
+    firstName: "Name",
+    lastName: "Last name",
+    country: "Country",
+    selectCountry: "Select country",
+    phoneCode: "Code",
+    phoneCodePlaceholder: "+Code",
+    phone: "Phone number",
+    passwordHint:
+      "Password must be at least 8 characters, include uppercase, number, and symbol.",
+    passwordTooWeak:
+      "Password must be at least 8 characters and include an uppercase letter, a number, and a symbol.",
+    repeatPassword: "Repeat password",
+    passwordsMismatch: "Passwords do not match",
+    creatingAccount: "Creating account…",
+  },
+
+  reset: {
+    stepOf: "Step {step} of {total}",
+    sendTitle: "Send reset code",
+    sendDescription:
+      "Enter your username or email and we'll send you a reset code.",
+    verifyTitle: "Verify code",
+    verifyDescription: "Enter the verification code we sent to your inbox.",
+    newPasswordTitle: "New password",
+    newPasswordDescription: "Choose a new password for your account.",
+    userLabel: "Username or email",
+    userPlaceholder: "Username/Email",
+    newPassword: "New password",
+    working: "Working…",
+    continue: "Continue",
+    rememberPassword: "Remember your password?",
+    sendFailed: "Failed to send reset code",
+    invalidCode: "Invalid or expired code",
+    resetFailed: "Failed to reset password",
+  },
+
+  guards: {
+    checkingSession: "Checking your session…",
+    verifyingAccess: "Verifying access…",
+    errorTitle: "Something went wrong",
+    unreachable: "Could not reach the server.",
+  },
+
+  serverGate: {
+    title: "Can't reach AlertUp right now",
+    body: "Some features may not work until the connection is back.",
+  },
 };
+
 
 export type Messages = typeof en;

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Select } from "../ui/select";
+import { Select } from "../ui/Select";
 import { useI18n } from "../../i18n/LanguageProvider";
 import {
   SELECTABLE_ROUTE_PROFILES,

@@ -1,4 +1,4 @@
-import { Button } from "../ui/button";
+import { Button } from "../ui/Button";
 import { useI18n } from "../../i18n/LanguageProvider";
 import { formatDistanceAndEta } from "../../lib/format";
 import { cn } from "../../lib/cn";

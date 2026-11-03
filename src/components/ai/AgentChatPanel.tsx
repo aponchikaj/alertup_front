@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Sheet } from "../ui/sheet";
-import { Button } from "../ui/button";
-import { Alert } from "../ui/feedback";
-import { SpinnerIcon, ZapIcon } from "../ui/icons";
+import { Sheet } from "../ui/Sheet";
+import { Button } from "../ui/Button";
+import { Alert } from "../ui/Feedback";
+import { SpinnerIcon, ZapIcon } from "../ui/Icons";
 import { cn } from "../../lib/cn";
 import { useI18n } from "../../i18n/LanguageProvider";
 import { useAgentChat } from "./useAgentChat";

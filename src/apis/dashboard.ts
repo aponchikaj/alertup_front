@@ -1,12 +1,13 @@
 import { APIS } from "./APIS"
-import { get, errorMessage, type ApiResponse } from "./http"
+import { get, errorMessage, failure, type Envelope } from "./http"
+import type { DashboardData } from "../types/api"
 
-export const getDashboard = async () => {
+export const getDashboard = async (): Promise<Envelope<DashboardData>> => {
     try {
-        const res = await get<ApiResponse>(APIS.getDashboard);
-        if (!res) return { Success: false, Message: "Something went wrong." };
+        const res = await get<Envelope<DashboardData>>(APIS.getDashboard);
+        if (!res) return failure("Something went wrong.");
         return res;
     } catch (err) {
-        return { Success: false, Message: errorMessage(err) };
+        return failure(errorMessage(err));
     }
 }

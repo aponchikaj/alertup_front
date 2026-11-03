@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { checkUserReviewAvailability, sendFeedbackReview } from "../../apis/reviews";
 import { cn } from "../../lib/cn";
-import { Button } from "../ui/button";
-import { Alert } from "../ui/feedback";
-import { Card } from "../ui/card";
-import { CheckCircleIcon, StarIcon } from "../ui/icons";
-import { TextAreaField } from "../ui/field";
+import { Button } from "../ui/Button";
+import { Alert } from "../ui/Feedback";
+import { Card } from "../ui/Card";
+import { CheckCircleIcon, StarIcon } from "../ui/Icons";
+import { TextAreaField } from "../ui/Field";
 import { useI18n } from "../../i18n/LanguageProvider";
 
 const MAX_COMMENT = 300;
@@ -27,7 +27,7 @@ const Reviews = () => {
     const checkIfAlreadySent = async () => {
       try {
         const res = await checkUserReviewAvailability();
-        setAvailable(Boolean(res && res.Success !== false));
+        setAvailable(Boolean(res && res.success !== false));
       } catch {
         setAvailable(false);
       }
@@ -49,11 +49,11 @@ const Reviews = () => {
         setServerError(t("reviews.failed"));
         return;
       }
-      if (res.Success === false) {
+      if (res.success === false) {
         // Falls back to a message: a rejection without one set serverError to
         // undefined, so the alert rendered nothing and the form silently
         // returned to idle.
-        setServerError(res.Message || t("reviews.failed"));
+        setServerError(res.message || t("reviews.failed"));
         return;
       }
       setStep(3);

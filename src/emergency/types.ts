@@ -29,11 +29,11 @@ export type BuildingEvent =
       type: "closure_changed";
       data: {
         closureId: string;
-        action: "created" | "updated" | "deleted";
+        action: "created" | "updated" | "deleted" | "started" | "ended";
         blocked: boolean;
-        edgeIds: string[];
-        nodeIds: string[];
+        floorId: string | null;
         reason: string | null;
+        startsAt: string | null;
         endsAt: string | null;
       };
     }

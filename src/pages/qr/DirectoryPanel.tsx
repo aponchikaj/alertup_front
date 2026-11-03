@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
-import { Alert, Skeleton } from '../../components/ui/feedback';
+import { Alert, Skeleton } from '../../components/ui/Feedback';
 import {
   ExitDoorIcon,
   LayersIcon,
   MapPinIcon,
   SearchIcon,
-} from '../../components/ui/icons';
+} from '../../components/ui/Icons';
 import { cn } from '../../lib/cn';
 import { useI18n } from '../../i18n/LanguageProvider';
 import type { DirectoryEntry } from '../../apis/wayfindingApi';

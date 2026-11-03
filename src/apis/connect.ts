@@ -1,23 +1,26 @@
 import { APIS } from "./APIS"
-import { get, ApiError, type ApiResponse } from "./http"
+import { get, ApiError, failure, type Envelope } from "./http"
+
+/** GET /api/connect — the server clock rides beside the envelope. */
+export type ConnectResponse = Envelope & { timestamp?: string }
 
 /**
  * Health probe used by the ServerGate loading screen. Distinguishes
  * "server is slow", "server is down" and "server returned an error", because
  * the gate shows a different message for each.
  */
-export const ConnectApis = async () => {
+export const ConnectApis = async (): Promise<ConnectResponse> => {
     try {
-        const res = await get<ApiResponse>(APIS.connectAPI, { timeoutMs: 10000 });
-        if (!res) return { Success: false, Message: 'Something went wrong.' };
+        const res = await get<ConnectResponse>(APIS.connectAPI, { timeoutMs: 10000 });
+        if (!res) return failure('Something went wrong.');
         return res;
     } catch (error) {
         if (error instanceof ApiError) {
             // status 0 means the request never got a response (timeout / network)
-            if (error.status === 0) return { Success: false, Message: error.message };
-            return { Success: false, Message: `Server error: ${error.status}` };
+            if (error.status === 0) return failure(error.message);
+            return failure(`Server error: ${error.status}`);
         }
 
-        return { Success: false, Message: 'Connection failed: unknown error' };
+        return failure('Connection failed: unknown error');
     }
 }

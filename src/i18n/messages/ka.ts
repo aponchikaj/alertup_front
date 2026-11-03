@@ -989,4 +989,74 @@ export const ka: Messages = {
       "შესაძლოა ვადა გაუვიდა, გაუქმდა ან უკვე გამოყენებულია. მოითხოვე ახალი.",
     backHome: "მთავარ გვერდზე",
   },
+
+  auth: {
+    welcomeBack: "კეთილი იყოს შენი დაბრუნება",
+    loginSubtitle: "შედი, რომ მართო შენი შენობები და QR მარშრუტები.",
+    verificationCode: "დამადასტურებელი კოდი",
+    twoFaSubtitle:
+      "შესვლის დასასრულებლად შეიყვანე კოდი ავთენტიფიკატორის აპლიკაციიდან.",
+    codePlaceholder: "კოდი",
+    passwordPlaceholder: "შენი პაროლი",
+    loggingIn: "მიმდინარეობს შესვლა…",
+    invalidCredentials: "ელფოსტა ან პაროლი არასწორია.",
+    noAccount: "არ გაქვს ანგარიში?",
+    forgotPassword: "დაგავიწყდა პაროლი?",
+    resetLink: "აღდგენა",
+    haveAccount: "უკვე გაქვს ანგარიში?",
+    createAccountTitle: "ანგარიშის შექმნა",
+    registerSubtitle:
+      "დაიტანე შენი შენობა რუკაზე — მიმართულებები სტუმრებისთვის და გასასვლელი, თუ ოდესმე დასჭირდებათ.",
+    accountType: "ანგარიშის ტიპი",
+    individual: "ფიზიკური პირი",
+    company: "კომპანია",
+    firstName: "სახელი",
+    lastName: "გვარი",
+    country: "ქვეყანა",
+    selectCountry: "აირჩიე ქვეყანა",
+    phoneCode: "კოდი",
+    phoneCodePlaceholder: "+კოდი",
+    phone: "ტელეფონის ნომერი",
+    passwordHint:
+      "პაროლი უნდა შედგებოდეს მინიმუმ 8 სიმბოლოსგან და შეიცავდეს დიდ ასოს, ციფრს და სპეციალურ სიმბოლოს.",
+    passwordTooWeak:
+      "პაროლი უნდა შედგებოდეს მინიმუმ 8 სიმბოლოსგან და შეიცავდეს ერთ დიდ ასოს, ერთ ციფრს და ერთ სპეციალურ სიმბოლოს.",
+    repeatPassword: "გაიმეორე პაროლი",
+    passwordsMismatch: "პაროლები არ ემთხვევა",
+    creatingAccount: "ანგარიში იქმნება…",
+  },
+
+  reset: {
+    stepOf: "ნაბიჯი {step} / {total}",
+    sendTitle: "აღდგენის კოდის გაგზავნა",
+    sendDescription:
+      "შეიყვანე მომხმარებლის სახელი ან ელფოსტა და აღდგენის კოდს გამოგიგზავნით.",
+    verifyTitle: "კოდის დადასტურება",
+    verifyDescription:
+      "შეიყვანე დამადასტურებელი კოდი, რომელიც ელფოსტაზე გამოგიგზავნეთ.",
+    newPasswordTitle: "ახალი პაროლი",
+    newPasswordDescription: "აირჩიე ახალი პაროლი შენი ანგარიშისთვის.",
+    userLabel: "მომხმარებლის სახელი ან ელფოსტა",
+    userPlaceholder: "მომხმარებელი/ელფოსტა",
+    newPassword: "ახალი პაროლი",
+    working: "მუშავდება…",
+    continue: "გაგრძელება",
+    rememberPassword: "გაგახსენდა პაროლი?",
+    sendFailed: "აღდგენის კოდის გაგზავნა ვერ მოხერხდა",
+    invalidCode: "კოდი არასწორია ან ვადაგასულია",
+    resetFailed: "პაროლის აღდგენა ვერ მოხერხდა",
+  },
+
+  guards: {
+    checkingSession: "სესია მოწმდება…",
+    verifyingAccess: "წვდომა მოწმდება…",
+    errorTitle: "დაფიქსირდა შეცდომა",
+    unreachable: "სერვერთან დაკავშირება ვერ მოხერხდა.",
+  },
+
+  serverGate: {
+    title: "AlertUp ახლა მიუწვდომელია",
+    body: "ზოგიერთმა ფუნქციამ შეიძლება არ იმუშაოს, სანამ კავშირი არ აღდგება.",
+  },
 };
+

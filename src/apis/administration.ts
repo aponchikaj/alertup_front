@@ -1,23 +1,45 @@
 import { APIS } from "./APIS"
-import { get, post, errorMessage, type ApiResponse } from "./http"
+import { get, post, errorMessage, failure, type Envelope } from "./http"
+import type {
+    EmergencyRecord,
+    EmergencyReport,
+    EmergencyResolveResult,
+    EmergencyTriggerResult,
+    LogEntry,
+} from "../types/api"
 
-export const GETBUILDINGLOGS = async (buildingId: string) => {
+/*
+ * Logs and emergencies still travel in their Mongo-era document shape, keyed
+ * by `_id`. They are renamed to `id` here, once, so no screen has to know.
+ */
+type Wire<T> = Omit<T, 'id'> & { _id: string }
+
+const fromWire = <T extends { id: string }>({ _id, ...rest }: Wire<T>): T =>
+    ({ ...rest, id: _id }) as unknown as T
+
+/** Re-key the payload of a successful envelope; failures pass through. */
+const mapData = <W, T>(res: Envelope<W>, map: (wire: W) => T): Envelope<T> =>
+    res.data === undefined
+        ? { success: res.success, message: res.message }
+        : { success: res.success, message: res.message, data: map(res.data) }
+
+export const GETBUILDINGLOGS = async (buildingId: string): Promise<Envelope<LogEntry[]>> => {
     try {
-        const res = await get<ApiResponse>(`${APIS.administration.getBuildingLogs}/${buildingId}`);
-        if (!res) return { Success: false, Message: "Something went wrong." };
-        return res;
+        const res = await get<Envelope<Wire<LogEntry>[]>>(`${APIS.administration.getBuildingLogs}/${buildingId}`);
+        if (!res) return failure("Something went wrong.");
+        return mapData(res, (logs) => logs.map(fromWire<LogEntry>));
     } catch (err) {
-        return { Success: false, Message: errorMessage(err) };
+        return failure(errorMessage(err));
     }
 }
 
-export const CLEARBUILDINGLOGS = async (buildingId: string) => {
+export const CLEARBUILDINGLOGS = async (buildingId: string): Promise<Envelope> => {
     try {
-        const res = await post<ApiResponse>(`${APIS.administration.clearBuildingLogs}/${buildingId}`, {});
-        if (!res) return { Success: false, Message: "Something went wrong." };
+        const res = await post<Envelope>(`${APIS.administration.clearBuildingLogs}/${buildingId}`, {});
+        if (!res) return failure("Something went wrong.");
         return res;
     } catch (err) {
-        return { Success: false, Message: errorMessage(err) };
+        return failure(errorMessage(err));
     }
 }
 
@@ -33,38 +55,46 @@ export const setEmergencyMode = async (
     buildingId: string,
     intent: 'activate' | 'resolve',
     challenge: { token: string; answer: number },
-) => {
+): Promise<Envelope<EmergencyTriggerResult | EmergencyResolveResult>> => {
     const url = intent === 'activate'
         ? APIS.administration.emergencyTrigger(buildingId)
         : APIS.administration.emergencyResolve(buildingId);
     try {
-        const res = await post<ApiResponse>(url, { challenge });
-        if (!res) return { Success: false, Message: "Something went wrong." };
+        const res = await post<Envelope<EmergencyTriggerResult | EmergencyResolveResult>>(url, { challenge });
+        if (!res) return failure("Something went wrong.");
         return res;
     } catch (err) {
-        return { Success: false, Message: errorMessage(err) };
+        return failure(errorMessage(err));
     }
 }
 
 export const GET_BUILDING_ANALYTICS = async (
     buildingID: string,
     filters?: Record<string, string | number | undefined | null>,
-) => {
+): Promise<Envelope<EmergencyRecord[]>> => {
     try {
-        const res = await get<ApiResponse>(APIS.administration.getBuildingAnalytics + buildingID, { params: filters });
-        if (!res) return { Success: false, Message: "Something went wrong." };
-        return res;
+        const res = await get<Envelope<Wire<EmergencyRecord>[]>>(APIS.administration.getBuildingAnalytics + buildingID, { params: filters });
+        if (!res) return failure("Something went wrong.");
+        return mapData(res, (list) => list.map(fromWire<EmergencyRecord>));
     } catch (err) {
-        return { Success: false, Message: errorMessage(err) };
+        return failure(errorMessage(err));
     }
 }
 
-export const GET_EMERGENCY_DATA = async (data: { buildingID: string; emergencyID: string }) => {
+interface EmergencyReportWire {
+    logs: Wire<LogEntry>[];
+    emergency: Wire<EmergencyRecord>;
+}
+
+export const GET_EMERGENCY_DATA = async (data: { buildingID: string; emergencyID: string }): Promise<Envelope<EmergencyReport>> => {
     try {
-        const res = await get<ApiResponse>(`${APIS.administration.getEmergencyAnalytics}${data.buildingID}/${data.emergencyID}`);
-        if (!res) return { Success: false, Message: "Something went wrong." };
-        return res;
+        const res = await get<Envelope<EmergencyReportWire>>(`${APIS.administration.getEmergencyAnalytics}${data.buildingID}/${data.emergencyID}`);
+        if (!res) return failure("Something went wrong.");
+        return mapData(res, (report) => ({
+            logs: report.logs.map(fromWire<LogEntry>),
+            emergency: fromWire<EmergencyRecord>(report.emergency),
+        }));
     } catch (err) {
-        return { Success: false, Message: errorMessage(err) };
+        return failure(errorMessage(err));
     }
 }
