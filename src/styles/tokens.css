@@ -1,244 +1,373 @@
 /* ============================================================================
-   AlertUp — Design Tokens (monochrome minimal)
+   AlertUp — Design Tokens · iOS-native (Apple HIG + Liquid Glass)
    ----------------------------------------------------------------------------
-   Two layers:
-     1. PRIMITIVES  — a single neutral ramp. Never used directly in components.
-     2. SEMANTICS   — role-based tokens (canvas, surface, ink, line, brand...).
-                      These are what components consume, and the only layer
-                      that changes between light and dark.
+   Three layers:
+     1. APPLE PRIMITIVES  — the HIG role names (label, fill, separator, tint…)
+                            with light / dark / emergency values.
+     2. SEMANTICS         — what components consume (--bg, --fg, --accent…).
+     3. COMPAT ALIASES    — the previous vocabulary, re-pointed, so the ~1,000
+                            existing call sites keep compiling. New code never
+                            uses these.
 
-   The visual language is black / white / gray. "Brand" now resolves to ink:
-   black surfaces and text in light mode, white in dark mode. Status colors
-   stay chromatic but muted — this is evacuation software, and the emergency
-   UI must keep red/green/amber semantics; they are the only color on the site.
+   THE ONE THING TO KNOW ABOUT APPLE'S PALETTE ON THE WEB
+   Apple's colours are tuned for a platform with Increase Contrast, Reduce
+   Transparency and Dynamic Type behind them. The web has none of that, so on
+   a fixed canvas the stock values miss WCAG AA in twelve places: secondary
+   label is 3.29:1, white-on-tint is 4.02:1, green-as-text 2.22:1, orange 2.20:1,
+   red 3.55:1. The fix is the one Apple itself ships — UIKit's Increase-Contrast
+   variants — used here for every TEXT role, with the stock tints kept for
+   fills, icons and the route line where 3:1 is the bar. Green and orange fills
+   take a dark label; white on either is ~2:1.
 
-   Contrast: every foreground/background pair below is >= 4.5:1 for body text
-   (WCAG 2.1 AA).
+   Every ratio below is COMPUTED (tokens.contrast.test.ts fails on regression).
+   Targets: body >= 7:1, secondary >= 4.5:1, tinted text >= 4.5:1, icons and
+   focus >= 3:1.
+
+   EMERGENCY MODE is a theme, not a banner: dark grouped canvas, orange chrome,
+   green route, labels at 100% white. Canvas luminance drops from 91% to 0%, so
+   the switch reads in grayscale before a single word is read.
    ========================================================================= */
 
 :root {
-  /* --- PRIMITIVES: neutral ramp ------------------------------------------- */
-  --neutral-0: #ffffff;
-  --neutral-50: #fafafa;
-  --neutral-100: #f5f5f5;
-  --neutral-200: #e5e5e5;
-  --neutral-300: #d4d4d4;
-  --neutral-400: #a3a3a3;
-  --neutral-500: #737373;
-  --neutral-600: #525252;
-  --neutral-700: #404040;
-  --neutral-800: #262626;
-  --neutral-900: #171717;
-  --neutral-950: #0a0a0a;
-  --neutral-1000: #000000;
-
-  /* The old brand ramp keeps its names so every consumer re-skins for free —
-     the values are now the neutral ramp. */
-  --brand-50: var(--neutral-50);
-  --brand-100: var(--neutral-100);
-  --brand-200: var(--neutral-200);
-  --brand-300: var(--neutral-300);
-  --brand-400: var(--neutral-400);
-  --brand-500: var(--neutral-500);
-  --brand-600: var(--neutral-600);
-  --brand-700: var(--neutral-700);
-  --brand-800: var(--neutral-800);
-  --brand-900: var(--neutral-900);
-  --brand-950: var(--neutral-950);
-
-  /* --- PRIMITIVES: status (muted, functional only) ------------------------- */
-  --red-500: #b3261e;
-  --red-400: #dc4a41;
-  --red-300: #f2938d;
-  --green-600: #1b6e42;
-  --green-500: #2e9963;
-  --green-300: #7ecfa4;
-  --amber-600: #8a5a00;
-  --amber-500: #c9971d;
-  --amber-300: #e8c56a;
-  --blue-600: #2f5e9e;
-  --blue-500: #5c8bc9;
-  --blue-300: #a3c2e8;
-
-  /* --- SEMANTICS: light theme (default) ----------------------------------- */
   color-scheme: light;
 
-  --canvas: var(--neutral-0);
-  --canvas-subtle: var(--neutral-100);
-  --surface: var(--neutral-0);
-  --surface-2: var(--neutral-50);
-  --surface-hover: var(--neutral-100);
+  /* --- 1. APPLE PRIMITIVES · light ------------------------------------- */
+  --bg-grouped:           #f2f2f7;   /* page canvas */
+  --bg-grouped-secondary: #ffffff;   /* cards, list groups */
+  --bg-grouped-tertiary:  #f2f2f7;   /* inset nested inside a card */
+  --bg-elevated:          #ffffff;   /* sheets, popovers */
 
-  --ink: var(--neutral-1000);
-  --ink-muted: var(--neutral-600);
-  --ink-subtle: var(--neutral-500);
-  --ink-inverse: var(--neutral-0);
+  /* Labels. Alpha, so they sit correctly on any background. The spec's .60
+     secondary is 3.29:1 on the grouped canvas; .74 is the smallest alpha that
+     clears 4.5 on both light backgrounds (5.00 card / 4.74 grouped). Tertiary
+     cannot reach 3:1 at any alpha Apple would recognise, so it is DISABLED and
+     DECORATIVE only — anything informational uses secondary. */
+  --label:            #000000;                 /* 21.00 card · 18.82 grouped */
+  --label-secondary:  rgb(60 60 67 / 0.74);    /*  5.00 card ·  4.74 grouped */
+  --label-tertiary:   rgb(60 60 67 / 0.58);    /*  ~3.1 — disabled/decorative only */
+  --label-quaternary: rgb(60 60 67 / 0.18);    /*  never carries information */
 
-  --line: var(--neutral-200);
-  --line-strong: var(--neutral-300);
+  --fill:            rgb(120 120 128 / 0.20);  /* segmented / gray button bg */
+  --fill-secondary:  rgb(120 120 128 / 0.16);
+  --fill-tertiary:   rgb(118 118 128 / 0.12);  /* text + search field bg */
+  --separator:       rgb(60 60 67 / 0.29);     /* 0.5px hairline — decorative */
+  --separator-opaque:#c6c6c8;
 
-  /* Brand = ink. Primary actions are solid black with white text. */
-  --brand: var(--neutral-1000);
-  --brand-hover: var(--neutral-800);
-  --brand-ink: var(--neutral-0);
-  --brand-text: var(--neutral-1000);
-  --brand-subtle: var(--neutral-100);
-  --brand-border: var(--neutral-300);
+  /* System tints — stock values for FILLS, ICONS, RINGS, ROUTE (3:1 bar). */
+  --tint:   #007aff;   /* icon on card 4.02 · ring on grouped 3.60 */
+  --green:  #34c759;   /* black on it 9.4 · white on it 2.22 -> dark label always */
+  --orange: #ff9500;   /* black on it 9.55 */
+  --red:    #ff3b30;
+  --yellow: #ffcc00;   /* drill / test mode */
+  --indigo: #5856d6;   /* Wayfinder AI */
+  --teal:   #30b0c7;   /* step-free routing */
+  --gray:   #8e8e93;   /* 3.26 on card — inactive icons */
+  --gray-2: #aeaeb2;  --gray-3: #c7c7cc;  --gray-4: #d1d1d6;
+  --gray-5: #e5e5ea;  --gray-6: #f2f2f7;
 
-  --danger: var(--red-500);
-  --danger-ink: #ffffff;
-  --danger-text: #9a2019;
-  --danger-subtle: #faf0ef;
-  --danger-border: #ecccca;
+  /* The same tints as TEXT (4.5 bar) — UIKit Increase-Contrast variants. */
+  --tint-text:   #0058c0;   /* 6.0 card · 5.5 grouped · 5.47 on the tinted-button wash */
+  --tint-fill:   #0066d6;   /* filled primary in light: white label 5.42 */
+  --green-text:  #1c7333;   /* verified by the guard */
+  --orange-text: #c93400;   /* 5.28 card · 4.73 grouped */
+  --red-text:    #d70015;   /* 5.38 card · 4.83 grouped · white on it 5.38 */
+  --yellow-text: #b25000;   /* 5.20 card */
+  --indigo-text: #3634a3;   /* 9.65 card */
+  --teal-text:   #0071a4;   /* 5.39 card */
+  --gray-text:   #6c6c70;   /* 5.23 card · 4.69 grouped */
 
-  --success: var(--green-600);
-  --success-ink: #ffffff;
-  --success-text: #175d38;
-  --success-subtle: #eff6f2;
-  --success-border: #c8e2d3;
+  /* --- Materials --------------------------------------------------------- */
+  --glass-bg:     rgb(255 255 255 / 0.55);
+  --glass-blur:   saturate(180%) blur(24px);
+  --glass-edge:   inset 0 0 0 0.5px rgb(255 255 255 / 0.6), 0 0 0 0.5px rgb(0 0 0 / 0.08);
+  --glass-shadow: 0 8px 32px rgb(0 0 0 / 0.10);
+  --glass-solid:  #f7f7fa;   /* fallback when backdrop-filter is unavailable
+                                or prefers-reduced-transparency is set */
 
-  --warning: var(--amber-600);
-  --warning-ink: #ffffff;
-  --warning-text: #6f4900;
-  --warning-subtle: #faf5ea;
-  --warning-border: #ead9b4;
+  --shadow-card:  0 1px 2px rgb(0 0 0 / 0.04);
+  --shadow-float: 0 8px 24px rgb(0 0 0 / 0.12), 0 2px 6px rgb(0 0 0 / 0.06);
+  --shadow-sheet: 0 -8px 40px rgb(0 0 0 / 0.18);
+  --card-edge:    0 0 0 0 transparent;   /* light cards carry no border */
 
-  --info: var(--blue-600);
-  --info-ink: #ffffff;
-  --info-text: #2a5490;
-  --info-subtle: #f0f4fa;
-  --info-border: #ccd9ec;
+  /* --- Shape · concentric corners ----------------------------------------
+     inner radius = outer radius − padding. Never a sharp corner. */
+  --r-xs: 6px;   --r-sm: 10px;  --r-md: 14px;
+  --r-lg: 20px;  --r-xl: 28px;  --r-pill: 999px;
 
-  --ring: var(--neutral-1000);
-  --scrim: rgb(0 0 0 / 0.55);
+  /* --- Motion · iOS springs ---------------------------------------------- */
+  --spring-snappy: cubic-bezier(0.2, 0.9, 0.3, 1);
+  --spring-smooth: cubic-bezier(0.32, 0.72, 0, 1);
+  --spring-bouncy: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-snappy: 180ms;  --dur-smooth: 420ms;  --dur-bouncy: 520ms;  --dur-fade: 200ms;
 
-  /* Elevation — pure neutral, restrained. Minimal design leans on hairline
-     borders; shadows only whisper. */
-  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.04);
-  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04);
-  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.04);
-  --shadow-lg: 0 12px 28px -6px rgb(0 0 0 / 0.10), 0 4px 8px -4px rgb(0 0 0 / 0.05);
-  --shadow-xl: 0 24px 48px -12px rgb(0 0 0 / 0.14);
-  --shadow-brand: 0 8px 24px -6px rgb(0 0 0 / 0.18);
-}
+  /* --- 2. SEMANTICS (what components consume) --------------------------- */
+  --bg:           var(--bg-grouped);
+  --bg-elevated-s:var(--bg-elevated);
+  --bg-card:      var(--bg-grouped-secondary);
+  --bg-inset:     var(--bg-grouped-tertiary);
+  --fg:           var(--label);
+  --fg-secondary: var(--label-secondary);
+  --fg-tertiary:  var(--label-tertiary);
+  --fg-disabled:  var(--label-tertiary);
+  --line:         var(--separator);
+  --line-opaque:  var(--separator-opaque);
+  --line-control: var(--gray);          /* 3.26 — a border that IS a control */
 
-/* ----------------------------------------------------------------------------
-   .on-dark — the dark palette, scoped to one element instead of the document.
-   The theme tokens live on :root, so a section that must be dark regardless of
-   the chosen theme cannot simply set an attribute. This redeclares them locally,
-   which means every component inside (buttons, badges, borders, focus rings)
-   resolves correctly without a single override.
-   Used by the home hero, where white light rays need a dark surface to exist on.
-   ------------------------------------------------------------------------- */
-.on-dark {
-  color-scheme: dark;
-  --canvas: var(--neutral-950);
-  --canvas-subtle: #111111;
-  --surface: #141414;
-  --surface-2: #1a1a1a;
-  --surface-hover: #222222;
-  --ink: var(--neutral-0);
-  --ink-muted: var(--neutral-400);
-  --ink-subtle: var(--neutral-500);
-  --ink-inverse: var(--neutral-950);
-  --line: var(--neutral-800);
-  --line-strong: #333333;
-  --brand: var(--neutral-0);
-  --brand-hover: var(--neutral-200);
-  --brand-ink: var(--neutral-1000);
-  --brand-text: var(--neutral-0);
-  --brand-subtle: #1a1a1a;
-  --brand-border: #333333;
-  --danger: var(--red-400);
-  --danger-ink: #1a0d0d;
-  --danger-text: var(--red-300);
-  --danger-subtle: #271515;
-  --danger-border: #45211f;
-  --success: var(--green-500);
-  --success-ink: #04140b;
-  --success-text: var(--green-300);
-  --success-subtle: #10211a;
-  --success-border: #1d3c2c;
-  --warning: var(--amber-500);
-  --warning-ink: #1a1204;
-  --warning-text: var(--amber-300);
-  --warning-subtle: #241d0e;
-  --warning-border: #423416;
-  --info: var(--blue-500);
-  --info-ink: #05101f;
-  --info-text: var(--blue-300);
-  --info-subtle: #131c2b;
-  --info-border: #23344f;
-  --ring: var(--neutral-0);
-  --scrim: rgb(0 0 0 / 0.7);
-  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.4);
-  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.5), 0 1px 2px -1px rgb(0 0 0 / 0.4);
-  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.55), 0 2px 4px -2px rgb(0 0 0 / 0.4);
-  --shadow-lg: 0 12px 28px -6px rgb(0 0 0 / 0.6), 0 4px 8px -4px rgb(0 0 0 / 0.45);
-  --shadow-xl: 0 24px 48px -12px rgb(0 0 0 / 0.7);
-  --shadow-brand: 0 8px 24px -6px rgb(255 255 255 / 0.10);
-  background-color: var(--canvas);
-  color: var(--ink);
+  --accent:        var(--tint-fill);    /* filled buttons */
+  --accent-icon:   var(--tint);         /* icons, rings, selection, route */
+  --accent-text:   var(--tint-text);
+  --accent-ink:    #ffffff;
+  --accent-wash:   rgb(0 122 255 / 0.15);   /* "tinted" button bg */
+
+  --route:      var(--tint);            /* everyday route line, 3px — 3.60 on grouped */
+  --route-exit: var(--green-text);      /* evacuation route in LIGHT: stock green is
+                                           2.1:1 on the canvas; the text variant clears 3 */
+
+  --safe:      var(--green);   --safe-ink: #000000;   --safe-text: var(--green-text);
+  --alarm:     var(--orange);  --alarm-ink: #000000;  --alarm-text: var(--orange-text);
+  --destructive:      var(--red-text);  /* filled red lives only in a sheet; text-safe by default */
+  --destructive-ink:  #ffffff;
+  --destructive-text: var(--red-text);
+  --ai:        var(--indigo);  --ai-text: var(--indigo-text);
+  --stepfree:  var(--teal);    --stepfree-text: var(--teal-text);
+  --drill:     var(--yellow);  --drill-text: var(--yellow-text);
+
+  --ring:  var(--tint);        /* 2px solid; the spec's .35 alpha was 1.60:1 */
+  --scrim: rgb(0 0 0 / 0.4);
+
+  /* Data-viz ramp F -> A+ (always paired with a letter) */
+  --viz-f: var(--red);  --viz-d: var(--orange);  --viz-c: var(--yellow);
+  --viz-b: var(--green); --viz-a: var(--green);  --viz-ap: var(--tint);
+
+  /* --- 3. COMPAT ALIASES (previous vocabulary; do not use in new code) --- */
+  --canvas: var(--bg);            --canvas-subtle: var(--bg-inset);
+  --surface: var(--bg-card);      --surface-2: var(--bg-inset);
+  --surface-hover: var(--fill-tertiary);
+  --ink: var(--fg);               --ink-2: var(--fg);
+  --ink-3: var(--fg-secondary);   --ink-4: var(--fg-tertiary);
+  --ink-muted: var(--fg-secondary); --ink-subtle: var(--fg-secondary);
+  --ink-inverse: #ffffff;
+  --line-strong: var(--line-opaque);
+  --brand: var(--accent);         --brand-hover: var(--tint-text);
+  --brand-ink: var(--accent-ink); --brand-text: var(--accent-text);
+  --brand-subtle: var(--accent-wash); --brand-border: rgb(0 122 255 / 0.3);
+  --brand-50: rgb(0 122 255 / 0.10); --brand-100: rgb(0 122 255 / 0.18);
+  --brand-300: rgb(0 122 255 / 0.45); --brand-500: var(--tint);
+  --brand-600: var(--tint-fill);  --brand-700: var(--tint-text); --brand-900: #0b1f4d;
+  --danger: var(--destructive);   --danger-ink: var(--destructive-ink);
+  --danger-text: var(--destructive-text);
+  --danger-subtle: rgb(255 59 48 / 0.12); --danger-border: rgb(255 59 48 / 0.35);
+  --success: var(--safe);         --success-ink: var(--safe-ink);
+  --success-text: var(--safe-text);
+  --success-subtle: rgb(52 199 89 / 0.15); --success-border: rgb(52 199 89 / 0.4);
+  --exit-300: var(--green);       --exit-500: var(--green);
+  --exit-600: var(--green-text);  --exit-700: var(--green-text);
+  --safe-subtle: rgb(52 199 89 / 0.15);
+  --warning: var(--alarm);        --warning-ink: var(--alarm-ink);
+  --warning-text: var(--alarm-text);
+  --warning-subtle: rgb(255 149 0 / 0.15); --warning-border: rgb(255 149 0 / 0.4);
+  --alarm-subtle: rgb(255 149 0 / 0.15); --signal-700: var(--orange-text);
+  --info: var(--tint);            --info-ink: #ffffff;
+  --info-text: var(--tint-text);
+  --info-subtle: var(--accent-wash); --info-border: rgb(0 122 255 / 0.3);
+  --shadow-sm: var(--shadow-card); --shadow-md: var(--shadow-float);
+  --shadow-lg: var(--shadow-sheet); --shadow-xl: var(--shadow-sheet);
+  --glow-brand: 0 0 0 2px var(--ring);
+  --ease-out: var(--spring-smooth); --ease-in-out: var(--spring-smooth);
+  --dur-fast: var(--dur-snappy); --dur-base: var(--dur-snappy);
+  --dur-slow: var(--dur-smooth); --dur-hero: 900ms;
 }
 
 /* ============================================================================
-   Dark theme — inverted monochrome: white actions on near-black surfaces.
+   DARK. Two entry points with identical values: the OS preference (unless the
+   in-app toggle has pinned light), and the explicit toggle, which wins.
    ========================================================================= */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+  color-scheme: dark;
+  
+    --bg-grouped:           #000000;
+    --bg-grouped-secondary: #1c1c1e;
+    --bg-grouped-tertiary:  #2c2c2e;
+    --bg-elevated:          #1c1c1e;
+  
+    --label:            #ffffff;                  /* 21.00 grouped · 17.01 card */
+    --label-secondary:  rgb(235 235 245 / 0.60);  /*  5.94 card — stock alpha passes here */
+    --label-tertiary:   rgb(235 235 245 / 0.40);  /*  ~3.4 card; stock .30 was 2.48 */
+    --label-quaternary: rgb(235 235 245 / 0.16);
+  
+    --fill:            rgb(120 120 128 / 0.36);
+    --fill-secondary:  rgb(120 120 128 / 0.32);
+    --fill-tertiary:   rgb(118 118 128 / 0.24);
+    --separator:       rgb(84 84 88 / 0.60);
+    --separator-opaque:#38383a;
+  
+    --tint:   #0a84ff;   --green:  #30d158;   --orange: #ff9f0a;   --red:    #ff453a;
+    --yellow: #ffd60a;   --indigo: #5e5ce6;   --teal:   #40c8e0;   --gray:   #8e8e93;
+    --gray-2: #636366;  --gray-3: #48484a;  --gray-4: #3a3a3c;  --gray-5: #2c2c2e;  --gray-6: #1c1c1e;
+  
+    /* Dark text variants. Most stock dark tints already clear 4.5 on the card;
+       indigo (3.36) does not, so it takes Apple's dark Increase-Contrast value. */
+    --tint-text:   #409cff;   /* 6.01 card */
+    --tint-fill:   #0a84ff;   /* label colour decided by the guard */
+    --green-text:  #30d158;   /* 8.42 card */
+    --orange-text: #ff9f0a;   /* 8.28 card */
+    --red-text:    #ff453a;   /* 4.99 card */
+    --yellow-text: #ffd60a;   /* 12.05 card */
+    --indigo-text: #7d7aff;
+    --teal-text:   #40c8e0;   /* 8.55 card */
+    --gray-text:   #aeaeb2;
+  
+    --glass-bg:     rgb(30 30 32 / 0.55);
+    --glass-edge:   inset 0 0 0 0.5px rgb(255 255 255 / 0.12), 0 0 0 0.5px rgb(0 0 0 / 0.4);
+    --glass-shadow: 0 8px 32px rgb(0 0 0 / 0.4);
+    --glass-solid:  #1c1c1e;
+    --shadow-card:  0 1px 2px rgb(0 0 0 / 0.3);
+    --shadow-float: 0 8px 24px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.3);
+    --shadow-sheet: 0 -8px 40px rgb(0 0 0 / 0.6);
+    --card-edge:    0 0 0 0.5px var(--separator);   /* dark cards get the hairline */
+  
+    --line-control: #8e8e93;
+    --accent-wash:  rgb(10 132 255 / 0.22);
+    --scrim:        rgb(0 0 0 / 0.55);
+    --brand-900:    #0b1f4d;
+    --ink-inverse:  #000000;
+    --info-ink:     #000000;
+    --destructive:      var(--red);
+    --destructive-ink:  #000000;
+  }
+}
+
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --canvas: var(--neutral-950);
-  --canvas-subtle: #111111;
-  --surface: #141414;
-  --surface-2: #1a1a1a;
-  --surface-hover: #222222;
+  --bg-grouped:           #000000;
+  --bg-grouped-secondary: #1c1c1e;
+  --bg-grouped-tertiary:  #2c2c2e;
+  --bg-elevated:          #1c1c1e;
 
-  --ink: var(--neutral-0);
-  --ink-muted: var(--neutral-400);
-  --ink-subtle: var(--neutral-500);
-  --ink-inverse: var(--neutral-950);
+  --label:            #ffffff;                  /* 21.00 grouped · 17.01 card */
+  --label-secondary:  rgb(235 235 245 / 0.60);  /*  5.94 card — stock alpha passes here */
+  --label-tertiary:   rgb(235 235 245 / 0.40);  /*  ~3.4 card; stock .30 was 2.48 */
+  --label-quaternary: rgb(235 235 245 / 0.16);
 
-  --line: var(--neutral-800);
-  --line-strong: #333333;
+  --fill:            rgb(120 120 128 / 0.36);
+  --fill-secondary:  rgb(120 120 128 / 0.32);
+  --fill-tertiary:   rgb(118 118 128 / 0.24);
+  --separator:       rgb(84 84 88 / 0.60);
+  --separator-opaque:#38383a;
 
-  --brand: var(--neutral-0);
-  --brand-hover: var(--neutral-200);
-  --brand-ink: var(--neutral-1000);
-  --brand-text: var(--neutral-0);
-  --brand-subtle: #1a1a1a;
-  --brand-border: #333333;
+  --tint:   #0a84ff;   --green:  #30d158;   --orange: #ff9f0a;   --red:    #ff453a;
+  --yellow: #ffd60a;   --indigo: #5e5ce6;   --teal:   #40c8e0;   --gray:   #8e8e93;
+  --gray-2: #636366;  --gray-3: #48484a;  --gray-4: #3a3a3c;  --gray-5: #2c2c2e;  --gray-6: #1c1c1e;
 
-  --danger: var(--red-400);
-  --danger-ink: #1a0d0d;
-  --danger-text: var(--red-300);
-  --danger-subtle: #271515;
-  --danger-border: #45211f;
+  /* Dark text variants. Most stock dark tints already clear 4.5 on the card;
+     indigo (3.36) does not, so it takes Apple's dark Increase-Contrast value. */
+  --tint-text:   #409cff;   /* 6.01 card */
+  --tint-fill:   #006fe6;   /* filled primary in dark: white label 4.75, 3.58 vs card.
+                               Stock #0A84FF is 3.65 behind white — kept for icons/route */
+  --green-text:  #30d158;   /* 8.42 card */
+  --orange-text: #ff9f0a;   /* 8.28 card */
+  --red-text:    #ff453a;   /* 4.99 card */
+  --yellow-text: #ffd60a;   /* 12.05 card */
+  --indigo-text: #7d7aff;
+  --teal-text:   #40c8e0;   /* 8.55 card */
+  --gray-text:   #aeaeb2;
 
-  --success: var(--green-500);
-  --success-ink: #04140b;
-  --success-text: var(--green-300);
-  --success-subtle: #10211a;
-  --success-border: #1d3c2c;
+  --glass-bg:     rgb(30 30 32 / 0.55);
+  --glass-edge:   inset 0 0 0 0.5px rgb(255 255 255 / 0.12), 0 0 0 0.5px rgb(0 0 0 / 0.4);
+  --glass-shadow: 0 8px 32px rgb(0 0 0 / 0.4);
+  --glass-solid:  #1c1c1e;
+  --shadow-card:  0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-float: 0 8px 24px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.3);
+  --shadow-sheet: 0 -8px 40px rgb(0 0 0 / 0.6);
+  --card-edge:    0 0 0 0.5px var(--separator);   /* dark cards get the hairline */
 
-  --warning: var(--amber-500);
-  --warning-ink: #1a1204;
-  --warning-text: var(--amber-300);
-  --warning-subtle: #241d0e;
-  --warning-border: #423416;
+  --line-control: #8e8e93;
+  --accent-wash:  rgb(10 132 255 / 0.22);
+  --scrim:        rgb(0 0 0 / 0.55);
+  --brand-900:    #0b1f4d;
+  --ink-inverse:  #000000;
+  --info-ink:     #000000;
+  --destructive:      var(--red);
+  --destructive-ink:  #000000;
+}
 
-  --info: var(--blue-500);
-  --info-ink: #05101f;
-  --info-text: var(--blue-300);
-  --info-subtle: #131c2b;
-  --info-border: #23344f;
+/* ============================================================================
+   EMERGENCY — a theme, not a banner. Set [data-mode="emergency"] on <html>;
+   .on-emergency scopes it to one section (the marketing page's emergency band).
+   Orange replaces the tint for chrome and headings; the route and the exit are
+   green; labels go to 100% white; type steps up one size (typography.css).
+   ========================================================================= */
+:root[data-mode="emergency"],
+.on-emergency {
+  color-scheme: dark;
 
-  --ring: var(--neutral-0);
-  --scrim: rgb(0 0 0 / 0.7);
+  --bg-grouped:           #000000;
+  --bg-grouped-secondary: #1c1c1e;
+  --bg-grouped-tertiary:  #2c2c2e;
+  --bg-elevated:          #1c1c1e;
 
-  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.4);
-  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.5), 0 1px 2px -1px rgb(0 0 0 / 0.4);
-  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.55), 0 2px 4px -2px rgb(0 0 0 / 0.4);
-  --shadow-lg: 0 12px 28px -6px rgb(0 0 0 / 0.6), 0 4px 8px -4px rgb(0 0 0 / 0.45);
-  --shadow-xl: 0 24px 48px -12px rgb(0 0 0 / 0.7);
-  --shadow-brand: 0 8px 24px -6px rgb(255 255 255 / 0.10);
+  --label:            #ffffff;                  /* 21.00 */
+  --label-secondary:  rgb(235 235 245 / 0.82);  /* louder than dark mode on purpose */
+  --label-tertiary:   rgb(235 235 245 / 0.40);
+  --label-quaternary: rgb(235 235 245 / 0.16);
+  --fill:            rgb(120 120 128 / 0.36);
+  --fill-secondary:  rgb(120 120 128 / 0.32);
+  --fill-tertiary:   rgb(118 118 128 / 0.24);
+  --separator:       rgb(84 84 88 / 0.60);
+  --separator-opaque:#38383a;
+
+  --tint:   #ff9f0a;   /* orange IS the tint here. 10.22 on black · 8.28 on card */
+  --green:  #30d158;   /* route + exit. 10.39 on black · black label on it 10.39 */
+  --orange: #ff9f0a;   --red: #ff453a;   --yellow: #ffd60a;
+  --indigo: #7d7aff;   --teal: #40c8e0;  --gray: #8e8e93;
+  --gray-2: #636366;  --gray-3: #48484a;  --gray-4: #3a3a3c;  --gray-5: #2c2c2e;  --gray-6: #1c1c1e;
+
+  --tint-text:   #ff9f0a;
+  --tint-fill:   #ff9f0a;
+  --green-text:  #30d158;  --orange-text: #ff9f0a;  --red-text: #ff453a;
+  --yellow-text: #ffd60a;  --indigo-text: #7d7aff;  --teal-text: #40c8e0;  --gray-text: #aeaeb2;
+
+  --accent:      var(--orange);   --accent-icon: var(--orange);
+  --accent-text: var(--orange);   --accent-ink:  #000000;   /* 10.22 */
+  --accent-wash: rgb(255 159 10 / 0.22);
+  --route:       var(--green);    --route-exit: var(--green);
+  --safe: var(--green);  --safe-ink: #000000;  --safe-text: var(--green);
+  --alarm: var(--orange); --alarm-ink: #000000; --alarm-text: var(--orange);
+  --destructive: var(--red); --destructive-ink: #000000; --destructive-text: var(--red);
+  --ring:  var(--orange);
+  --scrim: rgb(0 0 0 / 0.6);
+
+  --glass-bg:     rgb(30 30 32 / 0.6);
+  --glass-edge:   inset 0 0 0 0.5px rgb(255 159 10 / 0.25), 0 0 0 0.5px rgb(0 0 0 / 0.4);
+  --glass-shadow: 0 8px 32px rgb(0 0 0 / 0.5);
+  --glass-solid:  #1c1c1e;
+  --shadow-card:  0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-float: 0 8px 24px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.3);
+  --shadow-sheet: 0 -8px 40px rgb(0 0 0 / 0.6);
+  --card-edge:    0 0 0 0.5px var(--separator);
+  --line-control: #8e8e93;
+  --ink-inverse:  #000000;
+  --info: var(--orange); --info-ink: #000000; --info-text: var(--orange);
+  --brand-500: var(--orange); --brand-600: var(--orange); --brand-700: var(--orange);
+}
+
+.on-emergency {
+  background-color: var(--bg);
+  color: var(--fg);
+}
+
+/* Reduced transparency: glass becomes solid, per the HIG. */
+@media (prefers-reduced-transparency: reduce) {
+  :root { --glass-bg: var(--glass-solid); --glass-blur: none; }
+}
+
+/* Increase contrast: labels go fully opaque, separators go opaque. */
+@media (prefers-contrast: more) {
+  :root {
+    --label-secondary: var(--label);
+    --label-tertiary:  var(--label);
+    --separator: var(--separator-opaque);
+  }
 }

@@ -71,8 +71,7 @@ export const parseQRData = (qrData: string): {
     }
 
     return { type: 'unknown' };
-  } catch (error) {
-    console.error('Error parsing QR data:', error);
+  } catch {
     return { type: 'unknown' };
   }
 };

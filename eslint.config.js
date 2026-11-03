@@ -19,6 +19,19 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      // Shipped console calls leak internals to anyone with devtools open —
+      // one of them printed a plaintext password on the register page. Errors
+      // belong in state the UI renders, not in the console.
+      'no-console': 'error',
+    },
+  },
+  {
+    // Tests and mocks may report freely; nothing here reaches a user.
+    files: ['**/*.test.{ts,tsx}', 'src/__mocks__/**', 'src/setupTests.ts'],
+    rules: {
+      'no-console': 'off',
+    },
   },
   {
     // The map3d "pure" modules are unit-tested in jsdom, which has no WebGL —
@@ -29,6 +42,7 @@ export default defineConfig([
       'src/components/map3d/theme3d.ts',
       'src/components/map3d/picking.ts',
       'src/components/map3d/routeScene.ts',
+      'src/components/map/routeGeometry.ts',
     ],
     rules: {
       '@typescript-eslint/no-restricted-imports': [

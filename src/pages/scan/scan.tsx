@@ -32,8 +32,7 @@ const Scan = () => {
     try {
       window.location.href = target;
       setQrCodeMessage(""); // Clear any previous message
-    } catch (err) {
-      console.error("Failed to open QR link:", err);
+    } catch {
       setQrCodeMessage(t("home.qrOpenFailed"));
     }
   };

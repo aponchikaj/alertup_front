@@ -1,7 +1,5 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -19,8 +17,7 @@ import {
   XCircleIcon,
 } from "./icons";
 import { Portal } from "./overlayUtils";
-
-export type ToastTone = "info" | "success" | "warning" | "danger";
+import { ToastContext, type ToastOptions, type ToastTone } from "./toastContext";
 
 /* Same tone → colour/icon mapping as Alert in feedback.tsx, so a toast and an
    inline alert about the same event look related. */
@@ -40,31 +37,9 @@ const TOAST_TONES: Record<ToastTone, { wrap: string; icon: typeof InfoIcon }> = 
   },
 };
 
-export interface ToastOptions {
-  title: string;
-  description?: string;
-  tone?: ToastTone;
-  /** Auto-dismiss delay. Default 5000ms; hovering pauses the countdown. */
-  durationMs?: number;
-}
-
 interface ToastEntry extends ToastOptions {
   id: number;
 }
-
-interface ToastContextValue {
-  /** Enqueues a toast and returns its id (usable with `dismiss`). */
-  toast: (options: ToastOptions) => number;
-  dismiss: (id: number) => void;
-}
-
-const ToastContext = createContext<ToastContextValue | null>(null);
-
-export const useToast = (): ToastContextValue => {
-  const ctx = useContext(ToastContext);
-  if (!ctx) throw new Error("useToast must be used within <ToastProvider>");
-  return ctx;
-};
 
 const DEFAULT_DURATION_MS = 5000;
 

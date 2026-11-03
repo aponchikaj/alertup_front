@@ -70,8 +70,9 @@ const Scanner = ({
           onScanRef.current(decodedText);
           scanner.stop().then(() => setStartScanning(false)).catch(() => {});
         },
-        (err) => {
-          console.warn("QR scan error:", err);
+        () => {
+          // Fires once per frame that does not decode to a QR code — an
+          // expected, continuous non-event, not a failure worth reporting.
         },
       )
       .then(() => {
@@ -85,9 +86,8 @@ const Scanner = ({
         isRunningRef.current = true;
         setError("");
       })
-      .catch((err) => {
+      .catch(() => {
         if (cancelled) return;
-        console.error("Cannot start camera:", err);
         setError(tRef.current("scan.cameraError"));
         setStartScanning(false);
       });

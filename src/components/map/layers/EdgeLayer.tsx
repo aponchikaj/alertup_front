@@ -21,6 +21,20 @@ export interface EdgeLayerProps {
   /** Editor only: highlighted edge. */
   selectedEdgeId?: string | null;
   /**
+   * Editor only: edges gathered into a closure draft. Painted in the danger
+   * colour AND thicker, so the set is legible without relying on hue — the
+   * same reasoning as the inaccessible dash rhythm below.
+   */
+  highlightedEdgeIds?: ReadonlySet<string>;
+  /**
+   * Names what `highlightedEdgeIds` means, as a <title>. Red-plus-thicker are
+   * two cues but both are visual; this is the one that survives a screen
+   * reader, and it wins the element's single <title> slot over the
+   * inaccessible tooltip because being in a draft is the transient state the
+   * operator is actively working on. Localize via this prop.
+   */
+  highlightedLabel?: string;
+  /**
    * Editor only: makes edges clickable. A 14-unit invisible hit line backs
    * each visible one — a 2px stroke is an impossible click target.
    */
@@ -39,6 +53,8 @@ const EdgeLayerImpl = ({
   showAccessibility = true,
   inaccessibleLabel = 'Not wheelchair accessible',
   selectedEdgeId = null,
+  highlightedEdgeIds,
+  highlightedLabel = 'In the closure being drafted',
   onEdgeClick,
 }: EdgeLayerProps) => (
   <g data-testid="edge-layer">
@@ -53,6 +69,7 @@ const EdgeLayerImpl = ({
       const transit = transitType !== null;
       const flagged = showAccessibility && !edge.accessible;
       const selected = edge.id === selectedEdgeId;
+      const highlighted = highlightedEdgeIds?.has(edge.id) ?? false;
       const midX = (source.x + target.x) / 2;
       const midY = (source.y + target.y) / 2;
 
@@ -63,15 +80,26 @@ const EdgeLayerImpl = ({
             y1={source.y}
             x2={target.x}
             y2={target.y}
-            stroke={selected ? 'var(--brand)' : 'var(--line-strong)'}
-            strokeWidth={selected ? 3.5 : transit ? 2.5 : 2}
+            data-closure-draft={highlighted || undefined}
+            stroke={
+              highlighted
+                ? 'var(--danger)'
+                : selected
+                  ? 'var(--brand)'
+                  : 'var(--line-strong)'
+            }
+            strokeWidth={highlighted ? 5 : selected ? 3.5 : transit ? 2.5 : 2}
             strokeLinecap="round"
             // Three visually distinct treatments: solid walkway, long-dash
             // transit, dot-dash inaccessible.
             strokeDasharray={flagged ? '2 6' : transit ? '7 5' : undefined}
-            opacity={selected ? 1 : 0.9}
+            opacity={selected || highlighted ? 1 : 0.9}
           >
-            {flagged ? <title>{inaccessibleLabel}</title> : null}
+            {highlighted ? (
+              <title>{highlightedLabel}</title>
+            ) : flagged ? (
+              <title>{inaccessibleLabel}</title>
+            ) : null}
           </line>
           {onEdgeClick && (
             <line

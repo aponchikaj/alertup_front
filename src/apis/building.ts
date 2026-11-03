@@ -6,7 +6,6 @@ export const createNewBuilding = async (data: FormData | Record<string, unknown>
     const res = await post<ApiResponse>(APIS.buildings.newBuilding, data);
     return res || { Success: false, Message: 'Something went wrong.' };
   } catch (err) {
-    console.error("createNewBuilding error:", err);
     return { Success: false, Message: errorMessage(err) };
   }
 };
@@ -16,7 +15,6 @@ export const getMyBuildings = async () => {
     const res = await get<ApiResponse>(APIS.buildings.myBuildings);
     return res || { Success: false, Message: 'Something went wrong.' };
   } catch (err) {
-    console.error("getMyBuildings error:", err);
     return { Success: false, Message: errorMessage(err) };
   }
 };
@@ -26,7 +24,6 @@ export const deleteBuilding = async (buildingID: string) => {
     const res = await del<ApiResponse>(APIS.buildings.deleteBuilding + buildingID);
     return res || { Success: false, Message: 'Something went wrong.' };
   } catch (err) {
-    console.error("deleteBuilding error:", err);
     return { Success: false, Message: errorMessage(err) };
   }
 };
@@ -36,7 +33,6 @@ export const deactivateBuilding = async (id: string) => {
     const res = await put<ApiResponse>(`${APIS.buildings.deactivateBuilding}${id}`, {});
     return res || { Success: false, Message: 'Something went wrong.' };
   } catch (err) {
-    console.error("deactivateBuilding error:", err);
     return { Success: false, Message: errorMessage(err) };
   }
 };

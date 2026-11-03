@@ -33,6 +33,24 @@ export interface PoiFormValues {
   category: string;
   description: string;
   keywords: string[];
+  /** Printed/integrator code. Empty string means "no code". */
+  externalId: string;
+  /**
+   * Present ONLY when the user actually edited the alias chips.
+   *
+   * The backend replaces the whole `names` JSON column whenever the key is
+   * present at all, so an alias list that was merely *displayed* must not be
+   * echoed back: doing that would overwrite the column for no reason. An
+   * absent key is the only way to say "leave names alone" — see savePoi.
+   */
+  aliases?: string[];
+  /**
+   * The localized names this inspector LOADED, passed straight back out when
+   * `aliases` is submitted. Not editable here; they exist so that rewriting
+   * the `names` column to change aliases cannot drop the translations.
+   */
+  nameEn?: string;
+  nameKa?: string;
 }
 
 export interface NodeInspectorProps {
@@ -65,13 +83,21 @@ export const NodeInspector = ({
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const [showPoi, setShowPoi] = useState(poiExpanded || poi !== null);
-  const [poiForm, setPoiForm] = useState<PoiFormValues>({
+  const [poiForm, setPoiForm] = useState<
+    Omit<PoiFormValues, 'aliases' | 'nameEn' | 'nameKa'>
+  >({
     name: '',
     category: '',
     description: '',
     keywords: [],
+    externalId: '',
   });
   const [keywordDraft, setKeywordDraft] = useState('');
+  // Aliases live outside poiForm because they carry a dirty flag: they are only
+  // ever submitted when the user touched the chips (see PoiFormValues.aliases).
+  const [aliases, setAliases] = useState<string[]>([]);
+  const [aliasDraft, setAliasDraft] = useState('');
+  const [aliasesDirty, setAliasesDirty] = useState(false);
   const [savingPoi, setSavingPoi] = useState(false);
 
   // Re-seed every field when the inspector is pointed at a different node —
@@ -89,8 +115,12 @@ export const NodeInspector = ({
       category: poi?.category ?? '',
       description: poi?.description ?? '',
       keywords: poi?.keywords ?? [],
+      externalId: poi?.externalId ?? '',
     });
     setKeywordDraft('');
+    setAliases(poi?.aliases ?? []);
+    setAliasDraft('');
+    setAliasesDirty(false);
   }, [node.id, poi]);
 
   useEffect(() => {
@@ -123,6 +153,34 @@ export const NodeInspector = ({
       setPoiForm((f) =>
         f.keywords.length === 0 ? f : { ...f, keywords: f.keywords.slice(0, -1) },
       );
+    }
+  };
+
+  /**
+   * Every alias mutation goes through here, and only a mutation that actually
+   * changes the list flips the dirty flag — a no-op (re-adding a chip that is
+   * already there) must not turn an untouched field into a `names` overwrite.
+   */
+  const editAliases = (next: string[]) => {
+    setAliases(next);
+    setAliasesDirty(true);
+  };
+
+  const addAlias = (raw: string) => {
+    const value = raw.trim();
+    setAliasDraft('');
+    if (!value || aliases.includes(value)) return;
+    editAliases([...aliases, value]);
+  };
+
+  const handleAliasKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addAlias(aliasDraft);
+      return;
+    }
+    if (e.key === 'Backspace' && aliasDraft === '' && aliases.length > 0) {
+      editAliases(aliases.slice(0, -1));
     }
   };
 
@@ -230,6 +288,46 @@ export const NodeInspector = ({
               )}
             </div>
 
+            <div className="flex flex-col gap-2">
+              <TextField
+                label={t('mapEditor.poiAliases')}
+                value={aliasDraft}
+                onChange={(e) => setAliasDraft(e.target.value)}
+                onKeyDown={handleAliasKeyDown}
+                onBlur={() => addAlias(aliasDraft)}
+              />
+              {aliases.length > 0 && (
+                <ul className="flex flex-wrap gap-1.5">
+                  {aliases.map((alias) => (
+                    <li key={alias}>
+                      <span className="inline-flex items-center gap-1 rounded-full border border-line bg-surface-2 py-1 pl-3 pr-1 text-xs text-ink">
+                        {alias}
+                        <button
+                          type="button"
+                          aria-label={`${t('common.delete')} ${alias}`}
+                          onClick={() => editAliases(aliases.filter((a) => a !== alias))}
+                          className="grid h-5 w-5 place-items-center rounded-full text-ink-subtle hover:bg-surface-hover hover:text-ink"
+                        >
+                          <CloseIcon size={12} />
+                        </button>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <TextField
+              label={t('mapEditor.poiExternalId')}
+              hint={t('mapEditor.poiExternalIdHint')}
+              value={poiForm.externalId}
+              autoComplete="off"
+              spellCheck={false}
+              onChange={(e) =>
+                setPoiForm((f) => ({ ...f, externalId: e.target.value }))
+              }
+            />
+
             <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
@@ -238,11 +336,24 @@ export const NodeInspector = ({
                 onClick={async () => {
                   setSavingPoi(true);
                   try {
-                    await onSavePoi({
+                    const values: PoiFormValues = {
                       ...poiForm,
                       name: poiForm.name.trim(),
                       keywords: poiForm.keywords,
-                    });
+                      externalId: poiForm.externalId.trim(),
+                    };
+                    // The key is added only when the chips were edited: its
+                    // mere presence tells the server to replace the whole
+                    // `names` column.
+                    if (aliasesDirty) {
+                      values.aliases = aliases;
+                      // Sent together or not at all: `names` is rewritten
+                      // wholesale server-side, so the translations we loaded
+                      // ride along untouched.
+                      values.nameEn = poi?.nameEn;
+                      values.nameKa = poi?.nameKa;
+                    }
+                    await onSavePoi(values);
                   } finally {
                     setSavingPoi(false);
                   }

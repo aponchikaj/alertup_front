@@ -1,5 +1,6 @@
 import { memo, useMemo } from 'react';
 import { ROUTE_TONES, type RouteTone } from '../mapTheme';
+import { segmentPolyline } from '../routeGeometry';
 import type { RouteSegment } from '../types';
 
 /* ============================================================================
@@ -30,18 +31,17 @@ const RouteLayerImpl = ({
   strokeWidth = 5,
   animated = true,
 }: RouteLayerProps) => {
+  const points = useMemo(() => (segment ? segmentPolyline(segment) : null), [segment]);
   const path = useMemo(() => {
-    if (!segment || segment.nodes.length < 2) return null;
-    return segment.nodes
-      .map((node, i) => `${i === 0 ? 'M' : 'L'} ${node.x} ${node.y}`)
-      .join(' ');
-  }, [segment]);
+    if (!points || points.length < 2) return null;
+    return points.map((point, i) => `${i === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
+  }, [points]);
 
-  if (!path || !segment) return null;
+  if (!path || !segment || !points) return null;
 
   const color = ROUTE_TONES[tone];
-  const first = segment.nodes[0];
-  const last = segment.nodes[segment.nodes.length - 1];
+  const first = points[0];
+  const last = points[points.length - 1];
 
   return (
     <g data-testid="route-layer" className="pointer-events-none">

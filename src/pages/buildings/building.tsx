@@ -1,10 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useEffect, useState } from "react";
 import { getBuilding } from "../../apis/building";
-import { getMe } from "../../apis/me";
 import { Link, useParams } from "react-router-dom";
-import { EMERGENCY_MODE_FUNCTION } from "../../apis/administration";
+import { setEmergencyMode as setEmergencyModeApi } from "../../apis/administration";
 import { usePageAnimations } from "../../lib/animations";
 import { PageHeader, PageShell } from "../../components/ui/layout";
 import { Button, ButtonLink } from "../../components/ui/button";
@@ -20,6 +18,7 @@ import {
   UsersIcon,
 } from "../../components/ui/icons";
 import { useAuth } from "../../auth/useAuth";
+import { hasPermission, type Permission } from "../../auth/permissions";
 import { useI18n } from "../../i18n/LanguageProvider";
 import {
   EmergencyChallengeDialog,
@@ -32,15 +31,21 @@ const Building = () => {
   const { buildingID } = useParams();
   // Team management is reachable by the owner and by anyone with a membership
   // in this building — the page itself decides which controls they get.
-  const { memberships } = useAuth();
+  // FX-023: controls follow the viewer's permissions for THIS building, as
+  // the API enforces them — owners hold every permission implicitly, and a
+  // member gets exactly what their role grants (a fire marshal the emergency
+  // switch, an editor the map editor).
+  const { memberships, ownedBuildingIds } = useAuth();
   const isMember = Boolean(buildingID && memberships[buildingID]);
+  const isOwner = Boolean(buildingID && ownedBuildingIds.includes(buildingID));
+  const can = (perm: Permission) =>
+    Boolean(buildingID) && hasPermission(memberships, ownedBuildingIds, buildingID!, perm);
 
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
    
   const [buildingData, setBuildingData] = useState<any>(null);
   const [ownerData,setOwnerData] = useState<any>(null)
-  const [isOwner, setIsOwner] = useState<boolean>(false);
 
   const [emergencyMode,setEmergencyMode] = useState("off")
 
@@ -54,7 +59,10 @@ const Building = () => {
     setToggling(true)
     setChallengeError(null)
     try{
-      const res = await EMERGENCY_MODE_FUNCTION(buildingData._id, challenge)
+      // The dialog was opened as "activate" or "resolve" from what this page
+      // showed; send exactly that, never a toggle (FX-018).
+      const intent = emergencyMode === "on" ? "resolve" : "activate"
+      const res = await setEmergencyModeApi(buildingData._id, intent, challenge)
       // Each branch returns. Without the returns, a falsy `res` fell through to
       // res.Success on the next line and threw.
       if(!res){
@@ -83,7 +91,6 @@ const Building = () => {
       setLoading(true);
       try {
         const res = await getBuilding({ buildingID: buildingID! });
-        // console.log(res)
 
         if (!res || res.Success === false) {
           setServerError(res?.Message || t("common.error"));
@@ -97,65 +104,6 @@ const Building = () => {
         setBuildingData(res.Message);
         setOwnerData(res.Owner)
 
-        // Check if current user is the owner
-        const meRes = await getMe();
-
-        // Try alternative methods if getMe fails
-        let currentUserId = meRes?.user?._id;
-
-        if (!currentUserId && meRes?.Message?._id) {
-          currentUserId = meRes.Message._id;
-        }
-
-        if (!currentUserId && meRes?.Message?.user?._id) {
-          currentUserId = meRes.Message.user._id;
-        }
-
-        if (!currentUserId) {
-          // Try to get user ID from localStorage token first
-          const userToken = localStorage.getItem('userToken');
-
-          if (userToken) {
-            try {
-              // Decode JWT token to get user ID
-              const tokenParts = userToken.split('.');
-              if (tokenParts.length === 3) {
-                const payload = JSON.parse(atob(tokenParts[1]));
-                currentUserId = payload.userId || payload.userID || payload.user_id || payload._id;
-              }
-            } catch (error) {
-              // Failed to decode JWT token from localStorage
-            }
-          }
-
-          // If still no user ID, try cookies
-          if (!currentUserId) {
-            const cookies = document.cookie.split(';');
-            for (const cookie of cookies) {
-              const [name, value] = cookie.trim().split('=');
-              if (name === 'token' || name === 'authToken' || name === 'jwt') {
-                try {
-                  // Decode JWT token to get user ID
-                  const tokenParts = value.split('.');
-                  if (tokenParts.length === 3) {
-                    const payload = JSON.parse(atob(tokenParts[1]));
-                    currentUserId = payload.userId;
-                    break;
-                  }
-                } catch (error) {
-                  // Failed to decode JWT token
-                }
-              }
-            }
-          }
-        }
-
-        if (currentUserId) {
-          const isUserOwner = currentUserId === res.Message.owner;
-          setIsOwner(isUserOwner);
-        } else {
-          setIsOwner(false);
-        }
       } catch {
         setServerError(t("common.error"));
       } finally {
@@ -237,7 +185,7 @@ const Building = () => {
                     <FileTextIcon size={16} />
                     {t("buildings.logs")}
                   </ButtonLink>
-                  {isOwner && (
+                  {can("CAN_TRIGGER_EMERGENCY") && (
                     <Button size="sm" onClick={() => setChallengeOpen(true)}>
                       {t("emergency.resolve")}
                     </Button>
@@ -271,7 +219,7 @@ const Building = () => {
                 <Stat label={t("buildings.mapsUploaded")} value={buildingData.maps ? buildingData.maps.length : null} />
               </div>
 
-              {isOwner && emergencyMode !== "on" && (
+              {can("CAN_TRIGGER_EMERGENCY") && emergencyMode !== "on" && (
                 <div className="mt-6 flex flex-col gap-1.5">
                   <Button
                     variant="danger"
@@ -323,7 +271,7 @@ const Building = () => {
                 {/* The map editor is the authoring surface for this building —
                     walkways, shops, exits and floor links all live there, so it
                     leads, with its own explanation. */}
-                {isOwner && (
+                {can("CAN_EDIT_MAP") && (
                   <div className="flex flex-col gap-1.5">
                     <ButtonLink to={`/building/${buildingData._id}/nodes`} fullWidth>
                       <MapIcon size={18} />
@@ -351,7 +299,7 @@ const Building = () => {
                   </div>
                 )}
 
-                {isOwner && buildingData.emergencyMode == true && (
+                {(isOwner || isMember) && buildingData.emergencyMode == true && (
                   <ButtonLink
                     to={`/building/${buildingData._id}/logs`}
                     variant="secondary"
@@ -362,14 +310,16 @@ const Building = () => {
                   </ButtonLink>
                 )}
 
-                <ButtonLink
-                  to={`/building/${buildingData._id}/analytics`}
-                  variant="secondary"
-                  fullWidth
-                >
-                  <ChartIcon size={18} />
-                  {t("buildings.analytics")}
-                </ButtonLink>
+                {can("CAN_VIEW_ANALYTICS") && (
+                  <ButtonLink
+                    to={`/building/${buildingData._id}/analytics`}
+                    variant="secondary"
+                    fullWidth
+                  >
+                    <ChartIcon size={18} />
+                    {t("buildings.analytics")}
+                  </ButtonLink>
+                )}
               </div>
             </Card>
 

@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { LanguageProvider } from '../../i18n/LanguageProvider';
 import { en } from '../../i18n/messages/en';
 import * as http from '../../apis/http';
 import * as wayfindingApi from '../../apis/wayfindingApi';
+import * as realtime from '../../lib/realtime';
 import QRScanRoutePage from './qrScanRoutePage';
 
 /* ============================================================================
@@ -22,16 +23,50 @@ jest.mock('../../apis/http', () => {
 jest.mock('../../apis/wayfindingApi');
 
 // The emergency provider opens an SSE stream; a stub channel keeps the page
-// inert and the test synchronous.
-jest.mock('../../lib/realtime', () => ({
-  createBuildingChannel: () => ({
-    subscribe: () => () => {},
-    onStatusChange: () => () => {},
-    status: () => 'idle',
-    close: () => {},
-    resync: () => {},
-  }),
-}));
+// inert and the test synchronous, while still letting a test drive a status
+// change or push a `closure_changed` frame through `__setStatus`/`__emit`.
+jest.mock('../../lib/realtime', () => {
+  const listeners = {
+    status: new Set<(s: string) => void>(),
+    events: new Set<(evt: unknown) => void>(),
+  };
+  let status = 'open';
+  return {
+    createBuildingChannel: () => ({
+      subscribe: (cb: (evt: unknown) => void) => {
+        listeners.events.add(cb);
+        return () => listeners.events.delete(cb);
+      },
+      onStatusChange: (cb: (s: string) => void) => {
+        listeners.status.add(cb);
+        cb(status);
+        return () => listeners.status.delete(cb);
+      },
+      status: () => status,
+      close: () => {},
+      lastHeartbeatAt: () => null,
+      lastSeq: () => null,
+    }),
+    __setStatus: (next: string) => {
+      status = next;
+      listeners.status.forEach((cb) => cb(next));
+    },
+    __emit: (evt: unknown) => {
+      listeners.events.forEach((cb) => cb(evt));
+    },
+    __reset: () => {
+      status = 'open';
+      listeners.status.clear();
+      listeners.events.clear();
+    },
+  };
+});
+
+const realtimeMock = realtime as unknown as {
+  __setStatus: (s: string) => void;
+  __emit: (evt: unknown) => void;
+  __reset: () => void;
+};
 
 // The AI launcher lazy-loads its drawer; irrelevant here.
 jest.mock('../../components/ai/AiChatLauncher', () => ({
@@ -155,6 +190,8 @@ const renderPage = () =>
 
 beforeEach(() => {
   jest.clearAllMocks();
+  realtimeMock.__reset();
+  sessionStorage.clear();
   mockedGet.mockResolvedValue({ success: true, data: scanPayload });
   mockedWayfinding.fetchDirectory.mockResolvedValue(directoryEntries);
 });
@@ -256,7 +293,10 @@ describe('scan page — directory first, map one tap away', () => {
     fireEvent.click(screen.getByRole('button', { name: new RegExp(en.route.guideMe) }));
 
     await waitFor(() =>
-      expect(mockedWayfinding.fetchEvacuationRoute).toHaveBeenCalledWith('n1'),
+      expect(mockedWayfinding.fetchEvacuationRoute).toHaveBeenCalledWith(
+        'n1',
+        expect.objectContaining({}),
+      ),
     );
     // The route view replaces the idle slot; the exit strip folds away.
     await waitFor(() =>
@@ -274,5 +314,180 @@ describe('scan page — failure states', () => {
 
     expect(await screen.findByText(en.route.qrNotFound)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: en.common.back })).toBeInTheDocument();
+  });
+});
+
+/* ============================================================================
+   F15 item 6 — exactly one h1, in every state this page can render.
+   ----------------------------------------------------------------------------
+   Screen-reader users navigate by heading; a scan-review flagged this page as
+   having none. At this commit `RouteHeader`/`PageHeader` already renders a
+   descriptive <h1> in the loading, error and loaded states — these pin that
+   so a future refactor cannot drop it back to zero. If this ever regresses,
+   the fix belongs in `RouteHeader` (loaded) or the loading/error branches
+   directly, all in this file.
+   ========================================================================= */
+describe('scan page — exactly one h1 (F15 item 6)', () => {
+  test('names the page while the scan is loading', () => {
+    // The fetch is mocked but unresolved at first paint.
+    mockedGet.mockReturnValue(new Promise(() => {}));
+    renderPage();
+
+    const headings = screen.getAllByRole('heading', { level: 1 });
+    expect(headings).toHaveLength(1);
+    expect(headings[0]).toHaveTextContent(en.route.loadingTitle);
+  });
+
+  test('names the page on a failed scan', async () => {
+    mockedGet.mockRejectedValue(new http.ApiError('gone', 404, null));
+    renderPage();
+    await screen.findByText(en.route.qrNotFound);
+
+    const headings = screen.getAllByRole('heading', { level: 1 });
+    expect(headings).toHaveLength(1);
+    expect(headings[0]).toHaveTextContent(en.route.errorTitle);
+  });
+
+  test('names the page once the route loads', async () => {
+    renderPage();
+    await screen.findByText(/Tbilisi Mall/);
+
+    const headings = screen.getAllByRole('heading', { level: 1 });
+    expect(headings).toHaveLength(1);
+    expect(headings[0]).toHaveTextContent(en.route.title);
+  });
+});
+
+/* ============================================================================
+   F10 — connection-lost indicator + closure-driven refetch
+   ----------------------------------------------------------------------------
+   The stubbed realtime channel from the top of this file is driven directly
+   via `realtimeMock.__setStatus` / `__emit` — a status change or an SSE frame
+   without ever standing up a real EventSource.
+   ========================================================================= */
+
+describe('scan page — connection status and closures', () => {
+  test('the connection-lost notice shows only while an emergency is active and the channel is degraded', async () => {
+    renderPage();
+    await screen.findByText(/Tbilisi Mall/);
+
+    // Calm building, degraded channel: still just everyday wayfinding — no notice.
+    act(() => realtimeMock.__setStatus('degraded'));
+    expect(screen.queryByText(en.emergency.connectionLost)).toBeNull();
+
+    // The stream reports an emergency while the channel is still degraded.
+    act(() =>
+      realtimeMock.__emit({
+        type: 'state',
+        data: {
+          isEmergency: true,
+          emergencyId: 'e1',
+          message: 'Fire on level 2',
+          startedAt: new Date().toISOString(),
+        },
+      }),
+    );
+    expect(screen.getByText(en.emergency.connectionLost)).toBeInTheDocument();
+
+    // Connection recovers: the notice must go even though the emergency is
+    // still live — it names a transport problem, not the emergency itself.
+    act(() => realtimeMock.__setStatus('open'));
+    expect(screen.queryByText(en.emergency.connectionLost)).toBeNull();
+  });
+
+  test('the connection-lost notice lands in a live region that was already mounted', async () => {
+    // A screen reader only announces a change INSIDE a region it is already
+    // watching. Mounting the whole role=status alert at the moment the channel
+    // dies means the one person who most needs to know the route is frozen is
+    // the one person who is never told. The region is therefore permanent and
+    // only its content changes.
+    renderPage();
+    await screen.findByText(/Tbilisi Mall/);
+
+    const region = screen.getByTestId('connection-status');
+    expect(region).toHaveAttribute('aria-live', 'polite');
+    expect(region).toHaveAttribute('aria-atomic', 'true');
+    expect(region).toBeEmptyDOMElement();
+
+    act(() => realtimeMock.__setStatus('degraded'));
+    act(() =>
+      realtimeMock.__emit({
+        type: 'state',
+        data: {
+          isEmergency: true,
+          emergencyId: 'e1',
+          message: 'Fire on level 2',
+          startedAt: new Date().toISOString(),
+        },
+      }),
+    );
+
+    // Same node, now carrying the notice — not a replacement node.
+    expect(screen.getByTestId('connection-status')).toBe(region);
+    expect(region).toHaveTextContent(en.emergency.connectionLost);
+    // And exactly one live region: the Alert inside must not open a second.
+    expect(region.querySelectorAll('[aria-live]')).toHaveLength(0);
+  });
+
+  test('a closure_changed frame refetches the currently displayed route', async () => {
+    mockedWayfinding.fetchRoute.mockResolvedValue(scanPayload.route as never);
+    renderPage();
+    await screen.findByText('Cafe Aroma');
+
+    fireEvent.click(screen.getByRole('button', { name: /Cafe Aroma/ }));
+    await waitFor(() => expect(mockedWayfinding.fetchRoute).toHaveBeenCalledTimes(1));
+
+    act(() =>
+      realtimeMock.__emit({
+        type: 'closure_changed',
+        data: {
+          closureId: 'c1',
+          action: 'created',
+          blocked: true,
+          edgeIds: ['e1'],
+          nodeIds: [],
+          reason: 'Spill on floor',
+          endsAt: null,
+        },
+      }),
+    );
+
+    await waitFor(() => expect(mockedWayfinding.fetchRoute).toHaveBeenCalledTimes(2));
+    expect(mockedWayfinding.fetchRoute).toHaveBeenLastCalledWith(
+      expect.objectContaining({ fromNodeId: 'n1', toPoiId: 'p1' }),
+    );
+    // The route the visitor was already following is still the one on screen.
+    expect(screen.getByText(/Cafe Aroma/)).toBeInTheDocument();
+  });
+
+  test('a failed closure refetch keeps the displayed route on screen', async () => {
+    mockedWayfinding.fetchRoute.mockResolvedValueOnce(scanPayload.route as never);
+    renderPage();
+    await screen.findByText('Cafe Aroma');
+
+    fireEvent.click(screen.getByRole('button', { name: /Cafe Aroma/ }));
+    await waitFor(() => expect(mockedWayfinding.fetchRoute).toHaveBeenCalledTimes(1));
+
+    mockedWayfinding.fetchRoute.mockRejectedValueOnce(new Error('Network down'));
+    act(() =>
+      realtimeMock.__emit({
+        type: 'closure_changed',
+        data: {
+          closureId: 'c1',
+          action: 'updated',
+          blocked: true,
+          edgeIds: [],
+          nodeIds: ['n2'],
+          reason: 'Spill on floor',
+          endsAt: null,
+        },
+      }),
+    );
+
+    await waitFor(() => expect(mockedWayfinding.fetchRoute).toHaveBeenCalledTimes(2));
+    // The static fail-safe: the route already on screen must not be cleared
+    // by a refetch that failed.
+    expect(screen.getByText(/Cafe Aroma/)).toBeInTheDocument();
+    expect(screen.queryByTestId('directory-panel')).toBeNull();
   });
 });

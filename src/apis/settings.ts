@@ -91,7 +91,7 @@ export const logoutFromAccount = async () => {
   }
 }
 
-export const getSettings = async () => {
+export const getSettings = async (): Promise<ApiResponse> => {
   try {
     const res = await get<ApiResponse>(APIS.settings.getSettings);
     if (!res) return { Success: false, Message: "Something went wrong." };

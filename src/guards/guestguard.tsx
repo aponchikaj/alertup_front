@@ -1,11 +1,13 @@
 // src/guards/GuestGuard.js
-import { Navigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { Navigate, useSearchParams } from "react-router-dom";
+import { useEffect, useState, type ReactNode } from "react";
 import { useAuth } from "../auth/useAuth";
 import { SpinnerIcon } from "../components/ui/icons";
+import { safeNextPath } from "../lib/safeNext";
 
-const GuestGuard = ({ children }: { children: any }) => {
+const GuestGuard = ({ children }: { children: ReactNode }) => {
   const { status, refresh } = useAuth();
+  const [searchParams] = useSearchParams();
 
   // Re-validate once when the shared context says "authed" at mount time: the
   // user may have just signed out and navigated here before the context
@@ -35,7 +37,8 @@ const GuestGuard = ({ children }: { children: any }) => {
       </div>
     );
 
-  if (status === "authed") return <Navigate to="/dashboard" replace />; // redirect if logged in
+  // Signed in: go where they were heading (an invite link), else the dashboard.
+  if (status === "authed") return <Navigate to={safeNextPath(searchParams.get("next"))} replace />;
 
   // On an unreachable backend ("error"), fall through to the guest page rather
   // than bouncing to /dashboard — pairing that with AuthGuard's own failure

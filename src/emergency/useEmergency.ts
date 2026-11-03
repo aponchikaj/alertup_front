@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { EmergencyContext, type EmergencyContextValue } from "./EmergencyProvider";
+import { EmergencyContext, type EmergencyContextValue } from "./emergencyContext";
 
 /**
  * Emergency state for the current building. Returns null outside a provider,
